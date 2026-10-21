@@ -1,0 +1,39 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Android / Gradle
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+captures/
+
+# Xcode
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.build/
+
+# Unity
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Bb]uild/
+[Bb]uilds/
+
+# Flutter
+.dart_tool/
+.flutter-plugins*
+.packages
+
+# Secrets
+.env
+*.keystore
+*.jks

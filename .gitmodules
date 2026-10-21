@@ -1,0 +1,6 @@
+[submodule "sdks/meta-wearables-dat-android"]
+	path = sdks/meta-wearables-dat-android
+	url = https://github.com/facebook/meta-wearables-dat-android
+[submodule "sdks/meta-wearables-dat-ios"]
+	path = sdks/meta-wearables-dat-ios
+	url = https://github.com/facebook/meta-wearables-dat-ios
