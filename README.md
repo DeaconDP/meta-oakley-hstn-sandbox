@@ -26,7 +26,7 @@ notes/
 ## Getting started
 
 ```sh
-git clone --recurse-submodules <this repo>
+git clone --recurse-submodules https://github.com/DeaconDP/meta-oakley-hstn-sandbox
 # or, after a plain clone:
 git submodule update --init
 ```
@@ -45,3 +45,9 @@ git submodule update --init
 - https://github.com/facebook/meta-wearables-dat-android
 - https://github.com/facebook/meta-wearables-dat-ios
 - https://doc.photonengine.com/fusion/v2/industries-samples/fusion-meta-wearables-camera-streaming (Unity bridge reference)
+
+## Security
+
+This sandbox has no services and no secrets. Report a problem by opening a GitHub issue.
+
+Created by deac.online @ worldbuild.io
