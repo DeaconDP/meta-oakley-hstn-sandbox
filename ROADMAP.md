@@ -4,9 +4,11 @@
    - Mock: done 2026-10-21 (notes/baseline-android-mock.md).
    - Real HSTN: blocked on an Android 12+ phone and Developer Mode pairing.
 2. **Benchmark in each track**: build the same benchmark task (see notes/sdk-comparison.md) in android-native, then unity-bridge / flutter / ios-native as needed.
+   - android-native on mock: done 2026-10-22 (tracks/android-native/HstnBench, notes/bench-android-native.md). Still needs a real-HSTN run to confirm TTS reaches the glasses speakers over A2DP.
 3. **Pick a winner**: fill in the scorecard and commit to one track.
 4. **Build the actual idea** on the chosen track.
 
 ## Deferred
 - 2026-10-21: Real-HSTN baseline run. The only phone available is a Galaxy S7 (API 26), and the sample's minSdk is 31. `TODO.md:6`
 - 2026-10-21: Didn't check whether `GlassesModel` has an Oakley HSTN entry. The sample pairs only RAYBAN_META, which is fine for camera work. `sdks/meta-wearables-dat-android/samples/CameraAccess/app/src/main/java/com/meta/wearable/dat/externalsampleapps/cameraaccess/mockdevicekit/MockDeviceKitViewModel.kt:59`
+- 2026-10-22: Real-HSTN android-native benchmark and A2DP route check. Blocked on the same Android 12+ phone. `TODO.md`
