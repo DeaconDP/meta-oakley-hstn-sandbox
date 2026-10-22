@@ -7,5 +7,21 @@
 - [ ] Run CameraAccess against the real HSTN (needs both items above)
 - [x] Step-2 benchmark in android-native on the mock (2026-10-22, notes/bench-android-native.md)
 - [ ] Re-run `tracks/android-native/bench.sh` on a real phone + HSTN and confirm `route=a2dp`
-- [ ] Check which DAT 1.0 capabilities HSTN actually exposes (camera / mic / audio / IMU)
-- [ ] Decide whether the iOS track matters (needs the Mac)
+- [x] Check which DAT 1.0 capabilities HSTN actually exposes (2026-10-22, docs-level; see notes/hstn-capabilities.md. Real-hardware confirmation still open)
+- [x] Decide whether the iOS track matters (2026-10-22: yes. The Mac and the iPhone 13 Pro Max are ready, and the iPhone is a usable real-HSTN test phone; see tracks/ios-native/READINESS.md)
+- [ ] Step-2 benchmark in ios-native on the Simulator mock (copy the iOS CameraAccess sample, port the BenchClock/TTS timing)
+- [ ] Run CameraAccess / the iOS bench on the iPhone 13 Pro Max against the real HSTN (needs pairing + Developer Mode)
+- [ ] Step-2 benchmark in flutter on the mock (install Flutter SDK first; see tracks/flutter/FEASIBILITY.md)
+
+## Accessibility showcase (ROADMAP steps 4–8)
+- [x] Research: SDK→BLV mapping, prior art, perception stack (2026-10-22; notes/a11y-*.md)
+- [ ] Add a trigger→first-spoken-word metric (stream-frame grab → Claude Haiku 5.5 → streamed TTS) to HstnBench and the scorecard
+- [ ] Verify Anthropic retention / ZDR terms for image inputs from official docs (notes/a11y-perception-stack.md > Privacy)
+- [ ] Audio UX layer: earcons, verbosity levels, speech rate, barge-in, clause-chunked TTS queue, `USAGE_ASSISTANCE_ACCESSIBILITY` on Android
+- [ ] Session narrator demo (doff/fold/battery/thermal announcements + session rebuild), tested with Mock Device Kit
+- [ ] Read-aloud demo: ML Kit text recognition + framing guidance + uncertainty flags
+- [ ] Look-closer demo with "can't tell" behaviour and on-device face blur before upload
+- [ ] Low-vision magnifier view on the phone
+- [ ] Offline eval harness: Mock Device Kit `setCameraFeed`/`setCapturedImage` + VizWiz/TextVQA subset, replay mode for CI
+- [ ] TalkBack pass + WCAG 2.2 AA check of the companion UI
+- [ ] Mention the accessibility focus in README once the first demo runs
