@@ -7,7 +7,7 @@
 ## 1. Unity on this PC
 
 - **Hub**: Unity Hub 43.7.0 is in `C:\Program Files\Unity Hub`. The secondary install path is `C:\Work\Development\Unity\UnityEditors` (from `%APPDATA%\UnityHub\secondaryInstallPath.json`). `C:\Program Files\Unity\Hub\Editor` does not exist.
-- **The `unity` shim**: `%LOCALAPPDATA%NITY\bin\unity.exe` is not an editor. It is the **Unity CLI 1.0.0-beta.8**, installed by Hub on 2026-09-23 (`%APPDATA%\UnityHub\cli-install.json`). Its commands include `editors`, `install`, `install-modules`, `build` (runs the editor in batch mode) and `doctor`. `unity editors --json` lists installed editors with their modules. Entries without a `location` are releases you could install, not installed ones.
+- **The `unity` shim**: `%LOCALAPPDATA%\Unity\bin\unity.exe` is not an editor. It is the **Unity CLI 1.0.0-beta.8**, installed by Hub on 2026-09-23 (`%APPDATA%\UnityHub\cli-install.json`). Its commands include `editors`, `install`, `install-modules`, `build` (runs the editor in batch mode) and `doctor`. `unity editors --json` lists installed editors with their modules. Entries without a `location` are releases you could install, not installed ones.
 - **`%LOCALAPPDATA%\Unity`**: holds only caches, licensing logs and old per-version preference folders (2018.3, 2018.4, 2019.1). There are no editors there.
 - **Installed editors** (from `PlaybackEngines/AndroidPlayer` on disk):
 
