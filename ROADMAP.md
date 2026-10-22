@@ -44,6 +44,7 @@
    - Accessible phone UI: large trigger buttons, settings, a WCAG 2.2 AA pass, and TalkBack/VoiceOver tests.
 5. **Showcase demos, GA-only (shippable)**
    - **Read it aloud (word for word)**: on-device OCR with spoken framing guidance ("move left", "text cut off on the right"), next/previous sentence, and uncertain words flagged. Refuses on doses and money it can't verify.
+   - **Book reader** (extends Read it aloud): reads a printed book page by page. It detects page turns, splits two-page spreads, drops headers and page numbers, and captures the next page while the current one is spoken. A resolution experiment comes first, because FULL photo is Experimental and the GA stream may be too low-res for book print. (notes/book-reader.md)
    - **Look closer**: on-demand description from a cloud model, Claude Haiku 5.5 by default. Sonnet 5.5 is used for a "detailed look" that captures a photo after a spoken "hold still". It says "can't tell" instead of guessing.
    - **Low-vision magnifier**: the glasses camera full-screen on the phone with zoom, high-contrast and invert filters, and freeze frame.
 6. **Hands-free and spatial demos, experimental (dev/beta only)**

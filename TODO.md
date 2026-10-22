@@ -20,6 +20,8 @@
 - [ ] Audio UX layer: earcons, verbosity levels, speech rate, barge-in, clause-chunked TTS queue, `USAGE_ASSISTANCE_ACCESSIBILITY` on Android
 - [ ] Session narrator demo (doff/fold/battery/thermal announcements + session rebuild), tested with Mock Device Kit
 - [ ] Read-aloud demo: ML Kit text recognition + framing guidance + uncertainty flags
+- [ ] Book-reader resolution experiment: ~20 book pages through the mock at stream LOW/MEDIUM/HIGH and photo LARGE/FULL, ML Kit OCR, CER per setting (notes/book-reader.md > Experiment)
+- [ ] Book-reader demo: page-turn detection, spread split, header/page-number removal, pipelined capture during TTS, fold-as-bookmark
 - [ ] Look-closer demo with "can't tell" behaviour and on-device face blur before upload
 - [ ] Low-vision magnifier view on the phone
 - [ ] Offline eval harness: Mock Device Kit `setCameraFeed`/`setCapturedImage` + VizWiz/TextVQA subset, replay mode for CI
