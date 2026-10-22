@@ -45,7 +45,7 @@ https://github.com/rodcone/flutter_meta_wearables_dat/issues
 
 ## This PC
 - **Flutter/Dart: not installed.** Not on PATH. Not found in C:\flutter, C:\src\flutter, C:\tools\flutter, ~\flutter, scoop, chocolatey, WinGet or fvm. `%LOCALAPPDATA%\Pub\Cache` exists with leftovers from an old RustDesk build, but there's no SDK.
-- Android SDK: `C:/Users/deaco/AppData/Local/Android/Sdk` (from `HstnBench/local.properties`). It has platforms android-33/35/36 (36 is needed for compileSdk 36), build-tools 34–36, NDK 27.x and the emulator.
+- Android SDK: `%LOCALAPPDATA%/Android/Sdk` (from `HstnBench/local.properties`). It has platforms android-33/35/36 (36 is needed for compileSdk 36), build-tools 34–36, NDK 27.x and the emulator.
 - AVD `HSTN_Mock_API34` exists. JDK 17 and 21 are on PATH.
 - Setup still needed: Flutter stable SDK (about 2 GB, `winget install Google.Flutter` or a git clone), then `flutter doctor --android-licenses`.
 
