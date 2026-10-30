@@ -47,10 +47,32 @@ struct CameraNarration: ViewModifier {
 }
 
 extension View {
-  /// VoiceOver custom actions (swipe up/down on any camera-screen element): hear the status line,
-  /// or hear the last spoken line again.
+  /// VoiceOver custom actions (swipe up/down on any camera-screen element): read the text in
+  /// view, hear the status line, or hear the last spoken line again. While there is something
+  /// read, also next / previous / repeat sentence, and stop while reading.
   func cameraQuickActions(status: @escaping () -> Void) -> some View {
-    accessibilityAction(named: "Status", status)
+    modifier(CameraQuickActions(status: status))
+  }
+}
+
+private struct CameraQuickActions: ViewModifier {
+  let status: () -> Void
+
+  func body(content: Content) -> some View {
+    let reader = TextReader.shared
+    content
+      .accessibilityAction(named: "Read text") { reader.read() }
+      .accessibilityAction(named: "Status", status)
       .accessibilityAction(named: "Repeat last") { Announcer.shared.repeatLast() }
+      .accessibilityActions {
+        if reader.hasSentences {
+          Button("Next sentence") { reader.next() }
+          Button("Previous sentence") { reader.previous() }
+          Button("Repeat sentence") { reader.repeatSentence() }
+        }
+        if reader.isActive {
+          Button("Stop reading") { reader.stop() }
+        }
+      }
   }
 }

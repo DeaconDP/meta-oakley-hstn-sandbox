@@ -19,6 +19,10 @@
 // 60 pt target and Dynamic Type text. At accessibility text sizes the controls stack vertically
 // in a scroll view instead of overlaying the preview.
 //
+// "Read it aloud" (TextReader): a Read control next to Take photo, a reading card above the
+// controls while there is something read, and the reader's actions on every element's VoiceOver
+// actions. The view model is the reader's frame source while this screen is up.
+//
 
 import MWDATCore
 import SwiftUI
@@ -161,8 +165,16 @@ struct CameraView: View {
       LaunchActionRouter.shared.statusProvider = { [viewModel, wearablesVM] in
         viewModel.statusLine(updateRequired: wearablesVM.requiresFirmwareUpdate)
       }
+      TextReader.shared.source = viewModel
     }
-    .onDisappear { LaunchActionRouter.shared.statusProvider = nil }
+    .onDisappear {
+      LaunchActionRouter.shared.statusProvider = nil
+      let reader = TextReader.shared
+      if reader.source === viewModel {
+        if reader.isActive { reader.stop() }
+        reader.source = nil
+      }
+    }
     .navigationBarHidden(true)
   }
 
@@ -185,9 +197,15 @@ struct CameraView: View {
 
   /// Magic Tap: take a photo while the camera is on, otherwise the next step towards that. When
   /// nothing can be done from here (a wait, glasses missing, paused), says the status instead.
+  /// While the reader is reading (or working towards it), it stops it instead: Magic Tap is
+  /// iOS's play/pause gesture, and a photo mid-sentence would cut the reading anyway.
   private func performPrimaryAction() {
     if viewModel.activePreview != nil {
       viewModel.dismissCapturePreview()
+      return
+    }
+    if TextReader.shared.isActive {
+      TextReader.shared.stop()
       return
     }
     if viewModel.isBusy || isUpdateRequired {
@@ -211,6 +229,7 @@ struct CameraView: View {
   private func runLaunchAction(_ action: LaunchAction?) {
     switch action {
     case .look: performPrimaryAction()
+    case .read: TextReader.shared.read()
     case .status: speakStatus()
     case .repeatLast: Announcer.shared.repeatLast()
     case nil: break
@@ -516,6 +535,9 @@ struct CameraView: View {
       if isUpdateRequired {
         updateControls
       } else {
+        if TextReader.shared.phase != .idle {
+          ReadPanel(isLargeText: isLargeText, onStatus: speakStatus)
+        }
         // Reserved capture-row space + a single persistent button hold the button at
         // a fixed Y across every state.
         captureRow
@@ -538,6 +560,7 @@ struct CameraView: View {
           HStack(spacing: 10) {
             previewPill(compact: true)
             photoButton(compact: true)
+            readButton(compact: true)
             recordPill(compact: true)
             micToggle(compact: true)
           }
@@ -555,6 +578,7 @@ struct CameraView: View {
     VStack(spacing: 10) {
       previewPill(compact: false)
       photoButton(compact: false)
+      readButton(compact: false)
       recordPill(compact: false)
       micToggle(compact: false)
     }
@@ -583,6 +607,24 @@ struct CameraView: View {
     .accessibilityIdentifier("capture_button")
     .accessibilityLabel("Take photo")
     .accessibilityHint(captureControlsEnabled ? "" : "Available when the preview is on.")
+    .cameraQuickActions(status: speakStatus)
+    .disabled(!captureControlsEnabled)
+    .opacity(captureControlsEnabled ? 1 : 0.4)
+  }
+
+  /// Read text aloud, word for word: an icon beside Take photo in the row, a labelled row when
+  /// stacked. Needs the live stream, like Take photo. (VoiceOver's "Read text" action and Siri also
+  /// work before the preview is on: they start it first.)
+  private func readButton(compact: Bool) -> some View {
+    Button {
+      TextReader.shared.read()
+    } label: {
+      ControlLabel(icon: "text.viewfinder", title: compact ? nil : "Read text")
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("read_button")
+    .accessibilityLabel("Read text")
+    .accessibilityHint(captureControlsEnabled ? "Reads the text in front of you aloud, word for word." : "Available when the preview is on.")
     .cameraQuickActions(status: speakStatus)
     .disabled(!captureControlsEnabled)
     .opacity(captureControlsEnabled ? 1 : 0.4)
@@ -740,7 +782,7 @@ struct CameraView: View {
 /// Shared look for the capture controls: icon, optional text, a near-opaque dark fill (text
 /// contrast over any frame) and a light outline (boundary contrast over dark frames), at least
 /// 60 pt tall. Icon-only renders as a 60 pt circle.
-private struct ControlLabel: View {
+struct ControlLabel: View {
   let icon: String
   var title: String?
   var iconTint: Color = .white

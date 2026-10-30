@@ -2,12 +2,17 @@
 # Step-2 benchmark: runs the mock pair -> session -> stream -> photo -> TTS flow N times in the iOS
 # Simulator and prints the HstnBench timing lines. Run on the Mac, from this directory.
 # Usage: ./bench.sh [runs]
+#        BENCH_READ=1 ./bench.sh [runs]   also runs the "Read it aloud" test each run, adding
+#                                        trigger_to_first_word, ocr, frame_age and read_photo.
 # It uses its own simulator ("HstnBench iPhone 17") so it never touches other booted simulators.
 set -e
 RUNS="${1:-5}"
 SIM_NAME="${SIM_NAME:-HstnBench iPhone 17}"
 DERIVED="${DERIVED:-$HOME/Library/Developer/HstnBench/DerivedData}"
-TEST="CameraAccessUITests/CameraAccessUITests/testPhotoCaptureAndDismiss"
+TESTS="-only-testing:CameraAccessUITests/CameraAccessUITests/testPhotoCaptureAndDismiss"
+if [ "${BENCH_READ:-0}" = "1" ]; then
+  TESTS="$TESTS -only-testing:CameraAccessUITests/ReadAloudUITests/testReadAloud"
+fi
 FAILS=0
 cd "$(dirname "$0")/HstnBench"
 
@@ -29,7 +34,7 @@ SINCE=$(date '+%Y-%m-%d %H:%M:%S')
 for i in $(seq 1 "$RUNS"); do
   xcrun simctl bootstatus "$UDID" -b >/dev/null
   if xcodebuild test-without-building -project CameraAccess.xcodeproj -scheme CameraAccess \
-    -destination "$DEST" -derivedDataPath "$DERIVED" -only-testing:"$TEST" \
+    -destination "$DEST" -derivedDataPath "$DERIVED" $TESTS \
     -parallel-testing-enabled NO -collect-test-diagnostics never -quiet >/dev/null 2>&1; then
     echo "run $i: OK"
   else

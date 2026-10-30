@@ -17,6 +17,8 @@ import Observation
 enum LaunchAction: String, Sendable, CaseIterable {
   /// Take a photo and describe it with the current pipeline.
   case look
+  /// Read the text in view aloud, word for word (TextReader).
+  case read
   /// Speak the one-line readiness status ("Ready.", "Glasses aren't connected...").
   case status
   /// Repeat the last spoken line.

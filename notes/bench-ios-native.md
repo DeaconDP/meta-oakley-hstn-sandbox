@@ -24,3 +24,16 @@ A second batch of 5, run after the `AudioInputHandler` fix, gave medians of 19, 
 - `bench.sh` passes `-collect-test-diagnostics never`. A runtime warning made xcodebuild run a sysdiagnose after every test, about 10 minutes per run against a 30 s test.
 - `TtsReply` does its audio-session work on a serial queue (that was the main-thread warning) and caches the voice. It ducks other audio and deactivates after each reply, so music on the glasses comes back instead of being cut off for good. It also always sets `.playback` unless a recording is running. Before this, a finished recording left the session at play-and-record, so every later reply would have gone over HFP (mono, call quality) instead of A2DP.
 - `AudioInputHandler` (upstream sample code) read `audioEngine.inputNode` on every recording, even without a glasses mic. On the Simulator that stalled the audio server and the app aborted with an RPC timeout, so `testPhotoCaptureWhileRecording` crashed on the original code too. It now touches the input node only when the glasses HFP mic is active. It removes its tap even if the engine never started, and it releases the session after video-only recordings. Full suite: 21/21 pass (17 UI, 4 unit).
+
+## Read it aloud: trigger → first spoken word (added 2026-10-30, not measured yet)
+
+`BENCH_READ=1 ./bench.sh` also runs `ReadAloudUITests/testReadAloud`, which feeds the mock a printed page (`A11y/Read/Fixtures/read_page.mp4` / `.png`, made by `tools/make-read-fixtures.swift`) and presses Read. New metric lines, same `metric=… ms=…` layout:
+
+| Metric | What it measures |
+|---|---|
+| trigger_to_first_word | Read trigger → `didStart` of the first spoken line (detail `first=text\|guidance\|photo_notice\|starting_camera`, `source=frame\|photo`, `route=`). Target ≤ 1.5 s (ROADMAP phase 2) |
+| ocr | Vision `VNRecognizeTextRequest` (`.accurate`, language correction on) alone |
+| frame_age | Age of the stream frame handed to OCR (the latest decoded frame, not `capturePhoto`) |
+| read_photo | `capturePhoto` for reading, only when there is no frame from the last second or the text is too small in it |
+
+No numbers yet: on 2026-10-30, after a CoreSimulator update, the mock session would not start in any UI test on this Mac, `testPhotoCaptureAndDismiss` on unchanged HEAD included, so neither test could run. The real Vision pass over the fixture does run in the unit tests (`ReadFixtureOCRTests`) and reads the page in order.

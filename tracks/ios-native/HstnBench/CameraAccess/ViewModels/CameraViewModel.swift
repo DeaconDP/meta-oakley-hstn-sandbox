@@ -75,6 +75,11 @@ final class CameraViewModel {
   var currentVideoFrame: UIImage?
   var hasReceivedFirstFrame: Bool = false
 
+  /// The most recent decoded stream frame and when it arrived, for "Read it aloud". Unlike
+  /// `currentVideoFrame` it keeps updating while a capture preview is up, and it isn't observed,
+  /// so ~24 updates a second don't re-render anything.
+  @ObservationIgnored private(set) var latestReadFrame: ReadFrame?
+
   /// The stream's state, mirrored from `Stream.statePublisher`. `.stopped` means
   /// no live stream.
   var streamState: StreamState = .stopped
@@ -199,6 +204,12 @@ final class CameraViewModel {
   /// Bumped per recording start, so a slow stop of an older recording doesn't release the audio
   /// session while a newer one owns it.
   @ObservationIgnored private var recordingGeneration = 0
+  /// A startStreaming() call is between its permission check and adding the camera, so a
+  /// second caller (the reader nudging the stream along) doesn't start another one.
+  @ObservationIgnored private(set) var isStreamStartInFlight = false
+  /// Waiting for an in-stream photo taken for reading (no preview sheet, no photo reply).
+  @ObservationIgnored private var readPhotoContinuation: CheckedContinuation<UIImage?, Never>?
+  @ObservationIgnored private var readPhotoToken = 0
 
   @ObservationIgnored private let photoCaptureFailureMessage =
     "Couldn't capture photo. There may not be enough storage, or another capture is in progress. Try again in a few moments."
@@ -273,7 +284,9 @@ final class CameraViewModel {
       showError(.plain(SpokenMessage.startSessionFirst, action: hasSession ? nil : .startSession))
       return
     }
-    guard camera == nil else { return }
+    guard camera == nil, !isStreamStartInFlight else { return }
+    isStreamStartInFlight = true
+    defer { isStreamStartInFlight = false }
 
     do {
       let status = try await wearables.checkPermissionStatus(.camera)
@@ -379,6 +392,38 @@ final class CameraViewModel {
       isCapturingPhoto = false
       showError(photoCaptureFailureMessage)
     }
+  }
+
+  /// An in-stream photo for "Read it aloud": the reader gets the image, and nothing else happens
+  /// (no preview sheet, no "Photo captured" reply, no capture_to_photo metric). Times out after
+  /// 8 s; nil on any failure.
+  func captureStillForReading() async -> UIImage? {
+    guard isStreaming, !isCapturingPhoto, readPhotoContinuation == nil, let camera else { return nil }
+    isCapturingPhoto = true
+    EarconPlayer.shared.play(.capturing)
+    benchClock.start("read_photo")
+    guard camera.stream.capturePhoto(format: .jpeg) else {
+      isCapturingPhoto = false
+      return nil
+    }
+    readPhotoToken += 1
+    let token = readPhotoToken
+    return await withCheckedContinuation { continuation in
+      readPhotoContinuation = continuation
+      Task { [weak self] in
+        try? await Task.sleep(for: .seconds(8))
+        self?.resolveReadPhoto(nil, token: token)
+      }
+    }
+  }
+
+  /// Hands the read photo (or nil) to the waiting reader. `token` limits a timeout to its own
+  /// request.
+  private func resolveReadPhoto(_ image: UIImage?, token: Int? = nil) {
+    guard let continuation = readPhotoContinuation, token.map({ $0 == readPhotoToken }) ?? true else { return }
+    readPhotoContinuation = nil
+    isCapturingPhoto = false
+    continuation.resume(returning: image)
   }
 
   func toggleRecording() {
@@ -603,6 +648,7 @@ final class CameraViewModel {
 
     stream.videoFramePublisher.listen { [weak self] frame in
       guard let self else { return }
+      let arrivedAt = BenchClock.uptimeNanoseconds()
 
       if self.awaitingFirstFrame.take() {
         self.benchClock.end("stream_to_first_frame", detail: "size=\(Self.frameSize(frame))")
@@ -617,6 +663,9 @@ final class CameraViewModel {
 
       Task { @MainActor [weak self] in
         guard let self else { return }
+        if UIApplication.shared.applicationState != .background, let image = previewImage {
+          self.latestReadFrame = ReadFrame(image: image, arrivedAt: arrivedAt)
+        }
         // Keep the live surface stable while a capture preview is onscreen.
         if UIApplication.shared.applicationState != .background,
           activePreview == nil,
@@ -667,6 +716,8 @@ final class CameraViewModel {
     streamState = .stopped
     currentVideoFrame = nil
     hasReceivedFirstFrame = false
+    latestReadFrame = nil
+    resolveReadPhoto(nil)
   }
 
   /// Appends a frame to the recorder. `nonisolated` so it keeps writing while the
@@ -679,10 +730,24 @@ final class CameraViewModel {
     // Same bounded suppression window as `handleSessionError`: hide only the
     // expected teardown noise from an intentional background-driven stop.
     guard !isStoppingForBackground else { return }
+    // A failed photo for reading is the reader's to say ("The photo for reading wasn't taken").
+    if case .photoCaptureFailed = error, readPhotoContinuation != nil {
+      resolveReadPhoto(nil)
+      return
+    }
     showError(.stream(error))
   }
 
   private func handlePhotoData(_ data: PhotoData) {
+    if readPhotoContinuation != nil {
+      let image = UIImage(data: data.data)
+      if let image {
+        let pixels = image.size.applying(CGAffineTransform(scaleX: image.scale, y: image.scale))
+        benchClock.end("read_photo", detail: "size=\(Int(pixels.width))x\(Int(pixels.height))")
+      }
+      resolveReadPhoto(image)
+      return
+    }
     isCapturingPhoto = false
     if let image = UIImage(data: data.data) {
       let pixels = image.size.applying(CGAffineTransform(scaleX: image.scale, y: image.scale))

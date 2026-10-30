@@ -38,6 +38,11 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   /// interrupt or stop(), dropped (empty text), or the engine reported a cancel.
   typealias Completion = @MainActor (_ finished: Bool) -> Void
 
+  /// Called once when a line starts being heard, with the uptime (DispatchTime nanoseconds) of
+  /// the synthesizer's did-start callback, or of handing it to VoiceOver. Not called for a line
+  /// that is cut before it starts. Used to time "trigger to first spoken word".
+  typealias StartHandler = @MainActor (_ startedAt: UInt64) -> Void
+
   /// Where a line is spoken. Pure, so the routing rule is unit-testable.
   enum Output: Equatable, Sendable {
     case voiceOver
@@ -74,6 +79,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
     let earcon: Earcon?
     /// VoiceOver only: cut VoiceOver's current speech instead of queueing behind it.
     let interruptVoiceOver: Bool
+    var onStart: StartHandler? = nil
     let onFinish: Completion?
   }
 
@@ -87,6 +93,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   @ObservationIgnored private var waiterToken = 0
   @ObservationIgnored private var currentUtteranceTag: Int?
   @ObservationIgnored private var currentAnnouncement: String?
+  @ObservationIgnored private var currentOnStart: StartHandler?
   @ObservationIgnored private var nextTag = 0
   /// Whether this class holds A11yAudioSession's speech hold (balanced begin/end).
   @ObservationIgnored private var holdsSession = false
@@ -108,17 +115,26 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   /// Speaks `text`. `interrupt: true` cuts whatever the app is saying or has queued (and, for
   /// VoiceOver announcements, VoiceOver's current speech). `interrupt: false` waits until every
   /// line before it, including a pending announce() earcon, has finished.
-  func say(_ text: String, kind: AnnouncementKind = .status, interrupt: Bool = true, onFinish: Completion? = nil) {
-    enqueue(Line(text: text, kind: kind, earcon: nil, interruptVoiceOver: interrupt, onFinish: onFinish), interrupt: interrupt)
+  /// `onFinish` comes before `onStart` so a trailing closure stays the completion.
+  func say(
+    _ text: String, kind: AnnouncementKind = .status, interrupt: Bool = true, onFinish: Completion? = nil,
+    onStart: StartHandler? = nil
+  ) {
+    enqueue(
+      Line(text: text, kind: kind, earcon: nil, interruptVoiceOver: interrupt, onStart: onStart, onFinish: onFinish),
+      interrupt: interrupt)
   }
 
   /// Plays `earcon`, then speaks `text` once the tone has finished, so they don't overlap. Queues
   /// like say(): with `interrupt: false` the earcon too waits for the lines before it.
   /// With earcons off (or `earcon` nil) this is just say().
   func announce(
-    _ text: String, earcon: Earcon?, kind: AnnouncementKind = .status, interrupt: Bool = true, onFinish: Completion? = nil
+    _ text: String, earcon: Earcon?, kind: AnnouncementKind = .status, interrupt: Bool = true,
+    onFinish: Completion? = nil, onStart: StartHandler? = nil
   ) {
-    enqueue(Line(text: text, kind: kind, earcon: earcon, interruptVoiceOver: interrupt, onFinish: onFinish), interrupt: interrupt)
+    enqueue(
+      Line(text: text, kind: kind, earcon: earcon, interruptVoiceOver: interrupt, onStart: onStart, onFinish: onFinish),
+      interrupt: interrupt)
   }
 
   /// Barge-in: stops the app's own voice immediately and drops everything queued, calling their
@@ -158,7 +174,10 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
     }
     if interrupt { cancelAll() }
     lastSpoken = text
-    queue.append(Line(text: text, kind: line.kind, earcon: line.earcon, interruptVoiceOver: line.interruptVoiceOver, onFinish: line.onFinish))
+    queue.append(
+      Line(
+        text: text, kind: line.kind, earcon: line.earcon, interruptVoiceOver: line.interruptVoiceOver, onStart: line.onStart,
+        onFinish: line.onFinish))
     if runner == nil {
       let myGeneration = generation
       runner = Task { await runQueue(generation: myGeneration) }
@@ -199,6 +218,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
       currentAnnouncement = line.text
       return await waitForEnd(timeout: Self.voiceOverTimeout(for: line.text)) {
         UIAccessibility.post(notification: .announcement, argument: announcement)
+        line.onStart?(DispatchTime.now().uptimeNanoseconds)
       }
     case .ownVoice(let prefersAssistive):
       if !holdsSession {
@@ -217,6 +237,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
         utterance.rate = preferences.speechRate
       }
       currentUtteranceTag = utterance.tag
+      currentOnStart = line.onStart
       return await waitForEnd(timeout: nil) { synthesizer.speak(utterance) }
     }
   }
@@ -241,6 +262,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   private func finishCurrent(_ finished: Bool) {
     currentUtteranceTag = nil
     currentAnnouncement = nil
+    currentOnStart = nil
     waiterToken += 1
     let pending = waiter
     waiter = nil
@@ -288,6 +310,12 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
     }
   }
 
+  private func utteranceStarted(tag: Int, at startedAt: UInt64) {
+    guard tag == currentUtteranceTag, let onStart = currentOnStart else { return }
+    currentOnStart = nil
+    onStart(startedAt)
+  }
+
   private func utteranceEnded(tag: Int, finished: Bool) {
     guard tag == currentUtteranceTag else { return }
     finishCurrent(finished)
@@ -299,6 +327,13 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   }
 
   // MARK: AVSpeechSynthesizerDelegate
+
+  nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+    // Timestamped here, before the hop to the main actor, so the hop isn't counted.
+    let startedAt = DispatchTime.now().uptimeNanoseconds
+    guard let tag = (utterance as? TaggedUtterance)?.tag else { return }
+    Task { @MainActor in self.utteranceStarted(tag: tag, at: startedAt) }
+  }
 
   nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
     guard let tag = (utterance as? TaggedUtterance)?.tag else { return }
