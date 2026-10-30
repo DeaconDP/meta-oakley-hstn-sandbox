@@ -17,7 +17,7 @@ A second batch of 5, run after the `AudioInputHandler` fix, gave medians of 19, 
 - These are mock numbers, same as Android. They say nothing yet about Bluetooth/Wi-Fi transport on real glasses.
 - Against the Android emulator: session, first frame, and capture are about 10x faster, and `tts_to_audio_start` about 2.5x. `tts_total` is slower (1986 vs 1369 ms), probably because of a different voice and speaking rate. Most of the gap is the emulator, not the platform, so don't read it as an iOS-vs-Android result until both run on real hardware.
 - TTS played on the Mac (`route=phone`) because the Simulator has no A2DP sink. Glasses-speaker routing still needs a real HSTN.
-- `tts_to_audio_start` includes activating the audio session, since the reply now releases the session after every utterance.
+- `tts_to_audio_start` includes activating the audio session when it isn't already up. Since 2026-10-30 the session is shared with the accessibility earcons and announcer (`A11yAudioSession`) and released about 2 s after the last sound, so a reply right after an earcon skips activation. Re-run the bench before comparing against the table above.
 
 ## Fixes made while getting here
 
