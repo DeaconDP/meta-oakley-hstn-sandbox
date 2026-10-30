@@ -589,7 +589,7 @@ final class CameraViewModel {
     if let image = UIImage(data: data.data) {
       let pixels = image.size.applying(CGAffineTransform(scaleX: image.scale, y: image.scale))
       benchClock.end("capture_to_photo", detail: "size=\(Int(pixels.width))x\(Int(pixels.height))")
-      ttsReply.speak("Photo captured.")
+      ttsReply.speak("Photo captured.", isRecording: isRecording)
       activePreview = .photo(image)
     }
   }

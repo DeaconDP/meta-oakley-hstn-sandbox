@@ -8,6 +8,7 @@ RUNS="${1:-5}"
 SIM_NAME="${SIM_NAME:-HstnBench iPhone 17}"
 DERIVED="${DERIVED:-$HOME/Library/Developer/HstnBench/DerivedData}"
 TEST="CameraAccessUITests/CameraAccessUITests/testPhotoCaptureAndDismiss"
+FAILS=0
 cd "$(dirname "$0")/HstnBench"
 
 UDID=$(xcrun simctl list devices available | grep -F "$SIM_NAME (" | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
@@ -22,20 +23,39 @@ xcodebuild build-for-testing -project CameraAccess.xcodeproj -scheme CameraAcces
   -destination "$DEST" -derivedDataPath "$DERIVED" -quiet
 
 SINCE=$(date '+%Y-%m-%d %H:%M:%S')
+# Diagnostics collection (a sysdiagnose) adds about 10 minutes per run, so it's off.
 # Parallel testing runs on throwaway simulator clones, where the photo step fails, so run serially.
 # xcodebuild can leave the simulator shut down, so boot it before every run.
 for i in $(seq 1 "$RUNS"); do
   xcrun simctl bootstatus "$UDID" -b >/dev/null
   if xcodebuild test-without-building -project CameraAccess.xcodeproj -scheme CameraAccess \
     -destination "$DEST" -derivedDataPath "$DERIVED" -only-testing:"$TEST" \
-    -parallel-testing-enabled NO -quiet >/dev/null 2>&1; then
+    -parallel-testing-enabled NO -collect-test-diagnostics never -quiet >/dev/null 2>&1; then
     echo "run $i: OK"
   else
     echo "run $i: FAIL"
+    FAILS=$((FAILS + 1))
   fi
   sleep 3
 done
 
 xcrun simctl bootstatus "$UDID" -b >/dev/null
-xcrun simctl spawn "$UDID" log show --start "$SINCE" --style compact \
-  --predicate 'subsystem == "com.deaco.hstnbench"' | grep -oE '(metric=|tts_).*'
+LINES=$(xcrun simctl spawn "$UDID" log show --start "$SINCE" --style compact \
+  --predicate 'subsystem == "com.deaco.hstnbench"' 2>/dev/null | grep -oE '(metric=|tts_).*' || true)
+echo "$LINES"
+
+# n, min, median, and max per metric.
+echo
+printf "%-24s %3s %6s %6s %6s\n" metric n min median max
+echo "$LINES" | awk '
+  /^metric=/ { split($1, m, "="); split($2, t, "="); v[m[2]] = v[m[2]] " " t[2] }
+  END {
+    for (k in v) {
+      n = split(substr(v[k], 2), a, " ")
+      for (i = 2; i <= n; i++) { x = a[i]; for (j = i - 1; j >= 1 && a[j] + 0 > x + 0; j--) a[j + 1] = a[j]; a[j + 1] = x }
+      med = (n % 2) ? a[(n + 1) / 2] : (a[n / 2] + a[n / 2 + 1]) / 2
+      printf "%-24s %3d %6d %6d %6d\n", k, n, a[1], med, a[n]
+    }
+  }' | sort
+
+[ "$FAILS" -eq 0 ] || { echo "$FAILS of $RUNS runs failed" >&2; exit 1; }
