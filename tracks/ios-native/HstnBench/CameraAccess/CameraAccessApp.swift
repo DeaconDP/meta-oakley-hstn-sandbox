@@ -14,6 +14,9 @@
 // stream live video from their cameras, and capture photos. It provides a complete example
 // of DAT SDK integration including device registration, permissions, and media streaming.
 //
+// HstnBench: errors get a specific title, a spoken sentence with an earcon (WearablesViewModel
+// .present), and one action where there is one, instead of a generic "Something went wrong".
+//
 
 import Foundation
 import MWDATCore
@@ -60,6 +63,13 @@ struct CameraAccessApp: App {
     }
     #endif
 
+    // A test that asks for onboarding gets it from the first step, whatever an earlier run saved.
+    if LaunchOptions.isUITesting, LaunchOptions.forcesOnboarding {
+      A11yPreferences.shared.resetOnboarding()
+    }
+    // Render the earcons now, so the first tone doesn't wait on engine setup.
+    EarconPlayer.shared.prepare()
+
     let wearables = Wearables.shared
     self.wearables = wearables
     self._wearablesViewModel = State(wrappedValue: WearablesViewModel(wearables: wearables))
@@ -70,13 +80,28 @@ struct CameraAccessApp: App {
       // Main app view with access to the shared Wearables SDK instance
       // The Wearables.shared singleton provides the core DAT API
       MainAppView(wearables: Wearables.shared, viewModel: wearablesViewModel)
-        // Show error alerts for view model failures
-        .alert("Something went wrong", isPresented: $wearablesViewModel.showError) {
-          Button("OK") {
-            wearablesViewModel.dismissError()
+        // Registration and update failures: the title says what happened, the message is the
+        // spoken sentence, and the action (if any) is the one next step.
+        .alert(wearablesViewModel.errorTitle, isPresented: $wearablesViewModel.showError) {
+          if let action = wearablesViewModel.errorAction {
+            Button(action.title) {
+              wearablesViewModel.performErrorAction()
+            }
+            Button("Not now", role: .cancel) {
+              wearablesViewModel.dismissError()
+            }
+          } else {
+            Button("OK", role: .cancel) {
+              wearablesViewModel.dismissError()
+            }
           }
         } message: {
           Text(wearablesViewModel.errorMessage)
+        }
+        // Handles the callbacks from Meta AI, the scene phase for the registration timeout, and
+        // registration requests that Meta AI starts.
+        .background {
+          RegistrationView(viewModel: wearablesViewModel)
         }
         #if DEBUG
       .sheet(isPresented: $showDebugMenu) {
@@ -86,9 +111,6 @@ struct CameraAccessApp: App {
         DebugMenuView(showDebugMenu: $showDebugMenu)
       }
         #endif
-
-      // Registration view handles the flow for connecting to the glasses via Meta AI
-      RegistrationView(viewModel: wearablesViewModel)
     }
   }
 }

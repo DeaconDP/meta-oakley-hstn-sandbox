@@ -18,24 +18,58 @@ struct CircleButton: View {
   let icon: String
   let text: String?
   let action: () -> Void
+  /// VoiceOver name for an icon-only button (the SF Symbol name would be read otherwise).
+  let accessibilityLabel: String?
+
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+  init(icon: String, text: String?, accessibilityLabel: String? = nil, action: @escaping () -> Void) {
+    self.icon = icon
+    self.text = text
+    self.accessibilityLabel = accessibilityLabel
+    self.action = action
+  }
 
   var body: some View {
     Button(action: action) {
-      if let text {
+      if let text, dynamicTypeSize.isAccessibilitySize {
+        // Large text doesn't fit a circle: a capsule that grows with the text instead.
+        HStack(spacing: 8) {
+          Image(systemName: icon)
+            .accessibilityHidden(true)
+          Text(text)
+        }
+        .font(.headline)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .frame(minWidth: 60, minHeight: 60)
+        .background(.white, in: Capsule())
+      } else if let text {
         VStack(spacing: 2) {
           Image(systemName: icon)
-            .font(.system(size: 14))
+            .font(.system(size: 16))
+            .accessibilityHidden(true)
           Text(text)
-            .font(.system(size: 10, weight: .medium))
+            .font(.system(size: 11, weight: .semibold))
         }
+        .frame(width: 60, height: 60)
+        .background(.white, in: Circle())
       } else {
         Image(systemName: icon)
-          .font(.system(size: 16))
+          .font(.system(size: 20, weight: .semibold))
+          .frame(width: 60, height: 60)
+          .background(.white, in: Circle())
       }
     }
     .foregroundStyle(.black)
-    .frame(width: 56, height: 56)
-    .background(.white)
-    .clipShape(Circle())
+    // Dark outline: the white button stays distinct over a bright photo (3:1 boundary).
+    .overlay {
+      if text == nil || !dynamicTypeSize.isAccessibilitySize {
+        Circle().strokeBorder(Color.black.opacity(0.6), lineWidth: 1.5)
+      } else {
+        Capsule().strokeBorder(Color.black.opacity(0.6), lineWidth: 1.5)
+      }
+    }
+    .accessibilityLabel(accessibilityLabel ?? text ?? icon)
   }
 }

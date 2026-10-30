@@ -12,6 +12,11 @@
 // Welcome screen that guides users through the DAT SDK registration process.
 // This view is displayed when the app is not yet registered.
 //
+// HstnBench: made usable with VoiceOver and low vision (notes/a11y-onboarding.md): icons are
+// decorative, text uses Dynamic Type styles at 4.5:1 or better in light and dark mode, the page
+// scrolls instead of truncating at large sizes, the button is 60 pt tall, and the Meta AI handoff
+// is explained before it happens. Outcomes of connecting are spoken by WearablesViewModel.
+//
 
 import MWDATCore
 import SwiftUI
@@ -19,56 +24,98 @@ import SwiftUI
 struct HomeScreenView: View {
   var viewModel: WearablesViewModel
 
+  @ScaledMetric(relativeTo: .largeTitle) private var logoWidth: CGFloat = 120
+
   var body: some View {
-    ZStack {
-      Color.white.edgesIgnoringSafeArea(.all)
-
-      VStack(spacing: 12) {
-        Spacer()
-
+    ScrollView {
+      VStack(alignment: .leading, spacing: 24) {
         Image(.cameraAccessIcon)
           .resizable()
           .aspectRatio(contentMode: .fit)
-          .frame(width: 120)
+          // Grows with text size, but not past what leaves room for the text.
+          .frame(width: min(logoWidth, 200))
+          .frame(maxWidth: .infinity)
+          .a11yDecorative()
 
-        VStack(spacing: 12) {
-          TipRow(
-            resource: .smartGlassesIcon,
+        // The name VoiceOver reads for the app icon, so the user knows where they are.
+        Text("Camera Access")
+          .font(.largeTitle.bold())
+          .foregroundStyle(.primary)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityAddTraits(.isHeader)
+
+        VStack(alignment: .leading, spacing: 16) {
+          HomeTipRow(
+            systemImage: "eyeglasses",
             title: "Start a session",
             text: "Connect to your glasses to get started."
           )
-          TipRow(
-            resource: .videoIcon,
+          HomeTipRow(
+            systemImage: "video",
             title: "Start preview",
             text: "See the live camera feed from your glasses."
           )
-          TipRow(
-            resource: .tapIcon,
+          HomeTipRow(
+            systemImage: "hand.tap",
             title: "Capture",
             text: "Take photos and record video with audio from your glasses' microphone."
           )
         }
 
-        Spacer()
+        VStack(alignment: .leading, spacing: 16) {
+          A11yNote(text: SpokenMessage.beforeMetaAIHandoff)
 
-        VStack(spacing: 20) {
-          Text("You'll be redirected to the Meta AI app to confirm your connection.")
-            .font(.system(size: 14))
-            .foregroundStyle(.gray)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 12)
+          if let notice = viewModel.connectionNotice {
+            ConnectionNoticeView(text: notice)
+          }
 
-          CustomButton(
-            title: viewModel.registrationState == .registering ? "Connecting…" : "Connect my glasses",
-            style: .primary,
-            isDisabled: viewModel.registrationState == .registering
-          ) {
+          // Title kept: the UI tests find this button by "Connect my glasses".
+          Button(viewModel.isConnecting ? "Connecting…" : "Connect my glasses") {
             viewModel.connectGlasses()
           }
+          .buttonStyle(.a11yPrimary)
+          .disabled(viewModel.isConnecting)
+          .accessibilityHint(viewModel.isConnecting ? "" : "Opens the Meta AI app to confirm.")
+          .accessibilityIdentifier("connect_glasses_button")
         }
       }
-      .padding(.all, 24)
+      .padding(24)
+      .frame(maxWidth: 700, alignment: .leading)
+      .frame(maxWidth: .infinity)
     }
+    .background(Color(.systemBackground).ignoresSafeArea())
+    // "Connecting…" otherwise only changes visually.
+    .a11yAnnounce(onChangeOf: viewModel.isConnecting) { connecting in
+      connecting ? "Connecting." : nil
+    }
+  }
+}
+
+/// TipRow (Components/) uses fixed sizes and grey text; this one scales and keeps contrast. The
+/// SF Symbols match the asset icons' meaning and scale with the text.
+private struct HomeTipRow: View {
+  let systemImage: String
+  let title: String
+  let text: String
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 12) {
+      Image(systemName: systemImage)
+        .font(.title3)
+        .foregroundStyle(.primary)
+        .frame(minWidth: 28)
+        .a11yDecorative()
+      VStack(alignment: .leading, spacing: 4) {
+        Text(title)
+          .font(.headline)
+          .foregroundStyle(.primary)
+          .accessibilityAddTraits(.isHeader)
+        Text(text)
+          .font(.body)
+          .foregroundStyle(.primary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }

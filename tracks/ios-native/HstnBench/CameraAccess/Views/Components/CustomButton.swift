@@ -20,6 +20,14 @@ struct CustomButton: View {
   let isDisabled: Bool
   let action: () -> Void
 
+  // Explicit, so the private scaled metric below doesn't make the memberwise init private.
+  init(title: String, style: ButtonStyle, isDisabled: Bool, action: @escaping () -> Void) {
+    self.title = title
+    self.style = style
+    self.isDisabled = isDisabled
+    self.action = action
+  }
+
   enum ButtonStyle {
     case primary, destructive
 
@@ -42,15 +50,23 @@ struct CustomButton: View {
     }
   }
 
+  /// At least 60 pt tall (low-vision target size), growing with Dynamic Type; text wraps instead
+  /// of truncating at the accessibility sizes.
+  @ScaledMetric(relativeTo: .headline) private var minHeight: CGFloat = 60
+
   var body: some View {
     Button(action: action) {
       Text(title)
-        .font(.system(size: 15, weight: .semibold))
+        .font(.headline)
         .foregroundStyle(style.foregroundColor)
-        .frame(maxWidth: .infinity)
-        .frame(height: 56)
-        .background(style.backgroundColor)
-        .cornerRadius(30)
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: max(60, minHeight))
+        .background(style.backgroundColor, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        // Light outline so the boundary stays visible over a dark camera frame (3:1).
+        .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Color.white.opacity(0.9), lineWidth: 1.5))
     }
     .disabled(isDisabled)
     .opacity(isDisabled ? 0.6 : 1.0)

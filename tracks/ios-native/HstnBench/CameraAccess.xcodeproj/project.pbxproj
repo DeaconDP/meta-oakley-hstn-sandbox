@@ -110,6 +110,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		A11A0000000000000000000F /* A11y */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = A11y; sourceTree = "<group>"; };
 		E66CC00E2F3E05D900B07379 /* CameraAccessUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CameraAccessUITests; sourceTree = "<group>"; };
 		E699CC962E8150670052C240 /* CameraAccessTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CameraAccessTests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -213,6 +214,7 @@
 		8FD96B7D2E6F0A9800F56AB1 /* CameraAccess */ = {
 			isa = PBXGroup;
 			children = (
+				A11A0000000000000000000F /* A11y */,
 				E66CC01A2F3E1A9300B07379 /* TestResources */,
 				8FD96B702E6F0A9800F56AB1 /* ViewModels */,
 				B3C4000000000000000000F0 /* Bench */,
@@ -281,6 +283,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A11A0000000000000000000F /* A11y */,
 			);
 			name = CameraAccess;
 			productName = CameraAccess;
