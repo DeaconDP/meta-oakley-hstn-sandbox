@@ -26,4 +26,6 @@
 - [ ] Low-vision magnifier view on the phone
 - [ ] Offline eval harness: Mock Device Kit `setCameraFeed`/`setCapturedImage` + VizWiz/TextVQA subset, replay mode for CI
 - [ ] TalkBack pass + WCAG 2.2 AA check of the companion UI
+- [ ] Accessible onboarding and launch: spoken handoffs around the Meta AI registration and permission flows, speaker and camera check, practice-based tutorial, launch status line, spoken recovery messages, and App Intents / Back Tap / Magic Tap triggers (notes/a11y-onboarding.md)
+- [ ] Real HSTN: check Meta AI registration and permission screens under VoiceOver, plus the open questions in notes/a11y-onboarding.md
 - [ ] Mention the accessibility focus in README once the first demo runs
