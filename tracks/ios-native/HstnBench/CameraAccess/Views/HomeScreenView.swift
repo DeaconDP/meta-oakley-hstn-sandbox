@@ -38,7 +38,7 @@ struct HomeScreenView: View {
           .a11yDecorative()
 
         // The name VoiceOver reads for the app icon, so the user knows where they are.
-        Text("Camera Access")
+        Text("HSTN Reader")
           .font(.largeTitle.bold())
           .foregroundStyle(.primary)
           .fixedSize(horizontal: false, vertical: true)

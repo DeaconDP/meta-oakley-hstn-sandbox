@@ -906,7 +906,7 @@ private struct LivePreviewView: View {
 // MARK: - Update banner
 
 struct UpdateRequiredMessage: View {
-  private let message = "Your glasses need a firmware update before Camera Access can start."
+  private let message = "Your glasses need a firmware update before HSTN Reader can start."
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
