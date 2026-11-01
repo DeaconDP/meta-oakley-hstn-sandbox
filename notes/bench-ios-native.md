@@ -37,3 +37,9 @@ A second batch of 5, run after the `AudioInputHandler` fix, gave medians of 19, 
 | read_photo | `capturePhoto` for reading, only when there is no frame from the last second or the text is too small in it |
 
 No numbers yet: on 2026-10-30, after a CoreSimulator update, the mock session would not start in any UI test on this Mac, `testPhotoCaptureAndDismiss` on unchanged HEAD included, so neither test could run. The real Vision pass over the fixture does run in the unit tests (`ReadFixtureOCRTests`) and reads the page in order.
+
+## Re-run 2026-11-01 (shared audio session, British voice from 6892fda, Start-session hit-target fix)
+
+5 of 5 runs passed on "HstnBench iPhone 17" (Simulator, mock). Medians: session_start 21, stream_to_first_frame 41, capture_to_photo 354, tts_to_audio_start 48 (`route=phone`), tts_total 1404 ms. First frame and TTS start are about half the 2026-10-30 numbers; `tts_total` dropped from about 1986 to 1404 ms, most likely because of the new voice. These are still Simulator numbers and say nothing about Bluetooth on real glasses.
+
+`BENCH_READ=1` still has no numbers. The mock session now starts, but `ReadAloudUITests/testReadAloud` fails every time on sentence 2: the transcript reads "The quick brown(?) fox(?) jumps(?) over the lazy dog." because Vision's alternatives on the mock stream frame disagree, so those words are marked unsure. The test expects the sentence with no marks.

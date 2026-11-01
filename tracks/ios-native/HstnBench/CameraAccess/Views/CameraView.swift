@@ -103,12 +103,16 @@ struct CameraView: View {
             )
           Spacer(minLength: 0)
         }
+        // An explicit container: a sort priority on a bare stack hands the stack's whole frame to
+        // the element inside it, so the button's hit point lands in empty space.
+        .accessibilityElement(children: .contain)
         .accessibilitySortPriority(3)
 
         VStack(spacing: 0) {
           Spacer(minLength: 0)
           bottomBar
         }
+        .accessibilityElement(children: .contain)
         .accessibilitySortPriority(1)
       }
     }
@@ -546,13 +550,24 @@ struct CameraView: View {
     }
   }
 
-  /// In-session toolbar (Preview / Photo / Record / Mic), kept laid out so the
+  /// In-session toolbar (Preview / Photo / Read / Record / Mic), kept laid out so the
   /// session button below holds a fixed Y. Hidden without a session; Preview leads as
   /// the gateway and is the lone enabled control in session-ready, the rest enabling
-  /// once streaming. Falls back to one control per row when the row doesn't fit the text.
+  /// once streaming. One row when it fits, else two rows in the same reading order, and one
+  /// control per row only at large text, so the controls don't cover most of the preview.
   @ViewBuilder
   private var captureRow: some View {
-    Group {
+    // `.hidden()` keeps the space but removes the controls from VoiceOver and touch.
+    // accessibilityHidden on the row left them exposed as invisible, disabled buttons.
+    if viewModel.hasSession {
+      captureRowContent
+    } else {
+      captureRowContent.hidden()
+    }
+  }
+
+  private var captureRowContent: some View {
+    VStack(spacing: 0) {
       if isLargeText {
         verticalCaptureRow
       } else {
@@ -564,14 +579,21 @@ struct CameraView: View {
             recordPill(compact: true)
             micToggle(compact: true)
           }
+          VStack(spacing: 10) {
+            HStack(spacing: 10) {
+              previewPill(compact: true)
+              photoButton(compact: true)
+              readButton(compact: true)
+            }
+            HStack(spacing: 10) {
+              recordPill(compact: true)
+              micToggle(compact: true)
+            }
+          }
           verticalCaptureRow
         }
       }
     }
-    .opacity(viewModel.hasSession ? 1 : 0)
-    // Invisible controls must not be reachable by VoiceOver or touch either.
-    .accessibilityHidden(!viewModel.hasSession)
-    .allowsHitTesting(viewModel.hasSession)
   }
 
   private var verticalCaptureRow: some View {
