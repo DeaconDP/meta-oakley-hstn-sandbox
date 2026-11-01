@@ -19,8 +19,8 @@ import AVFoundation
 @MainActor
 final class TtsReply: NSObject, AVSpeechSynthesizerDelegate {
   private let synthesizer = AVSpeechSynthesizer()
-  // Looked up once; the lookup is slow enough to show up in tts_to_audio_start.
-  private let voice = AVSpeechSynthesisVoice(language: "en-US")
+  // Female British voice, shared with the Announcer (see AppVoice).
+  private let voice = AppVoice.shared
   private let clock = BenchClock.shared
   /// The reply waiting on the audio session, if any. A newer reply cancels it.
   private var pendingReply: Task<Void, Never>?

@@ -66,12 +66,8 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
   @ObservationIgnored private let audio = A11yAudioSession.shared
   @ObservationIgnored private let preferences = A11yPreferences.shared
-  // Looked up once; the lookup is slow enough to delay the first word.
-  @ObservationIgnored private lazy var voice: AVSpeechSynthesisVoice? = {
-    let language = AVSpeechSynthesisVoice.currentLanguageCode()
-    // The app's strings are English, so a non-English system language still gets an English voice.
-    return AVSpeechSynthesisVoice(language: language.hasPrefix("en") ? language : "en-US")
-  }()
+  // Female British voice, shared with TtsReply (see AppVoice).
+  @ObservationIgnored private lazy var voice = AppVoice.shared
 
   private struct Line {
     let text: String
