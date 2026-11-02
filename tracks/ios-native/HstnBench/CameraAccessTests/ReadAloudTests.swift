@@ -61,8 +61,49 @@ final class WordConfidenceTests: XCTestCase {
   }
 
   func testDifferentWordCountFallsBackToMembership() {
-    let result = WordConfidence.words(top: "jumps over the dog", confidence: 1, alternatives: [("jumps overthe dog", 0.9)])
-    XCTAssertEqual(result.map { $0.confidence < 0.5 }, [false, true, true, false])
+    let result = WordConfidence.words(top: "jumps over the dog", confidence: 1, alternatives: [("jumps overthe dig", 0.9)])
+    XCTAssertEqual(result.map { $0.confidence < 0.5 }, [false, true, true, true])
+  }
+
+  /// The candidates Vision returned for the fixture page on the mock's 540x960 stream frame, all
+  /// at confidence 1.0. Before these were recognized as noise, the page read
+  /// "The quick brown(?) fox(?) jumps(?) over the lazy dog."
+  func testVisionRunnersUpOnCleanPrintAreNotDoubt() {
+    let captured: [(top: String, alternatives: [String])] = [
+      ("Reading test", ["Readingtest", "Reading tst"]),
+      ("The quick brown fox", ["The quick brownfox", "The quick brown fo"]),
+      ("jumps over the lazy dog.", ["jump over the lazy dog.", "jumps over the lazy dog"]),
+      ("Printed text is read word", ["Printed text i read word", "Printed textis read word"]),
+      ("for word, in order. This is", ["for word, in order. This s", "for word,in order. This is"]),
+      ("the end of the test page.", ["the end of the test page", "the end of the test age."]),
+    ]
+    for (top, alternatives) in captured {
+      let result = WordConfidence.words(top: top, confidence: 1, alternatives: alternatives.map { ($0, 1) })
+      XCTAssertEqual(result.map(\.confidence), Array(repeating: 1, count: result.count), top)
+    }
+  }
+
+  func testChangedOrAddedLetterIsStillDoubt() {
+    for (top, alternative) in [("rn", "m"), ("form", "from"), ("no", "not"), ("brown", "crown")] {
+      let result = WordConfidence.words(top: top, confidence: 1, alternatives: [(alternative, 1)])
+      XCTAssertLessThan(result[0].confidence, ReadSpeech.uncertainBelow, "\(top) vs \(alternative)")
+    }
+  }
+
+  func testLostCharacterInAMeaningfulWordIsStillDoubt() {
+    let cases: [(top: String, alternative: String, disputed: Int)] = [
+      ("Take 500 mg", "Take 50 mg", 1),
+      ("Take 25 mg", "Take 2 5 mg", 1),
+      ("Take 5 mg", "Take 5 g", 2),
+      ("Take 2 tablets", "Take 2 tablet", 2),
+      ("Do not take", "Do no take", 1),
+      ("Take ten now", "Take tn now", 1),
+      ("costs 3 dollars", "costs 3 dollar", 2),
+    ]
+    for (top, alternative, disputed) in cases {
+      let result = WordConfidence.words(top: top, confidence: 1, alternatives: [(alternative, 1)])
+      XCTAssertLessThan(result[disputed].confidence, ReadSpeech.uncertainBelow, "\(top) vs \(alternative)")
+    }
   }
 }
 

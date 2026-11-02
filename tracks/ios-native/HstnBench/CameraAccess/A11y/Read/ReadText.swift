@@ -40,6 +40,13 @@ struct ReadPage: Equatable, Sendable {
 /// candidates instead: a word the runners-up spell differently is a word the recognizer wasn't
 /// sure of. That catches the cases that matter most ("5" vs "8", "rn" vs "m") without flagging a
 /// whole line because one word was hard.
+///
+/// On clean print `.accurate` still returns runners-up, at the same confidence as the top line,
+/// that only move a space or lose a letter: "brownfox", "brown fo", "jump", "tst", "age."
+/// (captured from the mock's stream frame, see testVisionRunnersUpOnCleanPrintAreNotDoubt). They
+/// offer no competing reading, so they aren't doubt, or every clean line would get the "uncertain"
+/// earcon. A runner-up that changes a letter or adds one still counts. Numbers, units and "not"
+/// are always compared strictly, because there a lost character changes the meaning.
 enum WordConfidence {
   /// An alternative only counts if it is at least this close to the top candidate's confidence.
   static let alternativeWeight: Float = 0.5
@@ -52,9 +59,14 @@ enum WordConfidence {
     var disputed = Array(repeating: false, count: topTokens.count)
     for alternative in alternatives where alternative.confidence >= confidence * alternativeWeight && alternative.confidence > 0 {
       let altTokens = tokenize(alternative.text)
+      // Same characters with the spaces elsewhere: only strictly compared words can be disputed.
+      let spacingOnly = altTokens.joined() == topTokens.joined()
       if altTokens.count == topTokens.count {
         for index in topTokens.indices where normalized(topTokens[index]) != normalized(altTokens[index]) {
-          disputed[index] = true
+          let strict = isStrict(topTokens[index])
+          if strict || !(spacingOnly || isOneLetterLost(normalized(topTokens[index]), in: normalized(altTokens[index]))) {
+            disputed[index] = true
+          }
         }
       } else {
         // Different word count: no reliable alignment, so a word is disputed if it doesn't
@@ -63,7 +75,7 @@ enum WordConfidence {
         for index in topTokens.indices {
           if let match = pool.firstIndex(of: normalized(topTokens[index])) {
             pool.remove(at: match)
-          } else {
+          } else if !spacingOnly || isStrict(topTokens[index]) {
             disputed[index] = true
           }
         }
@@ -76,6 +88,21 @@ enum WordConfidence {
 
   static func tokenize(_ text: String) -> [String] {
     text.split(whereSeparator: \.isWhitespace).map(String.init)
+  }
+
+  /// Words where one character changes the meaning: numbers, dose and money units, "not".
+  static func isStrict(_ token: String) -> Bool {
+    guard !token.contains(where: \.isNumber) else { return true }
+    let word = normalized(token).lowercased()
+    return word == "not" || ReadSpeech.isDoseUnit(word) || ReadSpeech.currencyWords.contains(word)
+      || ReadSpeech.numberWords.contains(word)
+  }
+
+  /// True when `alternative` is `top`, a word of letters, with exactly one letter missing.
+  static func isOneLetterLost(_ top: String, in alternative: String) -> Bool {
+    guard top.count == alternative.count + 1, top.allSatisfy(\.isLetter) else { return false }
+    let lost = zip(top, alternative).prefix { $0 == $1 }.count
+    return top.prefix(lost) + top.dropFirst(lost + 1) == alternative
   }
 
   /// Compares words without the punctuation around them ("dog." vs "dog,"), but keeps the
