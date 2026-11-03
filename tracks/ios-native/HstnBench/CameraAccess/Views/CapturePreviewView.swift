@@ -34,43 +34,74 @@ struct CapturePreviewView: View {
     }
   }
 
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
   var body: some View {
     ZStack {
-      Color.black.opacity(0.9)
+      Theme.page
         .ignoresSafeArea()
         .onTapGesture { dismiss() }
+        .accessibilityHidden(true)
 
-      VStack(spacing: 24) {
-        mediaView
-          .frame(maxWidth: .infinity)
-          .frame(height: 460)
-          .clipShape(RoundedRectangle(cornerRadius: 12))
-          .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
-
-        CircleButton(icon: "square.and.arrow.up", text: "Share") {
-          showShareSheet = true
-        }
-        .accessibilityIdentifier("share_button")
-      }
-      .padding()
-
-      VStack {
+      VStack(spacing: 0) {
         HStack {
-          Spacer()
-          CircleButton(icon: "xmark", text: nil) {
+          Text(isVideo ? "Your video" : "Your photo")
+            .font(.rounded(.title2, weight: .black))
+            .foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityHidden(true)
+          Spacer(minLength: 12)
+          CircleButton(icon: "xmark", text: nil, accessibilityLabel: "Close") {
             dismiss()
           }
+          .accessibilityHint("Returns to the camera.")
           .accessibilityIdentifier("close_preview_button")
-          .padding(.trailing, 20)
-          .padding(.top, 50)
         }
-        Spacer()
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+
+        ScrollView {
+          VStack(spacing: 20) {
+            mediaView
+              .frame(maxWidth: .infinity)
+              // Leaves room for Share when the text is large; 460 pt as before otherwise.
+              .frame(maxHeight: dynamicTypeSize.isAccessibilitySize ? 320 : 460)
+              .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+              .overlay {
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                  .strokeBorder(Theme.stroke, lineWidth: 2)
+                  .accessibilityHidden(true)
+              }
+              .accessibilityIgnoresInvertColors()
+
+            CircleButton(icon: "square.and.arrow.up", text: "Share") {
+              showShareSheet = true
+            }
+            .accessibilityHint(isVideo ? "Save or send the video." : "Save or send the photo.")
+            .accessibilityIdentifier("share_button")
+          }
+          .padding(.horizontal, 20)
+          .padding(.bottom, 20)
+        }
+        .scrollBounceBehavior(.basedOnSize)
       }
     }
+    // Over the camera screen: VoiceOver stays inside until it's closed.
+    .accessibilityElement(children: .contain)
+    .accessibilityAddTraits(.isModal)
+    // Two-finger scrub (Escape) closes, like Close; Magic Tap too, so the camera's own Magic Tap
+    // (take a photo) is one more two-finger double-tap away.
+    .accessibilityAction(.escape) { dismiss() }
+    .accessibilityAction(.magicTap) { dismiss() }
     .onAppear { player?.play() }
     .sheet(isPresented: $showShareSheet) {
       ShareSheet(activityItems: [shareItem])
     }
+  }
+
+  private var isVideo: Bool {
+    if case .video = preview { return true }
+    return false
   }
 
   @ViewBuilder
@@ -80,9 +111,13 @@ struct CapturePreviewView: View {
       Image(uiImage: image)
         .resizable()
         .aspectRatio(contentMode: .fit)
+        // Short label: the spoken reply (TtsReply) already says what happened.
+        .accessibilityLabel("Photo")
+        .accessibilityAddTraits(.isImage)
     case .video:
       if let player {
         VideoPlayer(player: player)
+          .accessibilityLabel("Recorded video")
       }
     }
   }

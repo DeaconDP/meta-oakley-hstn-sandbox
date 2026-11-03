@@ -51,6 +51,17 @@ final class CameraViewModel {
   /// glasses" placeholder. Sourced from the auto device selector.
   private(set) var hasActiveDevice: Bool = false
 
+  /// Physical state of the active glasses (DAT `DeviceState`), for the spoken status line and the
+  /// "removed / folded / battery" announcements. Battery is nil until the glasses report it.
+  private(set) var batteryLevel: Int?
+  private(set) var donState: DonState = .unknown
+  private(set) var hingeState: HingeState = .unknown
+  /// Last known camera permission (a query, never a redirect). nil until checked.
+  private(set) var cameraPermission: PermissionStatus?
+  /// The device stream has reported at least once, so `hasActiveDevice` is real, not the
+  /// initial false. Spoken status and launch actions wait for this.
+  private(set) var hasDeviceReport: Bool = false
+
   // MARK: - Session state (bound directly to the SDK)
 
   /// The device session's state, mirrored from `DeviceSession.statePublisher`.
@@ -63,6 +74,11 @@ final class CameraViewModel {
   /// so the ~24fps updates don't re-render the whole screen.
   var currentVideoFrame: UIImage?
   var hasReceivedFirstFrame: Bool = false
+
+  /// The most recent decoded stream frame and when it arrived, for "Read it aloud". Unlike
+  /// `currentVideoFrame` it keeps updating while a capture preview is up, and it isn't observed,
+  /// so ~24 updates a second don't re-render anything.
+  @ObservationIgnored private(set) var latestReadFrame: ReadFrame?
 
   /// The stream's state, mirrored from `Stream.statePublisher`. `.stopped` means
   /// no live stream.
@@ -81,6 +97,9 @@ final class CameraViewModel {
   /// recorder. Drives the isolated `RecordingTimerLabel`'s `TimelineView`, so the timer
   /// counts continuously — including through a stream pause. `nil` when not recording.
   var recordingStartDate: Date?
+  /// A stop is finalizing the file. Record stays disabled until it's done, so a new recording
+  /// can't start under a recorder (and audio session) that is still being released.
+  private(set) var isFinishingRecording: Bool = false
   /// Whether to record the glasses-microphone (Bluetooth HFP) audio into videos
   /// (sound-in-video). Toggled from the mic button shown while streaming.
   var includeAudioInStream: Bool = true
@@ -94,6 +113,10 @@ final class CameraViewModel {
   /// rather than an app-maintained error map.
   var showError: Bool = false
   var errorMessage: String = ""
+  /// Short alert title and the one next step for the current error (a11y: no generic
+  /// "something went wrong", every failure offers one action).
+  var errorTitle: String = ""
+  var errorAction: CameraErrorAction?
 
   /// Drives the confirm prompt shown before the camera-permission redirect to the
   /// Meta AI app — surfaced only when permission isn't already granted.
@@ -177,6 +200,16 @@ final class CameraViewModel {
   @ObservationIgnored private var appLifecycleTask: Task<Void, Never>?
   @ObservationIgnored private let sessionTokenBag = ListenerTokenBag()
   @ObservationIgnored private let streamTokenBag = ListenerTokenBag()
+  @ObservationIgnored private let deviceStateTokenBag = ListenerTokenBag()
+  /// Bumped per recording start, so a slow stop of an older recording doesn't release the audio
+  /// session while a newer one owns it.
+  @ObservationIgnored private var recordingGeneration = 0
+  /// A startStreaming() call is between its permission check and adding the camera, so a
+  /// second caller (the reader nudging the stream along) doesn't start another one.
+  @ObservationIgnored private(set) var isStreamStartInFlight = false
+  /// Waiting for an in-stream photo taken for reading (no preview sheet, no photo reply).
+  @ObservationIgnored private var readPhotoContinuation: CheckedContinuation<UIImage?, Never>?
+  @ObservationIgnored private var readPhotoToken = 0
 
   @ObservationIgnored private let photoCaptureFailureMessage =
     "Couldn't capture photo. There may not be enough storage, or another capture is in progress. Try again in a few moments."
@@ -200,6 +233,12 @@ final class CameraViewModel {
     appLifecycleTask?.cancel()
     backgroundStopSuppressionTask?.cancel()
     deviceSession?.stop()
+    // Never leave earcons locked out of the audio session if the screen goes away mid-recording.
+    if isRecording {
+      A11yAudioSession.recordingOwnsSession = false
+      VoiceControl.shared.recordingDidEnd()
+    }
+    VoiceControl.shared.detachGlasses()
   }
 
   // MARK: - Lifecycle step 1: session
@@ -246,19 +285,23 @@ final class CameraViewModel {
   /// confirmed, not a surprise.
   func startStreaming() async {
     guard let session = deviceSession, session.state == .started else {
-      showError("Start a session before previewing.")
+      showError(.plain(SpokenMessage.startSessionFirst, action: hasSession ? nil : .startSession))
       return
     }
-    guard camera == nil else { return }
+    guard camera == nil, !isStreamStartInFlight else { return }
+    isStreamStartInFlight = true
+    defer { isStreamStartInFlight = false }
 
     do {
-      if try await wearables.checkPermissionStatus(.camera) == .granted {
+      let status = try await wearables.checkPermissionStatus(.camera)
+      cameraPermission = status
+      if status == .granted {
         beginStream(on: session)
       } else {
         showCameraPermissionRedirectConfirm = true
       }
     } catch {
-      showError(error.localizedDescription)
+      showError(.permission(error))
     }
   }
 
@@ -269,14 +312,18 @@ final class CameraViewModel {
     showCameraPermissionRedirectConfirm = false
     guard let session = deviceSession, session.state == .started, camera == nil else { return }
     do {
-      guard try await wearables.requestPermission(.camera) == .granted else {
-        showError("Camera permission denied")
+      let status = try await wearables.requestPermission(.camera)
+      cameraPermission = status
+      guard status == .granted else {
+        showError(.plain(SpokenMessage.cameraPermissionNotGranted, title: "Camera access not allowed", action: .allowCamera))
         return
       }
     } catch {
-      showError(error.localizedDescription)
+      showError(.permission(error))
       return
     }
+    // Back from Meta AI: say the result before the camera's own "starting" lines.
+    Announcer.shared.announce(SpokenMessage.cameraPermissionGranted, earcon: .done)
     beginStream(on: session)
   }
 
@@ -297,7 +344,7 @@ final class CameraViewModel {
       // Add the consolidated `Camera` capability and stream through `camera.stream`.
       benchClock.start("stream_to_first_frame")
       guard let newCamera = try session.addCamera(config: config) else {
-        showError("Couldn't create the camera. Try again.")
+        showError(.plain(SpokenMessage.cameraStreamFailed, action: .startPreview))
         return
       }
       camera = newCamera
@@ -309,7 +356,7 @@ final class CameraViewModel {
       newCamera.stream.start()
     } catch {
       camera = nil
-      showError(error.localizedDescription)
+      showError(.plain(error.localizedDescription, action: .startPreview))
     }
   }
 
@@ -329,17 +376,58 @@ final class CameraViewModel {
   // MARK: - Capture
 
   func capturePhoto() {
+    // A second press (or Magic Tap) while the first photo is on its way isn't an error.
+    if isCapturingPhoto {
+      Announcer.shared.say(SpokenMessage.photoInProgress)
+      return
+    }
     guard !isCapturingPhoto, isStreaming else {
       showError(photoCaptureFailureMessage)
       return
     }
     isCapturingPhoto = true
+    // Cut the narrator, so TtsReply's reply isn't spoken over it.
+    Announcer.shared.stop()
+    // Shutter earcon on the press itself, well inside the 100 ms budget.
+    EarconPlayer.shared.play(.capturing)
     benchClock.start("capture_to_photo")
     let success = camera?.stream.capturePhoto(format: .jpeg) ?? false
     if !success {
       isCapturingPhoto = false
       showError(photoCaptureFailureMessage)
     }
+  }
+
+  /// An in-stream photo for "Read it aloud": the reader gets the image, and nothing else happens
+  /// (no preview sheet, no "Photo captured" reply, no capture_to_photo metric). Times out after
+  /// 8 s; nil on any failure.
+  func captureStillForReading() async -> UIImage? {
+    guard isStreaming, !isCapturingPhoto, readPhotoContinuation == nil, let camera else { return nil }
+    isCapturingPhoto = true
+    EarconPlayer.shared.play(.capturing)
+    benchClock.start("read_photo")
+    guard camera.stream.capturePhoto(format: .jpeg) else {
+      isCapturingPhoto = false
+      return nil
+    }
+    readPhotoToken += 1
+    let token = readPhotoToken
+    return await withCheckedContinuation { continuation in
+      readPhotoContinuation = continuation
+      Task { [weak self] in
+        try? await Task.sleep(for: .seconds(8))
+        self?.resolveReadPhoto(nil, token: token)
+      }
+    }
+  }
+
+  /// Hands the read photo (or nil) to the waiting reader. `token` limits a timeout to its own
+  /// request.
+  private func resolveReadPhoto(_ image: UIImage?, token: Int? = nil) {
+    guard let continuation = readPhotoContinuation, token.map({ $0 == readPhotoToken }) ?? true else { return }
+    readPhotoContinuation = nil
+    isCapturingPhoto = false
+    continuation.resume(returning: image)
   }
 
   func toggleRecording() {
@@ -351,10 +439,16 @@ final class CameraViewModel {
   }
 
   func startVideoRecording() {
-    guard isStreaming, !isRecording else { return }
+    guard isStreaming, !isRecording, !isFinishingRecording else { return }
     // Flip the intent flag synchronously so the toggle and UI don't lag the
     // frame-driven recorder; the file starts on the next frame.
     isRecording = true
+    recordingGeneration += 1
+    // Before the recorder takes the session (play-and-record for the glasses mic), so earcons and
+    // speech from here on play into it instead of switching it back to playback.
+    A11yAudioSession.recordingOwnsSession = true
+    // Voice control yields the mic and the session before the recorder configures them.
+    VoiceControl.shared.recordingWillStart()
     // If the glasses mic isn't available, flip the mic off so the button reflects that this
     // recording is video-only (the phone mic is never used). Left off afterward — the user can
     // re-tap the mic to turn it back on.
@@ -367,6 +461,8 @@ final class CameraViewModel {
     guard isRecording else { return }
     isRecording = false
     recordingStartDate = nil
+    let generation = recordingGeneration
+    isFinishingRecording = true
     // The writer starts on the first frame after the shutter opens. If stop lands
     // before that frame arrives, wait briefly (shutter still open) so even a quick
     // recording finalizes to a file and reliably opens the preview.
@@ -376,15 +472,26 @@ final class CameraViewModel {
       elapsedNanos += 25_000_000
     }
     // Show a preview/share sheet (mirrors the photo flow) for the finalized file.
-    switch await videoRecorder.stopRecording() {
+    let result = await videoRecorder.stopRecording()
+    // Released only once the recorder has finished with the session, on every outcome, and only
+    // if no newer recording has taken it since.
+    if recordingGeneration == generation, !isRecording {
+      A11yAudioSession.recordingOwnsSession = false
+      VoiceControl.shared.recordingDidEnd()
+    }
+    isFinishingRecording = false
+    switch result {
     case .completed(let url):
+      // Announced here, not when isRecording flips: by now the recorder has released the session,
+      // so the earcon and speech get a clean playback session.
+      Announcer.shared.announce(SpokenMessage.recordingSaved, earcon: .done)
       activePreview = .video(url)
     case .noRecording:
       // Reached only after the intent guard + start wait, so while streaming this
       // means the recording never started (e.g. the writer failed to start).
-      showError("Couldn't start recording. Try again.")
+      showError(.plain(SpokenMessage.recordingNotStarted))
     case .failed:
-      showError("Recording couldn't be saved. Try again.")
+      showError(.plain(SpokenMessage.recordingNotSaved))
     }
   }
 
@@ -417,8 +524,51 @@ final class CameraViewModel {
       guard let self else { return }
       for await deviceId in deviceSelector.activeDeviceStream() {
         hasActiveDevice = deviceId != nil
+        observeDeviceState(deviceId)
+        hasDeviceReport = true
       }
     }
+  }
+
+  /// Follows battery, worn and folded state of the active glasses, and refreshes the camera
+  /// permission status (a query only) so the status line can name it as the blocker.
+  private func observeDeviceState(_ deviceId: DeviceIdentifier?) {
+    deviceStateTokenBag.clear()
+    guard let deviceId, let device = wearables.deviceForIdentifier(deviceId) else {
+      batteryLevel = nil
+      donState = .unknown
+      hingeState = .unknown
+      return
+    }
+    // Current values first: the listener may not replay them.
+    batteryLevel = device.batteryLevel
+    donState = device.donState
+    hingeState = device.hingeState
+    device.addDeviceStateListener { [weak self] state in
+      Task { @MainActor in self?.handleDeviceState(state) }
+    }.store(in: deviceStateTokenBag)
+    Task { [weak self] in
+      guard let self else { return }
+      if let status = try? await wearables.checkPermissionStatus(.camera) {
+        cameraPermission = status
+      }
+    }
+  }
+
+  /// Waits until the device stream has reported (or `timeout`), and, if it reported no glasses,
+  /// a little longer for them to appear (they often connect just after launch).
+  func waitForDeviceReport(timeout: Duration = .seconds(2)) async {
+    let clock = ContinuousClock()
+    let deadline = clock.now + timeout
+    while clock.now < deadline, !Task.isCancelled, !(hasDeviceReport && hasActiveDevice) {
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+  }
+
+  private func handleDeviceState(_ state: DeviceState) {
+    if batteryLevel != state.batteryLevel { batteryLevel = state.batteryLevel }
+    if donState != state.donState { donState = state.donState }
+    if hingeState != state.hingeState { hingeState = state.hingeState }
   }
 
   private func startAppLifecycleMonitoring() {
@@ -472,8 +622,10 @@ final class CameraViewModel {
     sessionState = state
     if state == .started {
       benchClock.end("session_start")
+      if let deviceSession { VoiceControl.shared.attachGlasses(session: deviceSession, wearables: wearables) }
     }
     if state == .stopped {
+      VoiceControl.shared.detachGlasses()
       endBackgroundStopErrorSuppression()
       cleanupSession()
     }
@@ -486,7 +638,7 @@ final class CameraViewModel {
     guard !isStoppingForBackground else { return }
     // All session errors surface through the single alert, including
     // `datAppOnTheGlassesUpdateRequired`, which the SDK delivers as a one-shot event.
-    showError(error.localizedDescription)
+    showError(.session(error))
   }
 
   /// Terminal session cleanup — drop the reference and observers so the next
@@ -505,6 +657,7 @@ final class CameraViewModel {
 
     stream.videoFramePublisher.listen { [weak self] frame in
       guard let self else { return }
+      let arrivedAt = BenchClock.uptimeNanoseconds()
 
       if self.awaitingFirstFrame.take() {
         self.benchClock.end("stream_to_first_frame", detail: "size=\(Self.frameSize(frame))")
@@ -519,6 +672,9 @@ final class CameraViewModel {
 
       Task { @MainActor [weak self] in
         guard let self else { return }
+        if UIApplication.shared.applicationState != .background, let image = previewImage {
+          self.latestReadFrame = ReadFrame(image: image, arrivedAt: arrivedAt)
+        }
         // Keep the live surface stable while a capture preview is onscreen.
         if UIApplication.shared.applicationState != .background,
           activePreview == nil,
@@ -569,6 +725,8 @@ final class CameraViewModel {
     streamState = .stopped
     currentVideoFrame = nil
     hasReceivedFirstFrame = false
+    latestReadFrame = nil
+    resolveReadPhoto(nil)
   }
 
   /// Appends a frame to the recorder. `nonisolated` so it keeps writing while the
@@ -581,15 +739,31 @@ final class CameraViewModel {
     // Same bounded suppression window as `handleSessionError`: hide only the
     // expected teardown noise from an intentional background-driven stop.
     guard !isStoppingForBackground else { return }
-    showError(error.localizedDescription)
+    // A failed photo for reading is the reader's to say ("The photo for reading wasn't taken").
+    if case .photoCaptureFailed = error, readPhotoContinuation != nil {
+      resolveReadPhoto(nil)
+      return
+    }
+    showError(.stream(error))
   }
 
   private func handlePhotoData(_ data: PhotoData) {
+    if readPhotoContinuation != nil {
+      let image = UIImage(data: data.data)
+      if let image {
+        let pixels = image.size.applying(CGAffineTransform(scaleX: image.scale, y: image.scale))
+        benchClock.end("read_photo", detail: "size=\(Int(pixels.width))x\(Int(pixels.height))")
+      }
+      resolveReadPhoto(image)
+      return
+    }
     isCapturingPhoto = false
     if let image = UIImage(data: data.data) {
       let pixels = image.size.applying(CGAffineTransform(scaleX: image.scale, y: image.scale))
       benchClock.end("capture_to_photo", detail: "size=\(Int(pixels.width))x\(Int(pixels.height))")
-      ttsReply.speak("Photo captured.")
+      // Earcon only: TtsReply speaks the reply, so the Announcer stays quiet (one voice).
+      EarconPlayer.shared.play(.done)
+      ttsReply.speak("Photo captured.", isRecording: isRecording)
       activePreview = .photo(image)
     }
   }
@@ -602,7 +776,13 @@ final class CameraViewModel {
   }
 
   private func showError(_ message: String) {
-    errorMessage = message
+    showError(.plain(message))
+  }
+
+  private func showError(_ problem: CameraProblem) {
+    errorTitle = problem.title
+    errorMessage = problem.message
+    errorAction = problem.action
     showError = true
   }
 }

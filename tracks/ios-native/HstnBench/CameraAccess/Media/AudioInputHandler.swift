@@ -32,6 +32,9 @@ final class AudioInputHandler: Sendable {
     var mediaServicesResetObserver: NSObjectProtocol?
     var foregroundObserver: NSObjectProtocol?
     var isListening: Bool = false
+    // True while a tap is installed on the input node. Without one there's nothing to capture,
+    // so the engine stays off and the input node is never touched.
+    var hasInputTap: Bool = false
     var wasListeningBeforeInterruption: Bool = false
     var isBluetoothConnected: Bool = false
     var onAudioBuffer: (@Sendable ([Float], Int, AudioStreamBasicDescription) -> Void)?
@@ -87,7 +90,7 @@ final class AudioInputHandler: Sendable {
   func startListening() {
     // Claim the transition under the lock, then start the engine outside it.
     let engine: AVAudioEngine? = state.withLockUnchecked { state in
-      guard !state.isListening else { return nil }
+      guard !state.isListening, state.hasInputTap else { return nil }
       state.isListening = true
       return state.audioEngine
     }
@@ -103,18 +106,24 @@ final class AudioInputHandler: Sendable {
   }
 
   func stopListening() {
-    let engine: AVAudioEngine? = state.withLockUnchecked { state in
-      guard state.isListening else { return nil }
+    let (wasListening, hadInputTap, engine) = state.withLockUnchecked { state -> (Bool, Bool, AVAudioEngine) in
+      let snapshot = (state.isListening, state.hasInputTap, state.audioEngine)
       state.isListening = false
       state.wasListeningBeforeInterruption = false
-      return state.audioEngine
+      state.hasInputTap = false
+      return snapshot
     }
-    guard let engine else { return }
 
-    engine.stop()
-    engine.inputNode.removeTap(onBus: 0)
+    if wasListening {
+      engine.stop()
+    }
+    // Remove the tap even if the engine never started, so the next recording can install one.
+    if hadInputTap {
+      engine.inputNode.removeTap(onBus: 0)
+    }
     // Terminal stop: deactivate the shared session we claimed in configureBluetooth()
-    // so other apps' audio can resume (.notifyOthersOnDeactivation prompts them).
+    // so other apps' audio can resume (.notifyOthersOnDeactivation prompts them). This runs
+    // for video-only recordings too, since configureBluetooth() claims the session either way.
     do {
       try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     } catch {
@@ -266,16 +275,20 @@ final class AudioInputHandler: Sendable {
   }
 
   private func attemptAudioReset() {
-    let (wasListening, engine) = state.withLockUnchecked { state -> (Bool, AVAudioEngine) in
+    let (wasListening, hadInputTap, engine) = state.withLockUnchecked { state -> (Bool, Bool, AVAudioEngine) in
       let wasListening = state.isListening
+      let hadInputTap = state.hasInputTap
       state.isListening = false
-      return (wasListening, state.audioEngine)
+      state.hasInputTap = false
+      return (wasListening, hadInputTap, state.audioEngine)
     }
 
     if engine.isRunning {
       engine.stop()
     }
-    engine.inputNode.removeTap(onBus: 0)
+    if hadInputTap {
+      engine.inputNode.removeTap(onBus: 0)
+    }
 
     configureBluetooth()
 
@@ -317,16 +330,18 @@ final class AudioInputHandler: Sendable {
     // and record video-only — the phone mic is never used, even as a fallback.
     let glassesActive = audioSession.currentRoute.inputs.contains { $0.portType == .bluetoothHFP }
 
-    // Snapshot under the lock, then install the tap outside it — installTap can fire
+    // Snapshot under the lock, then touch the engine outside it — installTap can fire
     // the callback synchronously, re-entering the lock and deadlocking.
-    let inputNode = state.withLockUnchecked { state -> AVAudioInputNode in
+    let (engine, callback) = state.withLockUnchecked { state in
       state.isBluetoothConnected = glassesActive
-      return state.audioEngine.inputNode
+      return (state.audioEngine, state.onAudioBuffer)
     }
-    let callback = state.withLockUnchecked { $0.onAudioBuffer }
 
+    // Read `inputNode` only when the glasses mic is active: the first read brings up the
+    // input I/O unit, which on a host with no usable mic (the Simulator) can stall the audio
+    // server until it aborts the app with an RPC timeout.
     if glassesActive, let callback {
-      setupAudioEngineTap(inputNode: inputNode, onAudioBuffer: callback)
+      setupAudioEngineTap(inputNode: engine.inputNode, onAudioBuffer: callback)
     }
     if !glassesActive {
       // No glasses HFP mic → recording video-only; tell the app so it can reflect mic-off.
@@ -359,5 +374,6 @@ final class AudioInputHandler: Sendable {
 
       onAudioBuffer(audioData, frameCount, bufferFormat)
     }
+    state.withLockUnchecked { $0.hasInputTap = true }
   }
 }

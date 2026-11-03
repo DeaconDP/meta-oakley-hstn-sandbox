@@ -9,7 +9,8 @@
 //
 // CircleButton.swift
 //
-// Reusable circular button component used in streaming controls and UI actions.
+// Reusable button component used in streaming controls and UI actions.
+// HstnBench: with text, a chunky full-width button; without, a round chunky one, 60 pt across.
 //
 
 import SwiftUI
@@ -18,24 +19,37 @@ struct CircleButton: View {
   let icon: String
   let text: String?
   let action: () -> Void
+  /// VoiceOver name for an icon-only button (the SF Symbol name would be read otherwise).
+  let accessibilityLabel: String?
+
+  init(icon: String, text: String?, accessibilityLabel: String? = nil, action: @escaping () -> Void) {
+    self.icon = icon
+    self.text = text
+    self.accessibilityLabel = accessibilityLabel
+    self.action = action
+  }
 
   var body: some View {
-    Button(action: action) {
+    Group {
       if let text {
-        VStack(spacing: 2) {
-          Image(systemName: icon)
-            .font(.system(size: 14))
-          Text(text)
-            .font(.system(size: 10, weight: .medium))
+        Button(action: action) {
+          HStack(spacing: 8) {
+            Image(systemName: icon)
+              .accessibilityHidden(true)
+            Text(text)
+          }
         }
+        .buttonStyle(.a11yPrimary)
       } else {
-        Image(systemName: icon)
-          .font(.system(size: 16))
+        Button(action: action) {
+          Image(systemName: icon)
+            .font(.rounded(.title3, weight: .heavy))
+            .accessibilityHidden(true)
+        }
+        .buttonStyle(ChunkyButtonStyle(tone: .neutral, lipHeight: 5, radius: 33))
+        .frame(width: 66)
       }
     }
-    .foregroundStyle(.black)
-    .frame(width: 56, height: 56)
-    .background(.white)
-    .clipShape(Circle())
+    .accessibilityLabel(accessibilityLabel ?? text ?? icon)
   }
 }

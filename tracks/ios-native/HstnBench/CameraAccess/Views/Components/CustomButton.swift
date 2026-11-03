@@ -10,6 +10,7 @@
 // CustomButton.swift
 //
 // Reusable button component used throughout the CameraAccess app for consistent styling.
+// HstnBench: the chunky button from A11y/Theme, at least 60 pt tall, wrapping at large text.
 //
 
 import SwiftUI
@@ -21,23 +22,13 @@ struct CustomButton: View {
   let action: () -> Void
 
   enum ButtonStyle {
-    case primary, destructive
+    case primary, secondary, destructive
 
-    var backgroundColor: Color {
+    var tone: Tone {
       switch self {
-      case .primary:
-        return .appPrimary
-      case .destructive:
-        return .destructiveBackground
-      }
-    }
-
-    var foregroundColor: Color {
-      switch self {
-      case .primary:
-        return .white
-      case .destructive:
-        return .destructiveForeground
+      case .primary: .green
+      case .secondary: .neutral
+      case .destructive: .red
       }
     }
   }
@@ -45,14 +36,8 @@ struct CustomButton: View {
   var body: some View {
     Button(action: action) {
       Text(title)
-        .font(.system(size: 15, weight: .semibold))
-        .foregroundStyle(style.foregroundColor)
-        .frame(maxWidth: .infinity)
-        .frame(height: 56)
-        .background(style.backgroundColor)
-        .cornerRadius(30)
     }
+    .buttonStyle(ChunkyButtonStyle(tone: style.tone))
     .disabled(isDisabled)
-    .opacity(isDisabled ? 0.6 : 1.0)
   }
 }

@@ -42,6 +42,7 @@
    - Session narrator (demo 4 in notes/a11y-sdk-mapping.md): speaks "glasses removed, paused", "folded, session ended", battery thresholds and thermal step-down. It also rebuilds the session when the hinges reopen. GA only.
    - Frame pipeline: keeps the stream warm and grabs the sharpest recent frame, with optional face blurring on the phone.
    - Accessible phone UI: large trigger buttons, settings, a WCAG 2.2 AA pass, and TalkBack/VoiceOver tests.
+   - Onboarding and launch: first run with the screen reader on, spoken handoffs to and from Meta AI, a hardware check, launching without the screen, and spoken recovery messages. (notes/a11y-onboarding.md)
 5. **Showcase demos, GA-only (shippable)**
    - **Read it aloud (word for word)**: on-device OCR with spoken framing guidance ("move left", "text cut off on the right"), next/previous sentence, and uncertain words flagged. Refuses on doses and money it can't verify.
    - **Book reader** (extends Read it aloud): reads a printed book page by page. It detects page turns, splits two-page spreads, drops headers and page numbers, and captures the next page while the current one is spoken. A resolution experiment comes first: the GA in-stream photo (960x1440 on the mock) may be too low-res for a full page of book print, and FULL 12 MP photo is Experimental. (notes/book-reader.md)

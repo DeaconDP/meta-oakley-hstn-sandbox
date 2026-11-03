@@ -16,6 +16,7 @@
 		8FD96B952E6F0F7D00F56AB1 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8FD96B942E6F0F7D00F56AB1 /* MWDATCore */; };
 		8FD96B952E6F0F7D00F56AB2 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = 8FD96B942E6F0F7D00F56AB2 /* MWDATCamera */; };
 		8FD96B952E6F0F7D00F56AB3 /* MWDATMockDevice in Frameworks */ = {isa = PBXBuildFile; productRef = 8FD96B942E6F0F7D00F56AB3 /* MWDATMockDevice */; };
+		8FD96B952E6F0F7D00F56AB4 /* MWDATSpeech in Frameworks */ = {isa = PBXBuildFile; productRef = 8FD96B942E6F0F7D00F56AB4 /* MWDATSpeech */; };
 		E66CC01D2F3E1A9300B07380 /* MWDATMockDeviceTestClient in Frameworks */ = {isa = PBXBuildFile; productRef = E66CC01E2F3E1A9300B07380 /* MWDATMockDeviceTestClient */; };
 		8FFD5FF52E8422580035E446 /* CircleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD5FF22E8422580035E446 /* CircleButton.swift */; };
 		8FFD5FF62E8422580035E446 /* CustomButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD5FF32E8422580035E446 /* CustomButton.swift */; };
@@ -110,6 +111,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		A11A0000000000000000000F /* A11y */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = A11y; sourceTree = "<group>"; };
 		E66CC00E2F3E05D900B07379 /* CameraAccessUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CameraAccessUITests; sourceTree = "<group>"; };
 		E699CC962E8150670052C240 /* CameraAccessTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CameraAccessTests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -122,6 +124,7 @@
 				8FD96B952E6F0F7D00F56AB1 /* MWDATCore in Frameworks */,
 				8FD96B952E6F0F7D00F56AB2 /* MWDATCamera in Frameworks */,
 				8FD96B952E6F0F7D00F56AB3 /* MWDATMockDevice in Frameworks */,
+				8FD96B952E6F0F7D00F56AB4 /* MWDATSpeech in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -213,6 +216,7 @@
 		8FD96B7D2E6F0A9800F56AB1 /* CameraAccess */ = {
 			isa = PBXGroup;
 			children = (
+				A11A0000000000000000000F /* A11y */,
 				E66CC01A2F3E1A9300B07379 /* TestResources */,
 				8FD96B702E6F0A9800F56AB1 /* ViewModels */,
 				B3C4000000000000000000F0 /* Bench */,
@@ -281,6 +285,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A11A0000000000000000000F /* A11y */,
 			);
 			name = CameraAccess;
 			productName = CameraAccess;
@@ -813,6 +820,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 95F7F3332DEF0D91006D1C1A /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
 			productName = MWDATMockDevice;
+		};
+		8FD96B942E6F0F7D00F56AB4 /* MWDATSpeech */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 95F7F3332DEF0D91006D1C1A /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATSpeech;
 		};
 		E66CC01E2F3E1A9300B07380 /* MWDATMockDeviceTestClient */ = {
 			isa = XCSwiftPackageProductDependency;

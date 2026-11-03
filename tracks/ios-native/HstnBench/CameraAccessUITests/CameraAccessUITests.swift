@@ -208,6 +208,29 @@ final class CameraAccessUITests: XCTestCase {
     waitForActiveDevice()
   }
 
+  /// Regression: the Start session button's accessibility frame used to be the whole bottom
+  /// layer, so its hit point (and VoiceOver's activation point) landed on the invisible, disabled
+  /// capture controls. Before a session those controls must be absent from the accessibility
+  /// tree, and the button must be its own 60 pt target that a tap actually activates.
+  func testStartSessionButtonIsItsOwnTarget() async {
+    await pairDeviceWithCameraResources()
+    let startSession = waitForActiveDevice()
+
+    for id in ["start_preview_button", "capture_button", "read_button", "record_button"] {
+      XCTAssertFalse(app.buttons[id].exists, "\(id) must not be exposed before a session")
+    }
+    XCTAssertFalse(app.switches["mic_toggle"].exists, "mic_toggle must not be exposed before a session")
+
+    XCTAssertTrue(startSession.isHittable, "Start session should be hittable")
+    XCTAssertLessThanOrEqual(startSession.frame.height, 120, "Start session's frame should be the button, not its container")
+    let window = app.windows.firstMatch.frame
+    XCTAssertLessThan(startSession.frame.width, window.width, "Start session's frame should be the button, not its container")
+
+    // A coordinate tap at the button's centre (what a finger does) must start the session.
+    startSession.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    XCTAssertTrue(app.buttons["end_session_button"].waitForExistence(timeout: 15), "Tapping Start session should start a session")
+  }
+
   /// Verifies that the device state query reflects the correct number of paired devices.
   func testDeviceStateReflectsPairedDevices() async {
     // Initially no devices paired

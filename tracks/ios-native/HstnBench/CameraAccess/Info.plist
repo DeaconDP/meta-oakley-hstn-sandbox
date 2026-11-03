@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Camera Access</string>
+	<string>HSTN Reader</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -73,7 +73,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to stream from your phone's camera as a mock device feed.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs microphone access to record sound from your glasses' microphone alongside video.</string>
+	<string>HSTN Reader listens for your spoken commands, such as "read" and "stop", and records sound from your glasses' microphone alongside video. Commands are recognised on this phone and nothing you say is stored.</string>
+		<key>NSSpeechRecognitionUsageDescription</key>
+		<string>HSTN Reader recognises your spoken commands on this phone, so you can use it without touching the screen. Nothing you say is stored or sent anywhere.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

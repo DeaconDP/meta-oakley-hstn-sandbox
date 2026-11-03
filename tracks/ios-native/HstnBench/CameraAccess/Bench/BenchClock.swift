@@ -34,6 +34,18 @@ final class BenchClock: @unchecked Sendable {
     logger.notice("metric=\(metric, privacy: .public) ms=\(elapsedMs, privacy: .public)\(suffix, privacy: .public)")
   }
 
+  /// Logs a value measured elsewhere (a duration between two callbacks timestamped separately,
+  /// or an age) in the same `metric=... ms=...` layout, so bench.sh summarises it too.
+  func record(_ metric: String, ms: Int, detail: String = "") {
+    let suffix = detail.isEmpty ? "" : " \(detail)"
+    logger.notice("metric=\(metric, privacy: .public) ms=\(max(0, ms), privacy: .public)\(suffix, privacy: .public)")
+  }
+
+  /// Monotonic now, in the same clock as start/end, for callers that timestamp themselves.
+  static func uptimeNanoseconds() -> UInt64 {
+    DispatchTime.now().uptimeNanoseconds
+  }
+
   func note(_ message: String) {
     logger.notice("\(message, privacy: .public)")
   }
