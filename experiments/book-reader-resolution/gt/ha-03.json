@@ -1,0 +1,463 @@
+{
+ "id": "ha-03",
+ "kind": "hardback",
+ "image_mm": [
+  152,
+  229
+ ],
+ "px_per_mm": 12.0,
+ "font": "pala.ttf",
+ "size_pt": 12,
+ "leading_pt": 14.5,
+ "x_height_mm": 2.0,
+ "pages": [
+  {
+   "page_no": 5,
+   "rect": [
+    0,
+    0,
+    152,
+    229
+   ],
+   "gutter": "left"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  152,
+  114.5
+ ],
+ "lines": [
+  {
+   "text": "tain,” gallantly shot him through the head and rode away;",
+   "x0": 19.0,
+   "y0": 20.0,
+   "x1": 135.00000000000003,
+   "y1": 23.166666666666668,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "the mail was waylaid by seven robbers, and the guard shot",
+   "x0": 19.0,
+   "y0": 25.115277777777777,
+   "x1": 134.99999999999997,
+   "y1": 28.281944444444445,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "three dead, and then got shot dead himself by the other four,",
+   "x0": 19.0,
+   "y0": 30.230555555555554,
+   "x1": 134.99999999999997,
+   "y1": 33.39722222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“in consequence of the failure of his ammunition:” after",
+   "x0": 19.0,
+   "y0": 35.34583333333333,
+   "x1": 135.0,
+   "y1": 38.512499999999996,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "which the mail was robbed in peace; that magnificent poten-",
+   "x0": 19.0,
+   "y0": 40.46111111111111,
+   "x1": 134.99999999999997,
+   "y1": 43.62777777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "tate, the Lord Mayor of London, was made to stand and",
+   "x0": 19.0,
+   "y0": 45.576388888888886,
+   "x1": 134.99999999999997,
+   "y1": 48.74305555555555,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "deliver on Turnham Green, by one highwayman, who des-",
+   "x0": 19.0,
+   "y0": 50.69166666666666,
+   "x1": 135.0,
+   "y1": 53.85833333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "poiled the illustrious creature in sight of all his retinue.",
+   "x0": 19.0,
+   "y0": 55.80694444444444,
+   "x1": 122.91666666666667,
+   "y1": 58.973611111111104,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "All these things, and a thousand like them, came to pass",
+   "x0": 25.375,
+   "y0": 60.92222222222222,
+   "x1": 134.95833333333331,
+   "y1": 64.08888888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "in and close upon the dear old year one thousand seven",
+   "x0": 19.0,
+   "y0": 66.0375,
+   "x1": 135.0,
+   "y1": 69.20416666666667,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "hundred and seventy-five. Environed by them, while the",
+   "x0": 19.0,
+   "y0": 71.15277777777777,
+   "x1": 135.00000000000003,
+   "y1": 74.31944444444444,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Woodman and the Farmer worked unheeded, those two of",
+   "x0": 19.0,
+   "y0": 76.26805555555555,
+   "x1": 135.0,
+   "y1": 79.43472222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "the large jaws, and those other two of the plain and the fair",
+   "x0": 19.0,
+   "y0": 81.38333333333333,
+   "x1": 135.00000000000003,
+   "y1": 84.55,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "faces, trod with stir enough, and carried their divine rights",
+   "x0": 19.0,
+   "y0": 86.4986111111111,
+   "x1": 135.0,
+   "y1": 89.66527777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "with a high hand. Thus did the year one thousand seven",
+   "x0": 19.0,
+   "y0": 91.61388888888888,
+   "x1": 135.0,
+   "y1": 94.78055555555555,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "hundred and seventy-five conduct their Greatnesses, and",
+   "x0": 19.0,
+   "y0": 96.72916666666666,
+   "x1": 135.00000000000003,
+   "y1": 99.89583333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "myriads of small creatures—the creatures of this chronicle",
+   "x0": 19.0,
+   "y0": 101.84444444444443,
+   "x1": 134.99999999999997,
+   "y1": 105.0111111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "among the rest—along the roads that lay before them.",
+   "x0": 19.0,
+   "y0": 106.95972222222221,
+   "x1": 120.66666666666667,
+   "y1": 110.12638888888888,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Stave One. Marley’s Ghost",
+   "x0": 42.252604166666664,
+   "y0": 116.16722222222221,
+   "x1": 111.74739583333334,
+   "y1": 121.9047222222222,
+   "col": 0,
+   "heading": true,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Marley was dead: to begin with. There is no doubt whatever",
+   "x0": 19.0,
+   "y0": 127.42083333333332,
+   "x1": 134.99999999999997,
+   "y1": 130.58749999999998,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "about that. The register of his burial was signed by the cler-",
+   "x0": 19.0,
+   "y0": 132.5361111111111,
+   "x1": 135.00000000000003,
+   "y1": 135.70277777777775,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "gyman, the clerk, the undertaker, and the chief mourner.",
+   "x0": 19.0,
+   "y0": 137.65138888888887,
+   "x1": 135.0,
+   "y1": 140.81805555555553,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Scrooge signed it: and Scrooge’s name was good upon",
+   "x0": 19.0,
+   "y0": 142.76666666666665,
+   "x1": 135.0,
+   "y1": 145.9333333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "‘Change, for anything he chose to put his hand to. Old",
+   "x0": 19.0,
+   "y0": 147.88194444444443,
+   "x1": 135.00000000000003,
+   "y1": 151.0486111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Marley was as dead as a door-nail.",
+   "x0": 19.0,
+   "y0": 152.9972222222222,
+   "x1": 84.58072916666667,
+   "y1": 156.16388888888886,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Mind! I don’t mean to say that I know, of my own know-",
+   "x0": 25.375,
+   "y0": 158.11249999999998,
+   "x1": 134.95833333333331,
+   "y1": 161.27916666666664,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "ledge, what there is particularly dead about a door-nail. I",
+   "x0": 19.0,
+   "y0": 163.22777777777776,
+   "x1": 135.00000000000003,
+   "y1": 166.39444444444442,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "might have been inclined, myself, to regard a coffin-nail as",
+   "x0": 19.0,
+   "y0": 168.34305555555554,
+   "x1": 134.99999999999997,
+   "y1": 171.5097222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "the deadest piece of ironmongery in the trade. But the",
+   "x0": 19.0,
+   "y0": 173.45833333333331,
+   "x1": 134.99999999999997,
+   "y1": 176.62499999999997,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "wisdom of our ancestors is in the simile; and my unhallowed",
+   "x0": 19.0,
+   "y0": 178.5736111111111,
+   "x1": 135.0,
+   "y1": 181.74027777777775,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "hands shall not disturb it, or the Country’s done for. You will",
+   "x0": 19.0,
+   "y0": 183.68888888888887,
+   "x1": 134.99999999999997,
+   "y1": 186.85555555555553,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "therefore permit me to repeat, emphatically, that Marley was",
+   "x0": 19.0,
+   "y0": 188.80416666666665,
+   "x1": 135.0,
+   "y1": 191.9708333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "as dead as a door-nail.",
+   "x0": 19.0,
+   "y0": 193.91944444444442,
+   "x1": 61.415364583333336,
+   "y1": 197.08611111111108,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Scrooge knew he was dead? Of course he did. How could",
+   "x0": 25.375,
+   "y0": 199.0347222222222,
+   "x1": 134.95833333333334,
+   "y1": 202.20138888888886,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "header",
+   "text": "I. The Period",
+   "box": [
+    67.29231770833333,
+    12.0,
+    86.70768229166666,
+    15.485
+   ]
+  },
+  {
+   "kind": "page_number",
+   "text": "5",
+   "box": [
+    76.125,
+    215.0,
+    77.875,
+    218.485
+   ]
+  }
+ ]
+}

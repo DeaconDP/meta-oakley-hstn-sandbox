@@ -1,0 +1,463 @@
+{
+ "id": "pa-03",
+ "kind": "paperback",
+ "image_mm": [
+  110,
+  178
+ ],
+ "px_per_mm": 12.0,
+ "font": "times.ttf",
+ "size_pt": 11,
+ "leading_pt": 12.4,
+ "x_height_mm": 1.833,
+ "pages": [
+  {
+   "page_no": 3,
+   "rect": [
+    0,
+    0,
+    110,
+    178
+   ],
+   "gutter": "left"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  110,
+  89.0
+ ],
+ "lines": [
+  {
+   "text": "comers. Indeed you must go, for it will be impossible",
+   "x0": 12.0,
+   "y0": 13.0,
+   "x1": 101.00000000000004,
+   "y1": 16.5,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "for us to visit him if you do not.”",
+   "x0": 12.0,
+   "y0": 17.374444444444443,
+   "x1": 64.41666666666667,
+   "y1": 20.874444444444443,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“You are over-scrupulous, surely. I dare say Mr.",
+   "x0": 17.875,
+   "y0": 21.748888888888885,
+   "x1": 100.95833333333333,
+   "y1": 25.248888888888885,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Bingley will be very glad to see you; and I will send a",
+   "x0": 12.0,
+   "y0": 26.123333333333328,
+   "x1": 101.0,
+   "y1": 29.623333333333328,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "few lines by you to assure him of my hearty consent to",
+   "x0": 12.0,
+   "y0": 30.49777777777777,
+   "x1": 100.99999999999999,
+   "y1": 33.99777777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "his marrying whichever he chooses of the girls; though",
+   "x0": 12.0,
+   "y0": 34.87222222222221,
+   "x1": 101.0,
+   "y1": 38.37222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "I must throw in a good word for my little Lizzy.”",
+   "x0": 12.0,
+   "y0": 39.246666666666655,
+   "x1": 89.91276041666667,
+   "y1": 42.746666666666655,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“I desire you will do no such thing. Lizzy is not a",
+   "x0": 17.875,
+   "y0": 43.6211111111111,
+   "x1": 100.95833333333336,
+   "y1": 47.1211111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "bit better than the others; and I am sure she is not half",
+   "x0": 12.0,
+   "y0": 47.99555555555554,
+   "x1": 101.0,
+   "y1": 51.49555555555554,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "so handsome as Jane, nor half so good-humoured as",
+   "x0": 12.0,
+   "y0": 52.36999999999998,
+   "x1": 101.0,
+   "y1": 55.86999999999998,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Lydia. But you are always giving her the preference.”",
+   "x0": 12.0,
+   "y0": 56.744444444444426,
+   "x1": 97.24609375,
+   "y1": 60.244444444444426,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“They have none of them much to recommend",
+   "x0": 17.875,
+   "y0": 61.11888888888887,
+   "x1": 100.95833333333333,
+   "y1": 64.61888888888888,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "them,” replied he; “they are all silly and ignorant like",
+   "x0": 12.0,
+   "y0": 65.49333333333331,
+   "x1": 101.0,
+   "y1": 68.99333333333331,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "other girls; but Lizzy has something more of quickness",
+   "x0": 12.0,
+   "y0": 69.86777777777776,
+   "x1": 101.0,
+   "y1": 73.36777777777776,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "than her sisters.”",
+   "x0": 12.0,
+   "y0": 74.24222222222221,
+   "x1": 38.416666666666664,
+   "y1": 77.74222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“Mr. Bennet, how can you abuse your own children",
+   "x0": 17.875,
+   "y0": 78.61666666666666,
+   "x1": 100.95833333333333,
+   "y1": 82.11666666666666,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "in such a way? You take delight in vexing me. You",
+   "x0": 12.0,
+   "y0": 82.99111111111111,
+   "x1": 101.0,
+   "y1": 86.49111111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "have no compassion for my poor nerves.”",
+   "x0": 12.0,
+   "y0": 87.36555555555556,
+   "x1": 78.33333333333333,
+   "y1": 90.86555555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“You mistake me, my dear. I have a high respect for",
+   "x0": 17.875,
+   "y0": 91.74000000000001,
+   "x1": 100.95833333333333,
+   "y1": 95.24000000000001,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "your nerves. They are my old friends. I have heard you",
+   "x0": 12.0,
+   "y0": 96.11444444444446,
+   "x1": 100.99999999999999,
+   "y1": 99.61444444444446,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "mention them with consideration these last twenty years",
+   "x0": 12.0,
+   "y0": 100.48888888888891,
+   "x1": 101.0,
+   "y1": 103.98888888888891,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "at least.”",
+   "x0": 12.0,
+   "y0": 104.86333333333336,
+   "x1": 25.75,
+   "y1": 108.36333333333336,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“Ah, you do not know what I suffer.”",
+   "x0": 17.875,
+   "y0": 109.23777777777781,
+   "x1": 77.328125,
+   "y1": 112.73777777777781,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“But I hope you will get over it, and live to see",
+   "x0": 17.875,
+   "y0": 113.61222222222226,
+   "x1": 100.95833333333333,
+   "y1": 117.11222222222226,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "many young men of four thousand a year come into the",
+   "x0": 12.0,
+   "y0": 117.98666666666671,
+   "x1": 101.0,
+   "y1": 121.48666666666671,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "neighbourhood.”",
+   "x0": 12.0,
+   "y0": 122.36111111111116,
+   "x1": 38.916666666666664,
+   "y1": 125.86111111111116,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“It will be no use to us, if twenty such should come,",
+   "x0": 17.875,
+   "y0": 126.7355555555556,
+   "x1": 100.95833333333331,
+   "y1": 130.2355555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "since you will not visit them.”",
+   "x0": 12.0,
+   "y0": 131.11000000000004,
+   "x1": 59.666666666666664,
+   "y1": 134.61000000000004,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“Depend upon it, my dear, that when there are",
+   "x0": 17.875,
+   "y0": 135.48444444444448,
+   "x1": 100.95833333333333,
+   "y1": 138.98444444444448,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "twenty, I will visit them all.”",
+   "x0": 12.0,
+   "y0": 139.8588888888889,
+   "x1": 57.49609375,
+   "y1": 143.3588888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Mr. Bennet was so odd a mixture of quick parts,",
+   "x0": 17.875,
+   "y0": 144.23333333333335,
+   "x1": 100.95833333333331,
+   "y1": 147.73333333333335,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "sarcastic humour, reserve, and caprice, that the",
+   "x0": 12.0,
+   "y0": 148.60777777777778,
+   "x1": 101.0,
+   "y1": 152.10777777777778,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "experience of three-and-twenty years had been insuf-",
+   "x0": 12.0,
+   "y0": 152.98222222222222,
+   "x1": 101.0,
+   "y1": 156.48222222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "ficient to make his wife understand his character. Her",
+   "x0": 12.0,
+   "y0": 157.35666666666665,
+   "x1": 101.0,
+   "y1": 160.85666666666665,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "header",
+   "text": "Chapter I",
+   "box": [
+    50.5,
+    5.0,
+    62.5,
+    8.211666666666666
+   ]
+  },
+  {
+   "kind": "page_number",
+   "text": "3",
+   "box": [
+    99.41666666666667,
+    5.0,
+    101.0,
+    8.211666666666666
+   ]
+  }
+ ]
+}

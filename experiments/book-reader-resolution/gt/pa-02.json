@@ -1,0 +1,463 @@
+{
+ "id": "pa-02",
+ "kind": "paperback",
+ "image_mm": [
+  110,
+  178
+ ],
+ "px_per_mm": 12.0,
+ "font": "times.ttf",
+ "size_pt": 11,
+ "leading_pt": 12.4,
+ "x_height_mm": 1.833,
+ "pages": [
+  {
+   "page_no": 2,
+   "rect": [
+    0,
+    0,
+    110,
+    178
+   ],
+   "gutter": "right"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  110,
+  89.0
+ ],
+ "lines": [
+  {
+   "text": "house by the end of next week.”",
+   "x0": 9.0,
+   "y0": 13.0,
+   "x1": 60.083333333333336,
+   "y1": 16.5,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“What is his name?”",
+   "x0": 14.875,
+   "y0": 17.374444444444443,
+   "x1": 47.333333333333336,
+   "y1": 20.874444444444443,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“Bingley.”",
+   "x0": 14.875,
+   "y0": 21.748888888888885,
+   "x1": 31.829427083333332,
+   "y1": 25.248888888888885,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“Is he married or single?”",
+   "x0": 14.875,
+   "y0": 26.123333333333328,
+   "x1": 55.75,
+   "y1": 29.623333333333328,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“Oh! single, my dear, to be sure! A single man of",
+   "x0": 14.875,
+   "y0": 30.49777777777777,
+   "x1": 97.95833333333336,
+   "y1": 33.99777777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "large fortune; four or five thousand a year. What a fine",
+   "x0": 9.0,
+   "y0": 34.87222222222221,
+   "x1": 98.0,
+   "y1": 38.37222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "thing for our girls!”",
+   "x0": 9.0,
+   "y0": 39.246666666666655,
+   "x1": 40.25,
+   "y1": 42.746666666666655,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“How so? how can it affect them?”",
+   "x0": 14.875,
+   "y0": 43.6211111111111,
+   "x1": 70.41536458333333,
+   "y1": 47.1211111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“My dear Mr. Bennet,” replied his wife, “how can",
+   "x0": 14.875,
+   "y0": 47.99555555555554,
+   "x1": 97.95833333333333,
+   "y1": 51.49555555555554,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "you be so tiresome! You must know that I am thinking",
+   "x0": 9.0,
+   "y0": 52.36999999999998,
+   "x1": 98.00000000000001,
+   "y1": 55.86999999999998,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "of his marrying one of them.”",
+   "x0": 9.0,
+   "y0": 56.744444444444426,
+   "x1": 56.25,
+   "y1": 60.244444444444426,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“Is that his design in settling here?”",
+   "x0": 14.875,
+   "y0": 61.11888888888887,
+   "x1": 71.25,
+   "y1": 64.61888888888888,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“Design! nonsense, how can you talk so! But it is",
+   "x0": 14.875,
+   "y0": 65.49333333333331,
+   "x1": 97.95833333333333,
+   "y1": 68.99333333333331,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "very likely that he may fall in love with one of them,",
+   "x0": 9.0,
+   "y0": 69.86777777777776,
+   "x1": 98.00000000000001,
+   "y1": 73.36777777777776,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and therefore you must visit him as soon as he comes.”",
+   "x0": 9.0,
+   "y0": 74.24222222222221,
+   "x1": 96.25,
+   "y1": 77.74222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“I see no occasion for that. You and the girls may",
+   "x0": 14.875,
+   "y0": 78.61666666666666,
+   "x1": 97.95833333333333,
+   "y1": 82.11666666666666,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "go, or you may send them by themselves, which per-",
+   "x0": 9.0,
+   "y0": 82.99111111111111,
+   "x1": 98.00000000000001,
+   "y1": 86.49111111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "haps will be still better; for as you are as handsome as",
+   "x0": 9.0,
+   "y0": 87.36555555555556,
+   "x1": 98.0,
+   "y1": 90.86555555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "any of them, Mr. Bingley might like you the best of the",
+   "x0": 9.0,
+   "y0": 91.74000000000001,
+   "x1": 98.0,
+   "y1": 95.24000000000001,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "party.”",
+   "x0": 9.0,
+   "y0": 96.11444444444446,
+   "x1": 19.912760416666668,
+   "y1": 99.61444444444446,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“My dear, you flatter me. I certainly have had my",
+   "x0": 14.875,
+   "y0": 100.48888888888891,
+   "x1": 97.95833333333333,
+   "y1": 103.98888888888891,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "share of beauty, but I do not pretend to be anything",
+   "x0": 9.0,
+   "y0": 104.86333333333336,
+   "x1": 97.99999999999999,
+   "y1": 108.36333333333336,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "extraordinary now. When a woman has five grown-up",
+   "x0": 9.0,
+   "y0": 109.23777777777781,
+   "x1": 98.0,
+   "y1": 112.73777777777781,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "daughters, she ought to give over thinking of her own",
+   "x0": 9.0,
+   "y0": 113.61222222222226,
+   "x1": 98.0,
+   "y1": 117.11222222222226,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "beauty.”",
+   "x0": 9.0,
+   "y0": 117.98666666666671,
+   "x1": 22.329427083333332,
+   "y1": 121.48666666666671,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“In such cases, a woman has not often much beauty",
+   "x0": 14.875,
+   "y0": 122.36111111111116,
+   "x1": 97.95833333333331,
+   "y1": 125.86111111111116,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "to think of.”",
+   "x0": 9.0,
+   "y0": 126.7355555555556,
+   "x1": 28.333333333333332,
+   "y1": 130.2355555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“But, my dear, you must indeed go and see Mr.",
+   "x0": 14.875,
+   "y0": 131.11000000000004,
+   "x1": 97.95833333333331,
+   "y1": 134.61000000000004,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Bingley when he comes into the neighbourhood.”",
+   "x0": 9.0,
+   "y0": 135.48444444444448,
+   "x1": 87.83333333333333,
+   "y1": 138.98444444444448,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“It is more than I engage for, I assure you.”",
+   "x0": 14.875,
+   "y0": 139.8588888888889,
+   "x1": 83.74739583333333,
+   "y1": 143.3588888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“But consider your daughters. Only think what an",
+   "x0": 14.875,
+   "y0": 144.23333333333335,
+   "x1": 97.95833333333333,
+   "y1": 147.73333333333335,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "establishment it would be for one of them. Sir William",
+   "x0": 9.0,
+   "y0": 148.60777777777778,
+   "x1": 98.0,
+   "y1": 152.10777777777778,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and Lady Lucas are determined to go, merely on that",
+   "x0": 9.0,
+   "y0": 152.98222222222222,
+   "x1": 98.0,
+   "y1": 156.48222222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "account, for in general, you know, they visit no new-",
+   "x0": 9.0,
+   "y0": 157.35666666666665,
+   "x1": 98.00000000000001,
+   "y1": 160.85666666666665,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "header",
+   "text": "PRIDE AND PREJUDICE",
+   "box": [
+    36.45963541666667,
+    5.0,
+    70.54036458333334,
+    8.211666666666666
+   ]
+  },
+  {
+   "kind": "page_number",
+   "text": "2",
+   "box": [
+    9,
+    5.0,
+    10.583333333333334,
+    8.211666666666666
+   ]
+  }
+ ]
+}

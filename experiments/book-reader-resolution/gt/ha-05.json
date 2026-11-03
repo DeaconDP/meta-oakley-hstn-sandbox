@@ -1,0 +1,487 @@
+{
+ "id": "ha-05",
+ "kind": "hardback",
+ "image_mm": [
+  152,
+  229
+ ],
+ "px_per_mm": 12.0,
+ "font": "pala.ttf",
+ "size_pt": 12,
+ "leading_pt": 14.5,
+ "x_height_mm": 2.0,
+ "pages": [
+  {
+   "page_no": 7,
+   "rect": [
+    0,
+    0,
+    152,
+    229
+   ],
+   "gutter": "left"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  152,
+  114.5
+ ],
+ "lines": [
+  {
+   "text": "External heat and cold had little influence on Scrooge. No",
+   "x0": 25.375,
+   "y0": 20.0,
+   "x1": 134.95833333333334,
+   "y1": 23.166666666666668,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "warmth could warm, no wintry weather chill him. No wind",
+   "x0": 19.0,
+   "y0": 25.115277777777777,
+   "x1": 134.99999999999997,
+   "y1": 28.281944444444445,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "that blew was bitterer than he, no falling snow was more",
+   "x0": 19.0,
+   "y0": 30.230555555555554,
+   "x1": 135.00000000000003,
+   "y1": 33.39722222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "intent upon its purpose, no pelting rain less open to entreaty.",
+   "x0": 19.0,
+   "y0": 35.34583333333333,
+   "x1": 135.0,
+   "y1": 38.512499999999996,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Foul weather didn’t know where to have him. The heaviest",
+   "x0": 19.0,
+   "y0": 40.46111111111111,
+   "x1": 134.99999999999997,
+   "y1": 43.62777777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "rain, and snow, and hail, and sleet, could boast of the advan-",
+   "x0": 19.0,
+   "y0": 45.576388888888886,
+   "x1": 135.00000000000003,
+   "y1": 48.74305555555555,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "tage over him in only one respect. They often “came down”",
+   "x0": 19.0,
+   "y0": 50.69166666666666,
+   "x1": 135.00000000000003,
+   "y1": 53.85833333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "handsomely, and Scrooge never did.",
+   "x0": 19.0,
+   "y0": 55.80694444444444,
+   "x1": 87.82421875,
+   "y1": 58.973611111111104,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Nobody ever stopped him in the street to say, with glad-",
+   "x0": 25.375,
+   "y0": 60.92222222222222,
+   "x1": 134.95833333333337,
+   "y1": 64.08888888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "some looks, “My dear Scrooge, how are you? When will you",
+   "x0": 19.0,
+   "y0": 66.0375,
+   "x1": 135.00000000000003,
+   "y1": 69.20416666666667,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "come to see me?” No beggars implored him to bestow a",
+   "x0": 19.0,
+   "y0": 71.15277777777777,
+   "x1": 134.99999999999997,
+   "y1": 74.31944444444444,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "trifle, no children asked him what it was o’clock, no man or",
+   "x0": 19.0,
+   "y0": 76.26805555555555,
+   "x1": 134.99999999999997,
+   "y1": 79.43472222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "woman ever once in all his life inquired the way to such and",
+   "x0": 19.0,
+   "y0": 81.38333333333333,
+   "x1": 134.99999999999997,
+   "y1": 84.55,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "such a place, of Scrooge. Even the blind men’s dogs appeared",
+   "x0": 19.0,
+   "y0": 86.4986111111111,
+   "x1": 135.0,
+   "y1": 89.66527777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "to know him; and when they saw him coming on, would tug",
+   "x0": 19.0,
+   "y0": 91.61388888888888,
+   "x1": 135.00000000000003,
+   "y1": 94.78055555555555,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "their owners into doorways and up courts; and then would",
+   "x0": 19.0,
+   "y0": 96.72916666666666,
+   "x1": 134.99999999999997,
+   "y1": 99.89583333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "wag their tails as though they said, “No eye at all is better",
+   "x0": 19.0,
+   "y0": 101.84444444444443,
+   "x1": 135.0,
+   "y1": 105.0111111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "than an evil eye, dark master!”",
+   "x0": 19.0,
+   "y0": 106.95972222222221,
+   "x1": 76.91536458333333,
+   "y1": 110.12638888888888,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "But what did Scrooge care! It was the very thing he liked.",
+   "x0": 25.375,
+   "y0": 112.07499999999999,
+   "x1": 134.9583333333333,
+   "y1": 115.24166666666666,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "To edge his way along the crowded paths of life, warning all",
+   "x0": 19.0,
+   "y0": 117.19027777777777,
+   "x1": 134.99999999999997,
+   "y1": 120.35694444444444,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "human sympathy to keep its distance, was what the",
+   "x0": 19.0,
+   "y0": 122.30555555555554,
+   "x1": 135.0,
+   "y1": 125.47222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "knowing ones call “nuts” to Scrooge.",
+   "x0": 19.0,
+   "y0": 127.42083333333332,
+   "x1": 88.83333333333333,
+   "y1": 130.58749999999998,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Once upon a time—of all the good days in the year, on",
+   "x0": 25.375,
+   "y0": 132.5361111111111,
+   "x1": 134.95833333333334,
+   "y1": 135.70277777777775,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Christmas Eve—old Scrooge sat busy in his counting-house.",
+   "x0": 19.0,
+   "y0": 137.65138888888887,
+   "x1": 134.99999999999997,
+   "y1": 140.81805555555553,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "It was cold, bleak, biting weather: foggy withal: and he could",
+   "x0": 19.0,
+   "y0": 142.76666666666665,
+   "x1": 135.00000000000003,
+   "y1": 145.9333333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "hear the people in the court outside, go wheezing up and",
+   "x0": 19.0,
+   "y0": 147.88194444444443,
+   "x1": 135.00000000000003,
+   "y1": 151.0486111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "down, beating their hands upon their breasts, and stamping",
+   "x0": 19.0,
+   "y0": 152.9972222222222,
+   "x1": 135.0,
+   "y1": 156.16388888888886,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "their feet upon the pavement stones to warm them. The city",
+   "x0": 19.0,
+   "y0": 158.11249999999998,
+   "x1": 134.99999999999997,
+   "y1": 161.27916666666664,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "clocks had only just gone three, but it was quite dark",
+   "x0": 19.0,
+   "y0": 163.22777777777776,
+   "x1": 135.00000000000003,
+   "y1": 166.39444444444442,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "already—it had not been light all day—and candles were",
+   "x0": 19.0,
+   "y0": 168.34305555555554,
+   "x1": 135.0,
+   "y1": 171.5097222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "flaring in the windows of the neighbouring offices, like",
+   "x0": 19.0,
+   "y0": 173.45833333333331,
+   "x1": 135.0,
+   "y1": 176.62499999999997,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "ruddy smears upon the palpable brown air. The fog came",
+   "x0": 19.0,
+   "y0": 178.5736111111111,
+   "x1": 134.99999999999997,
+   "y1": 181.74027777777775,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "pouring in at every chink and keyhole, and was so dense",
+   "x0": 19.0,
+   "y0": 183.68888888888887,
+   "x1": 135.00000000000003,
+   "y1": 186.85555555555553,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "without, that although the court was of the narrowest, the",
+   "x0": 19.0,
+   "y0": 188.80416666666665,
+   "x1": 135.00000000000003,
+   "y1": 191.9708333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "houses opposite were mere phantoms.",
+   "x0": 19.0,
+   "y0": 193.91944444444442,
+   "x1": 91.58203125,
+   "y1": 197.08611111111108,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "The door of Scrooge’s counting-house was open that he",
+   "x0": 25.375,
+   "y0": 199.0347222222222,
+   "x1": 134.95833333333334,
+   "y1": 202.20138888888886,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "header",
+   "text": "Stave One. Marley's Ghost",
+   "box": [
+    57.04231770833333,
+    12.0,
+    96.95768229166666,
+    15.485
+   ]
+  },
+  {
+   "kind": "page_number",
+   "text": "7",
+   "box": [
+    76.125,
+    215.0,
+    77.875,
+    218.485
+   ]
+  }
+ ]
+}

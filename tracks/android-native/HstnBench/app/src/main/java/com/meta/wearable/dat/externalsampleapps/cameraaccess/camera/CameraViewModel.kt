@@ -44,6 +44,9 @@ import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bench.BenchClock
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bench.TtsReply
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.CameraLink
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.PageCamera
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.StreamFrameSize
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.AudioInputHandler
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.HevcDecoder
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.HevcParameterSetCollector
@@ -57,21 +60,29 @@ import java.nio.ByteBuffer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class CameraViewModel(
     application: Application,
     private val wearablesViewModel: WearablesViewModel,
-) : AndroidViewModel(application) {
+) : AndroidViewModel(application), PageCamera {
 
   companion object {
     private const val TAG = "CameraAccess:CameraViewModel"
@@ -126,6 +137,41 @@ class CameraViewModel(
   // a partial set yields an unfinalizable file ("Missing codec specific data"). Internally
   // synchronized.
   private val csdCollector = HevcParameterSetCollector()
+
+  // Book reader (PageCamera). Frame sizes are a cheap motion signal for page-turn detection; the
+  // buffer drops the oldest so the frame thread never waits on the reader.
+  private val _frameSizes =
+      MutableSharedFlow<StreamFrameSize>(
+          extraBufferCapacity = 64,
+          onBufferOverflow = BufferOverflow.DROP_OLDEST,
+      )
+  override val frameSizes: SharedFlow<StreamFrameSize> = _frameSizes
+  private val awaitingPermission = MutableStateFlow(false)
+  private val cameraDenied = MutableStateFlow(false)
+  override val isStreaming: StateFlow<Boolean> =
+      uiState.map { it.isStreaming }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+  override val link: StateFlow<CameraLink> =
+      combine(uiState, awaitingPermission, cameraDenied) { ui, awaiting, denied ->
+            when {
+              ui.isStreaming -> CameraLink.STREAMING
+              ui.isPaused -> CameraLink.PAUSED
+              ui.showCameraPermissionRedirectConfirm || awaiting -> CameraLink.NEEDS_PERMISSION
+              denied -> CameraLink.CAMERA_DENIED
+              ui.hasStream || ui.isStartingStream -> CameraLink.STARTING_STREAM
+              ui.isSessionActive -> CameraLink.CONNECTED
+              ui.hasSession -> CameraLink.CONNECTING
+              else -> CameraLink.DISCONNECTED
+            }
+          }
+          .distinctUntilChanged()
+          .stateIn(viewModelScope, SharingStarted.Eagerly, CameraLink.DISCONNECTED)
+  override val deviceSession: DeviceSession?
+    get() = session
+  private val pageCaptureMutex = Mutex()
+
+  // Voice-first launch: bring the stream up as soon as the session starts, without dialogs.
+  private var autoStream = false
+  private var autoPermission: (suspend (Permission) -> PermissionStatus)? = null
 
   private var sessionStateJob: Job? = null
   private var sessionErrorJob: Job? = null
@@ -227,7 +273,10 @@ class CameraViewModel(
     sessionStateJob = viewModelScope.launch {
       session.state.collect { state ->
         _uiState.update { it.copy(sessionState = state) }
-        if (state == DeviceSessionState.STARTED) BenchClock.end("session_start")
+        if (state == DeviceSessionState.STARTED) {
+          BenchClock.end("session_start")
+          if (autoStream) startStreamingWithoutDialogs()
+        }
         if (state == DeviceSessionState.STOPPED) {
           cleanupSession()
         }
@@ -427,6 +476,8 @@ class CameraViewModel(
       hevcDecoder?.decodeFrame(byteArray, presentationTimeUs)
     }
 
+    _frameSizes.tryEmit(StreamFrameSize(byteArray.size, videoFrame.isCodecConfig))
+
     // Hand off to the recorder thread; never blocks the preview.
     if (videoRecorder.isRecording.value) {
       recorderChannel.trySend(
@@ -489,6 +540,57 @@ class CameraViewModel(
     capability?.close()
   }
 
+  // MARK: - Voice-first start (book reader launched directly)
+
+  override fun connectAndStream(requestPermission: suspend (Permission) -> PermissionStatus) {
+    if (_uiState.value.isStreaming) return
+    cameraDenied.value = false
+    autoStream = true
+    autoPermission = requestPermission
+    if (_uiState.value.isSessionActive) startStreamingWithoutDialogs() else startSession()
+  }
+
+  private fun startStreamingWithoutDialogs() {
+    autoStream = false
+    val request = autoPermission
+    autoPermission = null
+    if (stream != null || _uiState.value.isStartingStream) return
+    _uiState.update { it.copy(isStartingStream = true) }
+    viewModelScope.launch {
+      try {
+        val granted =
+            Wearables.checkPermissionStatus(Permission.CAMERA).fold(
+                onSuccess = { it == PermissionStatus.Granted },
+                onFailure = { error, _ ->
+                  Log.e(TAG, "Failed to check camera permission: ${error.description}")
+                  false
+                },
+            )
+        val allowed =
+            granted ||
+                (request != null &&
+                    run {
+                      awaitingPermission.value = true
+                      try {
+                        request(Permission.CAMERA) == PermissionStatus.Granted
+                      } finally {
+                        awaitingPermission.value = false
+                      }
+                    })
+        if (allowed && _uiState.value.isSessionActive) {
+          beginStream()
+        } else if (!allowed) {
+          cameraDenied.value = true
+          wearablesViewModel.setRecentError(
+              getApplication<Application>().getString(R.string.error_camera_permission_denied),
+          )
+        }
+      } finally {
+        _uiState.update { it.copy(isStartingStream = false) }
+      }
+    }
+  }
+
   // MARK: - Capture
 
   fun capturePhoto() {
@@ -522,6 +624,26 @@ class CameraViewModel(
           } ?: _uiState.update { it.copy(isCapturingPhoto = false) }
     }
   }
+
+  /**
+   * Book reader capture: the same GA in-stream capturePhoto, without the preview sheet or the
+   * benchmark's "Photo captured." reply. Serialized so overlapping requests don't race the stream.
+   */
+  override suspend fun capturePage(): Bitmap? =
+      pageCaptureMutex.withLock {
+        val current = stream
+        if (current == null || !_uiState.value.isStreaming) return@withLock null
+        BenchClock.start("book_capture_to_photo")
+        var bitmap: Bitmap? = null
+        current
+            .capturePhoto()
+            .onSuccess { photoData ->
+              bitmap = withContext(Dispatchers.Default) { decodePhoto(photoData) }
+              bitmap?.let { BenchClock.end("book_capture_to_photo", "size=${it.width}x${it.height}") }
+            }
+            .onFailure { error, _ -> Log.e(TAG, "Book page capture failed: ${error.description}") }
+        bitmap
+      }
 
   // MARK: - Recording
 

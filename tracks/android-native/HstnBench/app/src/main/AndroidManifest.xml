@@ -60,6 +60,19 @@
             </intent-filter>
         </activity>
 
+        <!-- Voice-first entry point: its own launcher name so a blind user can say
+             "Hey Google, open Book Reader" and land in the reader, listening, with no taps. -->
+        <activity-alias
+            android:name=".BookReaderLauncher"
+            android:exported="true"
+            android:label="@string/book_reader_launcher_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

@@ -110,4 +110,100 @@
     <string name="camera_permission_alert_title" description="Camera permission alert title">Camera access required</string>
     <string name="camera_permission_alert_message" description="Camera permission alert message">Camera access was denied. Enable it in Settings to use the camera source.</string>
     <string name="camera_permission_open_settings" description="Camera permission open settings button">Open Settings</string>
+    <!-- Book reader -->
+    <string name="book_reader_open" description="Button on the camera screen that opens the book reader">Book reader</string>
+    <string name="book_reader_open_description" description="Accessibility description of the open-book-reader button">Open book reader. Reads a printed book aloud, page by page.</string>
+    <string name="book_reader_title" description="Book reader screen title">Book reader</string>
+    <string name="book_reader_close" description="Close the book reader">Close book reader</string>
+    <string name="book_start" description="Big button: start reading">Start reading</string>
+    <string name="book_pause" description="Big button: pause reading">Pause</string>
+    <string name="book_resume" description="Big button: resume reading">Resume</string>
+    <string name="book_next_page" description="Button: capture the next page now">Next page</string>
+    <string name="book_next_page_description" description="Accessibility description for Next page">Next page. Capture and read the page in view now.</string>
+    <string name="book_back_sentence" description="Button: go back one sentence">Back a sentence</string>
+    <string name="book_rate_label" description="Speech rate label; %1$s is the rate like 1.5"><xliff:g id="rate">%1$s</xliff:g>× speed</string>
+    <string name="book_rate_slower" description="Decrease speech rate">Slower</string>
+    <string name="book_rate_faster" description="Increase speech rate">Faster</string>
+    <string name="book_rate_slider_description" description="Accessibility description of the speech rate slider">Speech rate</string>
+    <string name="book_read_furniture" description="Toggle: also read page numbers and running headers">Read page numbers and headers</string>
+    <string name="book_auto_turn" description="Toggle: detect page turns automatically from the camera">Detect page turns automatically</string>
+    <string name="book_page_empty" description="Placeholder before any page is read">No page read yet. Hold the book in front of you and say “read”, or press Start reading.</string>
+    <string name="book_pages_read" description="Pages read count; %1$d is the number">Pages read: <xliff:g id="count">%1$d</xliff:g></string>
+    <string name="book_speech_unavailable" description="Shown when the text-to-speech engine is missing">Speech engine unavailable. Text is shown on screen only.</string>
+    <string name="book_status_idle" description="Book reader status before start">Ready</string>
+    <string name="book_status_capturing" description="Status while capturing and recognising a page">Capturing page…</string>
+    <string name="book_status_reading" description="Status while reading">Reading</string>
+    <string name="book_status_paused" description="Status when paused">Paused</string>
+    <string name="book_status_stopped" description="Status after leaving the reader">Stopped. Bookmark saved.</string>
+    <string name="book_status_same_page" description="Status when the capture is the page already read">Same page</string>
+    <string name="book_status_turn_page" description="Status when waiting for a page turn">Turn the page</string>
+    <string name="book_status_press_next" description="Status when waiting for Next page">Turn the page, then say or press Next page</string>
+    <string name="book_status_stream_lost" description="Spoken and shown when the glasses stream stops (fold, session end)">Glasses stream stopped. Bookmark saved.</string>
+    <string name="book_say_started" description="Spoken when reading starts">Reading the page.</string>
+    <string name="book_say_same_page" description="Spoken when a requested capture is the page already read">Same page. Turn the page, or say next page.</string>
+    <string name="book_say_resuming" description="Spoken when resuming from a bookmark">Resuming where you left off.</string>
+    <string name="book_error_not_streaming" description="Spoken when the camera isn't streaming">The glasses camera isn\'t on yet. Check your glasses are on, unfolded and connected.</string>
+    <string name="book_error_capture_failed" description="Spoken when the photo capture fails">Couldn\'t capture the page. Try again.</string>
+    <string name="book_error_ocr_failed" description="Spoken when text recognition fails">Couldn\'t read this page. Try again.</string>
+    <!-- Book reader voice control: everything in this block is spoken -->
+    <string name="voice_welcome_short" description="Spoken when the book reader opens with the stream already running">Book reader. Say read to start, or help at any time.</string>
+    <string name="voice_welcome_ready" description="Spoken when the glasses are connected in voice-first launch">Your glasses are ready. Hold the book open in front of you and say read. Say help at any time.</string>
+    <string name="voice_connecting" description="Spoken while connecting to the glasses">Book reader. Connecting to your glasses.</string>
+    <string name="voice_camera_permission" description="Spoken before opening Meta AI for camera permission">The glasses need permission to use the camera. Opening the Meta AI app. Allow it there, then come back.</string>
+    <string name="voice_mic_permission" description="Spoken before opening Meta AI for microphone permission">To hear you through the glasses, Meta AI needs to allow the microphone. Opening the Meta AI app.</string>
+    <string name="voice_no_glasses" description="Spoken when the glasses can't be reached">I can\'t reach your glasses. Check they\'re on, unfolded, and connected to this phone. I\'ll keep trying.</string>
+    <string name="voice_using_phone_mic" description="Spoken when voice falls back to the phone microphone">I\'ll listen through the phone\'s microphone, so keep the phone nearby.</string>
+    <string name="voice_unavailable" description="Spoken when no microphone can be used">Voice control is off because I can\'t use a microphone. The buttons on the phone screen still work.</string>
+    <string name="voice_paused" description="Spoken after pausing by voice">Paused.</string>
+    <string name="voice_goodbye" description="Spoken when leaving by voice">Bookmark saved. Goodbye.</string>
+    <string name="voice_help" description="Spoken list of voice commands">You can say: read, stop, next page, say that again, go back, back a paragraph, faster, slower, where am I, battery, or close. You can talk over me at any time.</string>
+    <string name="voice_not_understood" description="Spoken when speech isn't a command">Sorry, I didn\'t get that. Say help to hear what you can say.</string>
+    <string name="voice_nothing_read_yet" description="Spoken when asked to repeat before anything was read">Nothing read yet. Hold the book in front of you and say read.</string>
+    <string name="voice_rate" description="Spoken after a speed change; %1$s is the rate like 1.5"><xliff:g id="rate">%1$s</xliff:g> times speed.</string>
+    <string name="voice_rate_fastest" description="Spoken when already at max speed">That\'s already the fastest speed.</string>
+    <string name="voice_rate_slowest" description="Spoken when already at min speed">That\'s already the slowest speed.</string>
+    <string name="voice_where_reading" description="Where am I while reading: page, sentence, total, rate">Page <xliff:g id="page">%1$d</xliff:g> since you started. Sentence <xliff:g id="sentence">%2$d</xliff:g> of <xliff:g id="total">%3$d</xliff:g>. <xliff:g id="rate">%4$s</xliff:g> times speed.</string>
+    <string name="voice_where_waiting" description="Where am I between pages: pages read, rate">You\'ve read <xliff:g id="pages">%1$d</xliff:g> pages. I\'m waiting for the next page. <xliff:g id="rate">%2$s</xliff:g> times speed.</string>
+    <string name="voice_waiting_auto" description="Spoken when asked to read while waiting with auto turn on">Turn the page and I\'ll read it, or say next page.</string>
+    <string name="voice_waiting_manual" description="Spoken when asked to read while waiting with auto turn off">Turn the page, then say next page.</string>
+    <string name="voice_furniture_on" description="Spoken after enabling page numbers and headers">OK, I\'ll read page numbers and headers.</string>
+    <string name="voice_furniture_off" description="Spoken after disabling page numbers and headers">OK, I\'ll skip page numbers and headers.</string>
+    <string name="voice_auto_turn_on" description="Spoken after enabling auto page turn detection">OK, I\'ll notice when you turn the page.</string>
+    <string name="voice_auto_turn_off" description="Spoken after disabling auto page turn detection">OK, say next page when you\'ve turned it.</string>
+    <string name="voice_camera_denied" description="Spoken when camera permission was refused">Camera access wasn\'t allowed, so I can\'t see the book. Say read to ask again.</string>
+    <string name="voice_battery_both" description="Battery report: glasses %1$d, phone %2$d percent">Glasses battery <xliff:g id="glasses">%1$d</xliff:g> percent. Phone <xliff:g id="phone">%2$d</xliff:g> percent.</string>
+    <string name="voice_battery_glasses" description="Battery report, glasses only">Glasses battery <xliff:g id="glasses">%1$d</xliff:g> percent.</string>
+    <string name="voice_battery_phone" description="Battery report, phone only">The glasses aren\'t reporting their battery. Phone <xliff:g id="phone">%1$d</xliff:g> percent.</string>
+    <string name="voice_battery_unknown" description="Battery unknown">I can\'t read the battery levels right now.</string>
+    <!-- Book reader pitfalls: all spoken -->
+    <string name="book_say_still_working" description="Spoken when a capture or OCR takes long">Still reading this page.</string>
+    <string name="book_say_cant_see_page" description="Spoken after the last failed attempt">I still can\'t read the page. Say read when you\'re ready to try again.</string>
+    <string name="book_say_paused_by_glasses" description="Spoken when the glasses paused the camera">The glasses paused the camera. Tap the side of the glasses to carry on.</string>
+    <string name="book_say_glasses_back" description="Spoken when the stream comes back">The glasses camera is back. Say read to carry on.</string>
+    <string name="book_hint_covered" description="Image check: lens covered">I can\'t see anything. Is something covering the camera? It\'s at the front left of the frame.</string>
+    <string name="book_hint_dark" description="Image check: too dark">It\'s too dark to read. Turn on a light, or move closer to one.</string>
+    <string name="book_hint_nothing" description="Image check: no page in view">I can\'t see a page. Hold the book open in front of you, about a forearm\'s length away, and look down at it.</string>
+    <string name="book_hint_glare" description="Image check: glare">There\'s glare on the page. Tilt the book a little away from the light.</string>
+    <string name="book_hint_blocked" description="Image check: obstructed">Something is covering part of the page, maybe a hand or thumb. Move it to the edge.</string>
+    <string name="health_bluetooth_off" description="Bluetooth off on phone">Bluetooth is off on your phone, so I can\'t reach your glasses. Turn Bluetooth on.</string>
+    <string name="health_bluetooth_on" description="Bluetooth back on">Bluetooth is on again.</string>
+    <string name="health_no_glasses" description="No glasses linked">I can\'t find any glasses linked to this app. Pair your glasses in the Meta AI app first.</string>
+    <string name="health_disconnected" description="Glasses disconnected">Your glasses disconnected. I\'ve saved your place. Check they\'re on, unfolded and nearby.</string>
+    <string name="health_connected" description="Glasses reconnected">Your glasses are connected again.</string>
+    <string name="health_removed" description="Glasses taken off">You took your glasses off, so I\'ve paused. Put them on and say read to carry on.</string>
+    <string name="health_worn_again" description="Glasses put back on">Glasses on. Say read to carry on.</string>
+    <string name="health_update_required" description="Glasses update required">Your glasses need a software update before I can use them. You can update them in the Meta AI app.</string>
+    <string name="health_glasses_battery_low" description="Glasses battery low; %1$d percent">Glasses battery is at <xliff:g id="percent">%1$d</xliff:g> percent.</string>
+    <string name="health_glasses_battery_critical" description="Glasses battery critical; %1$d percent">Glasses battery is at <xliff:g id="percent">%1$d</xliff:g> percent and they\'ll turn off soon. Your place is saved. Put them on charge when you can.</string>
+    <string name="health_phone_battery_low" description="Phone battery low; %1$d percent">Phone battery is at <xliff:g id="percent">%1$d</xliff:g> percent.</string>
+    <string name="health_hot" description="Glasses warm">Your glasses are getting warm. Reading may slow down.</string>
+    <string name="health_too_hot" description="Glasses too hot">Your glasses are too hot, so I\'ve paused. Take them off for a few minutes to cool down, then say read.</string>
+    <string name="health_cooled" description="Glasses cooled">Your glasses have cooled down.</string>
+    <!-- Shown on the reader screen -->
+    <string name="voice_mic_glasses" description="Screen: listening through glasses">Listening through your glasses</string>
+    <string name="voice_mic_phone" description="Screen: listening through the phone">Listening through the phone</string>
+    <string name="voice_mic_none" description="Screen: voice off">Voice control off</string>
+    <string name="voice_heard" description="Screen: last thing heard; %1$s is the text">Heard: “<xliff:g id="text">%1$s</xliff:g>”</string>
+    <string name="voice_needs_setup" description="Spoken on voice-first launch when the app isn't registered with Meta AI yet">Book Reader needs a one-time setup with the Meta AI app before it can use your glasses. TalkBack works on this screen, or ask someone to help.</string>
+    <string name="book_reader_launcher_label" description="Launcher name of the voice-first entry point, so the user can say Open Book Reader">Book Reader</string>
 </resources>

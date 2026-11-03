@@ -73,7 +73,12 @@ dependencies {
   implementation(libs.kotlinx.collections.immutable)
   implementation(libs.mwdat.core)
   implementation(libs.mwdat.camera)
+  // Book reader voice control: on-glasses speech recognition (Experimental in DAT 1.0).
+  implementation(libs.mwdat.speech)
   implementation(libs.mwdat.mockdevice)
+  // Book reader: on-device OCR, Latin script, model bundled in the APK (no Play Services download).
+  implementation(libs.mlkit.text.recognition)
+  testImplementation(libs.junit)
   androidTestImplementation(libs.androidx.ui.test.junit4)
   androidTestImplementation(libs.androidx.test.uiautomator)
   androidTestImplementation(libs.androidx.test.rules)

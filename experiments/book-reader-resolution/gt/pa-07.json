@@ -1,0 +1,439 @@
+{
+ "id": "pa-07",
+ "kind": "paperback",
+ "image_mm": [
+  110,
+  178
+ ],
+ "px_per_mm": 12.0,
+ "font": "times.ttf",
+ "size_pt": 11,
+ "leading_pt": 12.4,
+ "x_height_mm": 1.833,
+ "pages": [
+  {
+   "page_no": 7,
+   "rect": [
+    0,
+    0,
+    110,
+    178
+   ],
+   "gutter": "left"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  110,
+  89.0
+ ],
+ "lines": [
+  {
+   "text": "the Greeks give it a separate deity, and own brother of",
+   "x0": 12.0,
+   "y0": 13.0,
+   "x1": 100.99999999999999,
+   "y1": 16.5,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Jove? Surely all this is not without meaning. And still",
+   "x0": 12.0,
+   "y0": 17.374444444444443,
+   "x1": 101.0,
+   "y1": 20.874444444444443,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "deeper the meaning of that story of Narcissus, who",
+   "x0": 12.0,
+   "y0": 21.748888888888885,
+   "x1": 101.0,
+   "y1": 25.248888888888885,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "because he could not grasp the tormenting, mild image",
+   "x0": 12.0,
+   "y0": 26.123333333333328,
+   "x1": 101.0,
+   "y1": 29.623333333333328,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "he saw in the fountain, plunged into it and was drow-",
+   "x0": 12.0,
+   "y0": 30.49777777777777,
+   "x1": 101.0,
+   "y1": 33.99777777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "ned. But that same image, we ourselves see in all rivers",
+   "x0": 12.0,
+   "y0": 34.87222222222221,
+   "x1": 101.00000000000001,
+   "y1": 38.37222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and oceans. It is the image of the ungraspable phantom",
+   "x0": 12.0,
+   "y0": 39.246666666666655,
+   "x1": 101.0,
+   "y1": 42.746666666666655,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "of life; and this is the key to it all.",
+   "x0": 12.0,
+   "y0": 43.6211111111111,
+   "x1": 65.41666666666667,
+   "y1": 47.1211111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Now, when I say that I am in the habit of going to",
+   "x0": 17.875,
+   "y0": 47.99555555555554,
+   "x1": 100.95833333333333,
+   "y1": 51.49555555555554,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "sea whenever I begin to grow hazy about the eyes, and",
+   "x0": 12.0,
+   "y0": 52.36999999999998,
+   "x1": 101.00000000000001,
+   "y1": 55.86999999999998,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "begin to be over conscious of my lungs, I do not mean",
+   "x0": 12.0,
+   "y0": 56.744444444444426,
+   "x1": 101.0,
+   "y1": 60.244444444444426,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "to have it inferred that I ever go to sea as a passenger.",
+   "x0": 12.0,
+   "y0": 61.11888888888887,
+   "x1": 100.99999999999999,
+   "y1": 64.61888888888888,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "For to go as a passenger you must needs have a purse,",
+   "x0": 12.0,
+   "y0": 65.49333333333331,
+   "x1": 101.0,
+   "y1": 68.99333333333331,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and a purse is but a rag unless you have something in it.",
+   "x0": 12.0,
+   "y0": 69.86777777777776,
+   "x1": 101.0,
+   "y1": 73.36777777777776,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Besides, passengers get sea-sick—grow quarrelsome—",
+   "x0": 12.0,
+   "y0": 74.24222222222221,
+   "x1": 101.0,
+   "y1": 77.74222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "don’t sleep of nights—do not enjoy themselves much,",
+   "x0": 12.0,
+   "y0": 78.61666666666666,
+   "x1": 101.0,
+   "y1": 82.11666666666666,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "as a general thing;—no, I never go as a passenger; nor,",
+   "x0": 12.0,
+   "y0": 82.99111111111111,
+   "x1": 101.00000000000001,
+   "y1": 86.49111111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "though I am something of a salt, do I ever go to sea as a",
+   "x0": 12.0,
+   "y0": 87.36555555555556,
+   "x1": 100.99999999999999,
+   "y1": 90.86555555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Commodore, or a Captain, or a Cook. I abandon the",
+   "x0": 12.0,
+   "y0": 91.74000000000001,
+   "x1": 100.99999999999999,
+   "y1": 95.24000000000001,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "glory and distinction of such offices to those who like",
+   "x0": 12.0,
+   "y0": 96.11444444444446,
+   "x1": 101.0,
+   "y1": 99.61444444444446,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "them. For my part, I abominate all honourable respec-",
+   "x0": 12.0,
+   "y0": 100.48888888888891,
+   "x1": 101.0,
+   "y1": 103.98888888888891,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "table toils, trials, and tribulations of every kind what-",
+   "x0": 12.0,
+   "y0": 104.86333333333336,
+   "x1": 101.0,
+   "y1": 108.36333333333336,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "soever. It is quite as much as I can do to take care of",
+   "x0": 12.0,
+   "y0": 109.23777777777781,
+   "x1": 101.0,
+   "y1": 112.73777777777781,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "myself, without taking care of ships, barques, brigs,",
+   "x0": 12.0,
+   "y0": 113.61222222222226,
+   "x1": 101.0,
+   "y1": 117.11222222222226,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "schooners, and what not.",
+   "x0": 12.0,
+   "y0": 117.98666666666671,
+   "x1": 51.333333333333336,
+   "y1": 121.48666666666671,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Chapter I",
+   "x0": 45.417317708333336,
+   "y0": 125.86066666666672,
+   "x1": 67.58268229166667,
+   "y1": 131.14816666666673,
+   "col": 0,
+   "heading": true,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "It is a truth universally acknowledged, that a single man",
+   "x0": 12.0,
+   "y0": 135.4844444444445,
+   "x1": 101.0,
+   "y1": 138.9844444444445,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "in possession of a good fortune, must be in want of a",
+   "x0": 12.0,
+   "y0": 139.85888888888894,
+   "x1": 101.00000000000001,
+   "y1": 143.35888888888894,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "wife.",
+   "x0": 12.0,
+   "y0": 144.23333333333338,
+   "x1": 20.0,
+   "y1": 147.73333333333338,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "However little known the feelings or views of such",
+   "x0": 17.875,
+   "y0": 148.6077777777778,
+   "x1": 100.95833333333333,
+   "y1": 152.1077777777778,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "a man may be on his first entering a neighbourhood,",
+   "x0": 12.0,
+   "y0": 152.98222222222225,
+   "x1": 101.0,
+   "y1": 156.48222222222225,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "this truth is so well fixed in the minds of the surroun-",
+   "x0": 12.0,
+   "y0": 157.35666666666668,
+   "x1": 101.0,
+   "y1": 160.85666666666668,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "header",
+   "text": "Chapter 1. Loomings",
+   "box": [
+    42.958333333333336,
+    5.0,
+    70.04166666666667,
+    8.211666666666666
+   ]
+  },
+  {
+   "kind": "page_number",
+   "text": "7",
+   "box": [
+    99.41666666666667,
+    5.0,
+    101.0,
+    8.211666666666666
+   ]
+  }
+ ]
+}

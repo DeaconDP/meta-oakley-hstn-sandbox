@@ -41,6 +41,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
@@ -83,6 +84,7 @@ import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.BookReaderViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.camera.CameraUiState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.camera.CameraViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
@@ -101,6 +103,7 @@ fun CameraScreen(
     onRequestWearablesPermission: suspend (Permission) -> PermissionStatus,
     onRequestRecordAudioPermission: suspend () -> Boolean,
     modifier: Modifier = Modifier,
+    voiceFirst: Boolean = false,
     cameraViewModel: CameraViewModel = viewModel(
         factory =
             CameraViewModel.Factory(
@@ -113,6 +116,8 @@ fun CameraScreen(
   val wearablesUi by wearablesViewModel.uiState.collectAsStateWithLifecycle()
   val activity = LocalActivity.current
   var showSettingsMenu by remember { mutableStateOf(false) }
+  // Voice-first launch ("Open Book Reader"): straight into the reader, no taps needed.
+  var showBookReader by remember { mutableStateOf(voiceFirst) }
 
   val isUpdateRequired = wearablesUi.isFirmwareUpdateRequired
 
@@ -162,6 +167,7 @@ fun CameraScreen(
           onCapturePhoto = cameraViewModel::capturePhoto,
           onToggleRecording = { cameraViewModel.toggleRecording(onRequestRecordAudioPermission) },
           onToggleMic = cameraViewModel::toggleMic,
+          onOpenBookReader = { showBookReader = true },
           onUpdateFirmware = { activity?.let { wearablesViewModel.openFirmwareUpdate(it) } },
       )
     }
@@ -170,6 +176,35 @@ fun CameraScreen(
       CapturePreviewScreen(
           preview = preview,
           onDismiss = { cameraViewModel.dismissCapturePreview() },
+      )
+    }
+
+    // Book reader: full-screen over the live preview, which keeps streaming underneath so the reader
+    // can capture pages and watch for page turns.
+    if (showBookReader) {
+      val bookReaderViewModel: BookReaderViewModel =
+          viewModel(
+              factory =
+                  BookReaderViewModel.Factory(
+                      application = (LocalActivity.current as ComponentActivity).application,
+                      camera = cameraViewModel,
+                  ),
+          )
+      BookReaderScreen(
+          viewModel = bookReaderViewModel,
+          voiceFirst = voiceFirst,
+          onRequestWearablesPermission = onRequestWearablesPermission,
+          onRequestRecordAudioPermission = onRequestRecordAudioPermission,
+          onClose = {
+            bookReaderViewModel.stop()
+            showBookReader = false
+            if (voiceFirst) {
+              // Launched just to read: end the session and step aside (the goodbye still plays)
+              // rather than leaving a blind user on a camera screen with the stream running.
+              cameraViewModel.endSession()
+              activity?.moveTaskToBack(true)
+            }
+          },
       )
     }
 
@@ -428,6 +463,7 @@ private fun BottomBar(
     onCapturePhoto: () -> Unit,
     onToggleRecording: () -> Unit,
     onToggleMic: () -> Unit,
+    onOpenBookReader: () -> Unit,
     onUpdateFirmware: () -> Unit,
 ) {
   Column(
@@ -445,6 +481,18 @@ private fun BottomBar(
           onClick = onUpdateFirmware,
       )
     } else {
+      // Book reader needs a live stream (it captures pages with the in-stream photo).
+      CapturePill(
+          modifier =
+              Modifier.fillMaxWidth()
+                  .alpha(if (ui.hasSession) 1f else 0f)
+                  .testTag("book_reader_button"),
+          icon = Icons.AutoMirrored.Filled.MenuBook,
+          label = stringResource(R.string.book_reader_open),
+          contentDescription = stringResource(R.string.book_reader_open_description),
+          enabled = ui.isStreaming,
+          onClick = onOpenBookReader,
+      )
       CaptureRow(
           ui = ui,
           onStartPreview = onStartPreview,
