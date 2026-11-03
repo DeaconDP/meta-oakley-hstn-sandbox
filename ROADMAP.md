@@ -19,12 +19,13 @@
 
 ## Ground rules (apply to every phase)
 
+- **Voice-first, both ways, from launch.** (Decided 2026-11-03.) A blind user can't find buttons on a screen, so every feature is fully usable by voice alone. They open it by voice ("Hey Google, open Book Reader"; later "Hey Meta, start …"), it connects with no taps or dialogs and narrates each step, and they control it conversationally with natural phrasing ("hang on", "say that again", "a bit faster", "where am I", "help"). Every response is spoken, and the user can talk over it at any time. The phone screen mirrors the state for sighted helpers, low-vision users and TalkBack users, but it is never the only way to do something. Understanding runs on-device (no cloud). Mic: the glasses' own speech recognition when available, otherwise the phone's on-device recogniser. The Bluetooth hands-free mic isn't used, because it would drop all output to mono. (notes/book-reader-android.md > Voice control)
 - **Audio-first UX.** Every action plays an earcon within 100 ms. Silence is never how a failure is reported. Users can set verbosity (short / normal / detailed) and speech rate, and can cut speech off at any time. App audio has to work alongside TalkBack/VoiceOver; on Android it is tagged as accessibility audio. (notes/a11y-prior-art.md > 3, notes/a11y-perception-stack.md > TTS)
 - **Say how sure it is.** If the model isn't confident, it says "can't tell" and asks for a better frame instead of guessing. It refuses outright on medication doses and on money it can't verify.
 - **Privacy.** The cloud is called only on an explicit trigger, never continuously. Faces are blurred on the phone before upload, and no frames are stored. No face recognition and no identifying people (BIPA, GDPR Article 9, EU AI Act Article 5).
 - **Not a mobility aid.** Anything involving obstacles or direction is presented as orientation help, never as a replacement for a cane or guide dog.
 - **Companion phone UI meets WCAG 2.2 AA** and is fully usable with TalkBack and VoiceOver.
-- **Production path stays separate.** Ship-ready features use only GA APIs: the camera stream, in-stream photo, device state, and OS Bluetooth audio. Experimental APIs (inputs, speech, voice invocation, Motion, in-stream mic) go behind a flag in dev/beta builds.
+- **Production path stays separate.** Ship-ready features use only GA APIs: the camera stream, in-stream photo, device state, and OS Bluetooth audio. Experimental APIs (inputs, voice invocation, Motion, in-stream mic) go behind a flag in dev/beta builds. **Exception: on-glasses speech** is used by default wherever the build channel allows it, because voice control is the default. Where it's unavailable (production builds, no permission, no recogniser), the app falls back to the GA path, Android's on-device recogniser on the phone mic, so voice works in every build.
 
 ## Phases
 
@@ -41,6 +42,7 @@
    - Audio UX layer: earcon set, verbosity levels, speech rate, interrupt/barge-in, a queue that splits streamed model text into clauses for TTS, and screen-reader coexistence.
    - Session narrator (demo 4 in notes/a11y-sdk-mapping.md): speaks "glasses removed, paused", "folded, session ended", battery thresholds and thermal step-down. It also rebuilds the session when the hinges reopen. GA only.
    - Frame pipeline: keeps the stream warm and grabs the sharpest recent frame, with optional face blurring on the phone.
+   - Voice layer, shared by every demo: mic selection with fallback, an on-device command grammar, an echo guard (the mic hears our own speech), barge-in on partial results, and spoken start-up narration. The first version is in the book reader (`bookreader/VoiceControl.kt`, `book/VoiceCommands.kt`); lift it out when the second demo needs it.
    - Accessible phone UI: large trigger buttons, settings, a WCAG 2.2 AA pass, and TalkBack/VoiceOver tests.
    - Onboarding and launch: first run with the screen reader on, spoken handoffs to and from Meta AI, a hardware check, launching without the screen, and spoken recovery messages. (notes/a11y-onboarding.md)
 5. **Showcase demos, GA-only (shippable)**
@@ -49,7 +51,7 @@
    - **Look closer**: on-demand description from a cloud model, Claude Haiku 5.5 by default. Sonnet 5.5 is used for a "detailed look" that captures a photo after a spoken "hold still". It says "can't tell" instead of guessing.
    - **Low-vision magnifier**: the glasses camera full-screen on the phone with zoom, high-contrast and invert filters, and freeze frame.
 6. **Hands-free and spatial demos, experimental (dev/beta only)**
-   - Trigger layer: capture-button short press = look, hold = read. "Hey Meta, start {app}" opens straight into a mode.
+   - Trigger layer: capture-button short press = look, hold = read. "Hey Meta, start {app}" opens straight into a mode (this is the glasses-side twin of the "Open Book Reader" launcher entry; it needs Developer Center approval).
    - Voice Q&A about the scene: the glasses' own speech recognition plus the current frame. This keeps audio on A2DP; the Bluetooth hands-free mic would force mono.
    - **Watch for X**: an on-device detector keeps looking for a named object (door, cup, bus number) and plays an earcon when it appears.
    - **Object finder**: earcon pitch follows the object's horizontal offset, and the glasses' gyro keeps it stable between frames. Orientation help only.

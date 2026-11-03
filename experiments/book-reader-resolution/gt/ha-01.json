@@ -1,0 +1,417 @@
+{
+ "id": "ha-01",
+ "kind": "hardback",
+ "image_mm": [
+  152,
+  229
+ ],
+ "px_per_mm": 12.0,
+ "font": "pala.ttf",
+ "size_pt": 12,
+ "leading_pt": 14.5,
+ "x_height_mm": 2.0,
+ "pages": [
+  {
+   "page_no": 3,
+   "rect": [
+    0,
+    0,
+    152,
+    229
+   ],
+   "gutter": "left"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  152,
+  114.5
+ ],
+ "lines": [
+  {
+   "text": "I. The Period",
+   "x0": 60.20833333333333,
+   "y0": 42.0,
+   "x1": 93.79166666666666,
+   "y1": 47.7375,
+   "col": 0,
+   "heading": true,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "It was the best of times, it was the worst of times, it was the",
+   "x0": 19.0,
+   "y0": 53.25361111111111,
+   "x1": 135.00000000000003,
+   "y1": 56.42027777777778,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "age of wisdom, it was the age of foolishness, it was the epoch",
+   "x0": 19.0,
+   "y0": 58.36888888888889,
+   "x1": 135.0,
+   "y1": 61.535555555555554,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "of belief, it was the epoch of incredulity, it was the season of",
+   "x0": 19.0,
+   "y0": 63.48416666666667,
+   "x1": 135.00000000000003,
+   "y1": 66.65083333333334,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Light, it was the season of Darkness, it was the spring of",
+   "x0": 19.0,
+   "y0": 68.59944444444444,
+   "x1": 134.99999999999997,
+   "y1": 71.76611111111112,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "hope, it was the winter of despair, we had everything before",
+   "x0": 19.0,
+   "y0": 73.71472222222222,
+   "x1": 134.99999999999997,
+   "y1": 76.88138888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "us, we had nothing before us, we were all going direct to",
+   "x0": 19.0,
+   "y0": 78.83,
+   "x1": 135.0,
+   "y1": 81.99666666666667,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Heaven, we were all going direct the other way—in short,",
+   "x0": 19.0,
+   "y0": 83.94527777777778,
+   "x1": 134.99999999999997,
+   "y1": 87.11194444444445,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "the period was so far like the present period, that some of its",
+   "x0": 19.0,
+   "y0": 89.06055555555555,
+   "x1": 134.99999999999997,
+   "y1": 92.22722222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "noisiest authorities insisted on its being received, for good or",
+   "x0": 19.0,
+   "y0": 94.17583333333333,
+   "x1": 135.00000000000003,
+   "y1": 97.3425,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "for evil, in the superlative degree of comparison only.",
+   "x0": 19.0,
+   "y0": 99.2911111111111,
+   "x1": 120.07421875,
+   "y1": 102.45777777777778,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "There were a king with a large jaw and a queen with a",
+   "x0": 25.375,
+   "y0": 104.40638888888888,
+   "x1": 134.9583333333333,
+   "y1": 107.57305555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "plain face, on the throne of England; there were a king with a",
+   "x0": 19.0,
+   "y0": 109.52166666666666,
+   "x1": 135.0,
+   "y1": 112.68833333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "large jaw and a queen with a fair face, on the throne of",
+   "x0": 19.0,
+   "y0": 114.63694444444444,
+   "x1": 135.0,
+   "y1": 117.80361111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "France. In both countries it was clearer than crystal to the",
+   "x0": 19.0,
+   "y0": 119.75222222222222,
+   "x1": 135.00000000000003,
+   "y1": 122.91888888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "lords of the State preserves of loaves and fishes, that things",
+   "x0": 19.0,
+   "y0": 124.86749999999999,
+   "x1": 135.0,
+   "y1": 128.03416666666666,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "in general were settled for ever.",
+   "x0": 19.0,
+   "y0": 129.98277777777776,
+   "x1": 78.41015625,
+   "y1": 133.1494444444444,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "It was the year of Our Lord one thousand seven hundred",
+   "x0": 25.375,
+   "y0": 135.09805555555553,
+   "x1": 134.95833333333334,
+   "y1": 138.2647222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and seventy-five. Spiritual revelations were conceded to",
+   "x0": 19.0,
+   "y0": 140.2133333333333,
+   "x1": 134.99999999999997,
+   "y1": 143.37999999999997,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "England at that favoured period, as at this. Mrs. Southcott",
+   "x0": 19.0,
+   "y0": 145.3286111111111,
+   "x1": 134.99999999999997,
+   "y1": 148.49527777777774,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "had recently attained her five-and-twentieth blessed",
+   "x0": 19.0,
+   "y0": 150.44388888888886,
+   "x1": 131.0390625,
+   "y1": 153.61055555555552,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "birthday, of whom a prophetic private in the Life Guards",
+   "x0": 19.0,
+   "y0": 155.55916666666664,
+   "x1": 135.00000000000003,
+   "y1": 158.7258333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "had heralded the sublime appearance by announcing that",
+   "x0": 19.0,
+   "y0": 160.67444444444442,
+   "x1": 135.0,
+   "y1": 163.84111111111108,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "arrangements were made for the swallowing up of London",
+   "x0": 19.0,
+   "y0": 165.7897222222222,
+   "x1": 135.0,
+   "y1": 168.95638888888885,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and Westminster. Even the Cock-lane ghost had been laid",
+   "x0": 19.0,
+   "y0": 170.90499999999997,
+   "x1": 135.0,
+   "y1": 174.07166666666663,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "only a round dozen of years, after rapping out its messages,",
+   "x0": 19.0,
+   "y0": 176.02027777777775,
+   "x1": 134.99999999999997,
+   "y1": 179.1869444444444,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "as the spirits of this very year last past (supernaturally",
+   "x0": 19.0,
+   "y0": 181.13555555555553,
+   "x1": 135.0,
+   "y1": 184.30222222222218,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "deficient in originality) rapped out theirs. Mere messages in",
+   "x0": 19.0,
+   "y0": 186.2508333333333,
+   "x1": 135.0,
+   "y1": 189.41749999999996,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "the earthly order of events had lately come to the English",
+   "x0": 19.0,
+   "y0": 191.36611111111108,
+   "x1": 135.00000000000003,
+   "y1": 194.53277777777774,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Crown and People, from a congress of British subjects in",
+   "x0": 19.0,
+   "y0": 196.48138888888886,
+   "x1": 135.00000000000003,
+   "y1": 199.64805555555552,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "America: which, strange to relate, have proved more impor-",
+   "x0": 19.0,
+   "y0": 201.59666666666664,
+   "x1": 135.0,
+   "y1": 204.7633333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "page_number",
+   "text": "3",
+   "box": [
+    76.125,
+    215.0,
+    77.875,
+    218.485
+   ]
+  }
+ ]
+}

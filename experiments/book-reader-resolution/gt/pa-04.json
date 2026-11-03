@@ -1,0 +1,439 @@
+{
+ "id": "pa-04",
+ "kind": "paperback",
+ "image_mm": [
+  110,
+  178
+ ],
+ "px_per_mm": 12.0,
+ "font": "times.ttf",
+ "size_pt": 11,
+ "leading_pt": 12.4,
+ "x_height_mm": 1.833,
+ "pages": [
+  {
+   "page_no": 4,
+   "rect": [
+    0,
+    0,
+    110,
+    178
+   ],
+   "gutter": "right"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  110,
+  89.0
+ ],
+ "lines": [
+  {
+   "text": "mind was less difficult to develop. She was a woman of",
+   "x0": 9.0,
+   "y0": 13.0,
+   "x1": 97.99999999999999,
+   "y1": 16.5,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "mean understanding, little information, and uncertain",
+   "x0": 9.0,
+   "y0": 17.374444444444443,
+   "x1": 97.99999999999999,
+   "y1": 20.874444444444443,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "temper. When she was discontented, she fancied herself",
+   "x0": 9.0,
+   "y0": 21.748888888888885,
+   "x1": 98.0,
+   "y1": 25.248888888888885,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "nervous. The business of her life was to get her",
+   "x0": 9.0,
+   "y0": 26.123333333333328,
+   "x1": 98.00000000000001,
+   "y1": 29.623333333333328,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "daughters married; its solace was visiting and news.",
+   "x0": 9.0,
+   "y0": 30.49777777777777,
+   "x1": 91.08333333333333,
+   "y1": 33.99777777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Chapter 1. Loomings",
+   "x0": 29.625651041666668,
+   "y0": 38.371777777777766,
+   "x1": 77.37434895833333,
+   "y1": 43.65927777777777,
+   "col": 0,
+   "heading": true,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Call me Ishmael. Some years ago—never mind how",
+   "x0": 9.0,
+   "y0": 47.99555555555554,
+   "x1": 98.00000000000001,
+   "y1": 51.49555555555554,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "long precisely—having little or no money in my purse,",
+   "x0": 9.0,
+   "y0": 52.36999999999998,
+   "x1": 98.0,
+   "y1": 55.86999999999998,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and nothing particular to interest me on shore, I thought",
+   "x0": 9.0,
+   "y0": 56.744444444444426,
+   "x1": 98.0,
+   "y1": 60.244444444444426,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "I would sail about a little and see the watery part of the",
+   "x0": 9.0,
+   "y0": 61.11888888888887,
+   "x1": 98.0,
+   "y1": 64.61888888888888,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "world. It is a way I have of driving off the spleen and",
+   "x0": 9.0,
+   "y0": 65.49333333333331,
+   "x1": 98.0,
+   "y1": 68.99333333333331,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "regulating the circulation. Whenever I find myself",
+   "x0": 9.0,
+   "y0": 69.86777777777776,
+   "x1": 98.0,
+   "y1": 73.36777777777776,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "growing grim about the mouth; whenever it is a damp,",
+   "x0": 9.0,
+   "y0": 74.24222222222221,
+   "x1": 98.0,
+   "y1": 77.74222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "drizzly November in my soul; whenever I find myself",
+   "x0": 9.0,
+   "y0": 78.61666666666666,
+   "x1": 98.0,
+   "y1": 82.11666666666666,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "involuntarily pausing before coffin warehouses, and",
+   "x0": 9.0,
+   "y0": 82.99111111111111,
+   "x1": 98.0,
+   "y1": 86.49111111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "bringing up the rear of every funeral I meet; and",
+   "x0": 9.0,
+   "y0": 87.36555555555556,
+   "x1": 98.00000000000001,
+   "y1": 90.86555555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "especially whenever my hypos get such an upper hand",
+   "x0": 9.0,
+   "y0": 91.74000000000001,
+   "x1": 98.0,
+   "y1": 95.24000000000001,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "of me, that it requires a strong moral principle to",
+   "x0": 9.0,
+   "y0": 96.11444444444446,
+   "x1": 98.00000000000001,
+   "y1": 99.61444444444446,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "prevent me from deliberately stepping into the street,",
+   "x0": 9.0,
+   "y0": 100.48888888888891,
+   "x1": 98.0,
+   "y1": 103.98888888888891,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and methodically knocking people’s hats off—then, I",
+   "x0": 9.0,
+   "y0": 104.86333333333336,
+   "x1": 97.99999999999999,
+   "y1": 108.36333333333336,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "account it high time to get to sea as soon as I can. This",
+   "x0": 9.0,
+   "y0": 109.23777777777781,
+   "x1": 97.99999999999999,
+   "y1": 112.73777777777781,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "is my substitute for pistol and ball. With a philosophical",
+   "x0": 9.0,
+   "y0": 113.61222222222226,
+   "x1": 98.0,
+   "y1": 117.11222222222226,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "flourish Cato throws himself upon his sword; I quietly",
+   "x0": 9.0,
+   "y0": 117.98666666666671,
+   "x1": 98.0,
+   "y1": 121.48666666666671,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "take to the ship. There is nothing surprising in this. If",
+   "x0": 9.0,
+   "y0": 122.36111111111116,
+   "x1": 98.0,
+   "y1": 125.86111111111116,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "they but knew it, almost all men in their degree, some",
+   "x0": 9.0,
+   "y0": 126.7355555555556,
+   "x1": 98.0,
+   "y1": 130.2355555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "time or other, cherish very nearly the same feelings",
+   "x0": 9.0,
+   "y0": 131.11000000000004,
+   "x1": 98.0,
+   "y1": 134.61000000000004,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "towards the ocean with me.",
+   "x0": 9.0,
+   "y0": 135.48444444444448,
+   "x1": 52.416666666666664,
+   "y1": 138.98444444444448,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "There now is your insular city of the Manhattoes,",
+   "x0": 14.875,
+   "y0": 139.8588888888889,
+   "x1": 97.95833333333333,
+   "y1": 143.3588888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "belted round by wharves as Indian isles by coral reefs—",
+   "x0": 9.0,
+   "y0": 144.23333333333335,
+   "x1": 98.0,
+   "y1": 147.73333333333335,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "commerce surrounds it with her surf. Right and left, the",
+   "x0": 9.0,
+   "y0": 148.60777777777778,
+   "x1": 97.99999999999999,
+   "y1": 152.10777777777778,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "streets take you waterward. Its extreme downtown is",
+   "x0": 9.0,
+   "y0": 152.98222222222222,
+   "x1": 98.00000000000001,
+   "y1": 156.48222222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "the battery, where that noble mole is washed by waves,",
+   "x0": 9.0,
+   "y0": 157.35666666666665,
+   "x1": 98.0,
+   "y1": 160.85666666666665,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "header",
+   "text": "PRIDE AND PREJUDICE",
+   "box": [
+    36.45963541666667,
+    5.0,
+    70.54036458333334,
+    8.211666666666666
+   ]
+  },
+  {
+   "kind": "page_number",
+   "text": "4",
+   "box": [
+    9,
+    5.0,
+    10.583333333333334,
+    8.211666666666666
+   ]
+  }
+ ]
+}

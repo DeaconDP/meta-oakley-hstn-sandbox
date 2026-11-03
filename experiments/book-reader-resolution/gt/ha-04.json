@@ -1,0 +1,487 @@
+{
+ "id": "ha-04",
+ "kind": "hardback",
+ "image_mm": [
+  152,
+  229
+ ],
+ "px_per_mm": 12.0,
+ "font": "pala.ttf",
+ "size_pt": 12,
+ "leading_pt": 14.5,
+ "x_height_mm": 2.0,
+ "pages": [
+  {
+   "page_no": 6,
+   "rect": [
+    0,
+    0,
+    152,
+    229
+   ],
+   "gutter": "right"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  152,
+  114.5
+ ],
+ "lines": [
+  {
+   "text": "it be otherwise? Scrooge and he were partners for I don’t",
+   "x0": 17.0,
+   "y0": 20.0,
+   "x1": 132.99999999999997,
+   "y1": 23.166666666666668,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "know how many years. Scrooge was his sole executor, his",
+   "x0": 17.0,
+   "y0": 25.115277777777777,
+   "x1": 133.00000000000003,
+   "y1": 28.281944444444445,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "sole administrator, his sole assign, his sole residuary legatee,",
+   "x0": 17.0,
+   "y0": 30.230555555555554,
+   "x1": 133.0,
+   "y1": 33.39722222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "his sole friend, and sole mourner. And even Scrooge was not",
+   "x0": 17.0,
+   "y0": 35.34583333333333,
+   "x1": 133.00000000000003,
+   "y1": 38.512499999999996,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "so dreadfully cut up by the sad event, but that he was an",
+   "x0": 17.0,
+   "y0": 40.46111111111111,
+   "x1": 133.00000000000003,
+   "y1": 43.62777777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "excellent man of business on the very day of the funeral, and",
+   "x0": 17.0,
+   "y0": 45.576388888888886,
+   "x1": 133.0,
+   "y1": 48.74305555555555,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "solemnised it with an undoubted bargain.",
+   "x0": 17.0,
+   "y0": 50.69166666666666,
+   "x1": 96.25,
+   "y1": 53.85833333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "The mention of Marley’s funeral brings me back to the",
+   "x0": 23.375,
+   "y0": 55.80694444444444,
+   "x1": 132.95833333333334,
+   "y1": 58.973611111111104,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "point I started from. There is no doubt that Marley was dead.",
+   "x0": 17.0,
+   "y0": 60.92222222222222,
+   "x1": 133.00000000000003,
+   "y1": 64.08888888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "This must be distinctly understood, or nothing wonderful",
+   "x0": 17.0,
+   "y0": 66.0375,
+   "x1": 133.0,
+   "y1": 69.20416666666667,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "can come of the story I am going to relate. If we were not per-",
+   "x0": 17.0,
+   "y0": 71.15277777777777,
+   "x1": 133.0,
+   "y1": 74.31944444444444,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "fectly convinced that Hamlet’s Father died before the play",
+   "x0": 17.0,
+   "y0": 76.26805555555555,
+   "x1": 133.0,
+   "y1": 79.43472222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "began, there would be nothing more remarkable in his taking",
+   "x0": 17.0,
+   "y0": 81.38333333333333,
+   "x1": 133.00000000000003,
+   "y1": 84.55,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "a stroll at night, in an easterly wind, upon his own ramparts,",
+   "x0": 17.0,
+   "y0": 86.4986111111111,
+   "x1": 133.0,
+   "y1": 89.66527777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "than there would be in any other middle-aged gentleman",
+   "x0": 17.0,
+   "y0": 91.61388888888888,
+   "x1": 133.0,
+   "y1": 94.78055555555555,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "rashly turning out after dark in a breezy spot—say Saint",
+   "x0": 17.0,
+   "y0": 96.72916666666666,
+   "x1": 133.0,
+   "y1": 99.89583333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Paul’s Churchyard for instance—literally to astonish his",
+   "x0": 17.0,
+   "y0": 101.84444444444443,
+   "x1": 132.99999999999997,
+   "y1": 105.0111111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "son’s weak mind.",
+   "x0": 17.0,
+   "y0": 106.95972222222221,
+   "x1": 50.075520833333336,
+   "y1": 110.12638888888888,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Scrooge never painted out Old Marley’s name. There it",
+   "x0": 23.375,
+   "y0": 112.07499999999999,
+   "x1": 132.95833333333334,
+   "y1": 115.24166666666666,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "stood, years afterwards, above the warehouse door: Scrooge",
+   "x0": 17.0,
+   "y0": 117.19027777777777,
+   "x1": 133.0,
+   "y1": 120.35694444444444,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and Marley. The firm was known as Scrooge and Marley.",
+   "x0": 17.0,
+   "y0": 122.30555555555554,
+   "x1": 133.0,
+   "y1": 125.47222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Sometimes people new to the business called Scrooge",
+   "x0": 17.0,
+   "y0": 127.42083333333332,
+   "x1": 133.0,
+   "y1": 130.58749999999998,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Scrooge, and sometimes Marley, but he answered to both",
+   "x0": 17.0,
+   "y0": 132.5361111111111,
+   "x1": 133.0,
+   "y1": 135.70277777777775,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "names. It was all the same to him.",
+   "x0": 17.0,
+   "y0": 137.65138888888887,
+   "x1": 80.99869791666667,
+   "y1": 140.81805555555553,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Oh! But he was a tight-fisted hand at the grindstone,",
+   "x0": 23.375,
+   "y0": 142.76666666666665,
+   "x1": 132.95833333333334,
+   "y1": 145.9333333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Scrooge! a squeezing, wrenching, grasping, scraping,",
+   "x0": 17.0,
+   "y0": 147.88194444444443,
+   "x1": 130.70833333333334,
+   "y1": 151.0486111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "clutching, covetous, old sinner! Hard and sharp as flint, from",
+   "x0": 17.0,
+   "y0": 152.9972222222222,
+   "x1": 133.00000000000003,
+   "y1": 156.16388888888886,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "which no steel had ever struck out generous fire; secret, and",
+   "x0": 17.0,
+   "y0": 158.11249999999998,
+   "x1": 132.99999999999997,
+   "y1": 161.27916666666664,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "self-contained, and solitary as an oyster. The cold within him",
+   "x0": 17.0,
+   "y0": 163.22777777777776,
+   "x1": 132.99999999999997,
+   "y1": 166.39444444444442,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "froze his old features, nipped his pointed nose, shrivelled his",
+   "x0": 17.0,
+   "y0": 168.34305555555554,
+   "x1": 132.99999999999997,
+   "y1": 171.5097222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "cheek, stiffened his gait; made his eyes red, his thin lips blue;",
+   "x0": 17.0,
+   "y0": 173.45833333333331,
+   "x1": 132.99999999999997,
+   "y1": 176.62499999999997,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and spoke out shrewdly in his grating voice. A frosty rime",
+   "x0": 17.0,
+   "y0": 178.5736111111111,
+   "x1": 132.99999999999997,
+   "y1": 181.74027777777775,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "was on his head, and on his eyebrows, and his wiry chin. He",
+   "x0": 17.0,
+   "y0": 183.68888888888887,
+   "x1": 132.99999999999997,
+   "y1": 186.85555555555553,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "carried his own low temperature always about with him; he",
+   "x0": 17.0,
+   "y0": 188.80416666666665,
+   "x1": 133.00000000000003,
+   "y1": 191.9708333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "iced his office in the dog-days; and didn’t thaw it one degree",
+   "x0": 17.0,
+   "y0": 193.91944444444442,
+   "x1": 132.99999999999997,
+   "y1": 197.08611111111108,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "at Christmas.",
+   "x0": 17.0,
+   "y0": 199.0347222222222,
+   "x1": 42.166666666666664,
+   "y1": 202.20138888888886,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "header",
+   "text": "A CHRISTMAS CAROL",
+   "box": [
+    56.62630208333333,
+    12.0,
+    93.37369791666666,
+    15.485
+   ]
+  },
+  {
+   "kind": "page_number",
+   "text": "6",
+   "box": [
+    74.125,
+    215.0,
+    75.875,
+    218.485
+   ]
+  }
+ ]
+}

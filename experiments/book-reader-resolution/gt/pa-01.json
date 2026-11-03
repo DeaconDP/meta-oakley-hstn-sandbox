@@ -1,0 +1,381 @@
+{
+ "id": "pa-01",
+ "kind": "paperback",
+ "image_mm": [
+  110,
+  178
+ ],
+ "px_per_mm": 12.0,
+ "font": "times.ttf",
+ "size_pt": 11,
+ "leading_pt": 12.4,
+ "x_height_mm": 1.833,
+ "pages": [
+  {
+   "page_no": 1,
+   "rect": [
+    0,
+    0,
+    110,
+    178
+   ],
+   "gutter": "left"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  110,
+  89.0
+ ],
+ "lines": [
+  {
+   "text": "Chapter I",
+   "x0": 45.417317708333336,
+   "y0": 35.0,
+   "x1": 67.58268229166667,
+   "y1": 40.2875,
+   "col": 0,
+   "heading": true,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "It is a truth universally acknowledged, that a single man",
+   "x0": 12.0,
+   "y0": 44.623777777777775,
+   "x1": 101.0,
+   "y1": 48.123777777777775,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "in possession of a good fortune, must be in want of a",
+   "x0": 12.0,
+   "y0": 48.99822222222222,
+   "x1": 101.00000000000001,
+   "y1": 52.49822222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "wife.",
+   "x0": 12.0,
+   "y0": 53.37266666666666,
+   "x1": 20.0,
+   "y1": 56.87266666666666,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "However little known the feelings or views of such",
+   "x0": 17.875,
+   "y0": 57.7471111111111,
+   "x1": 100.95833333333333,
+   "y1": 61.2471111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "a man may be on his first entering a neighbourhood,",
+   "x0": 12.0,
+   "y0": 62.121555555555545,
+   "x1": 101.0,
+   "y1": 65.62155555555555,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "this truth is so well fixed in the minds of the surroun-",
+   "x0": 12.0,
+   "y0": 66.496,
+   "x1": 101.0,
+   "y1": 69.996,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "ding families, that he is considered as the rightful",
+   "x0": 12.0,
+   "y0": 70.87044444444444,
+   "x1": 101.0,
+   "y1": 74.37044444444444,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "property of some one or other of their daughters.",
+   "x0": 12.0,
+   "y0": 75.2448888888889,
+   "x1": 89.41666666666667,
+   "y1": 78.7448888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“My dear Mr. Bennet,” said his lady to him one",
+   "x0": 17.875,
+   "y0": 79.61933333333334,
+   "x1": 100.95833333333336,
+   "y1": 83.11933333333334,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "day, “have you heard that Netherfield Park is let at",
+   "x0": 12.0,
+   "y0": 83.9937777777778,
+   "x1": 101.00000000000001,
+   "y1": 87.4937777777778,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "last?”",
+   "x0": 12.0,
+   "y0": 88.36822222222224,
+   "x1": 20.916666666666668,
+   "y1": 91.86822222222224,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Mr. Bennet replied that he had not.",
+   "x0": 17.875,
+   "y0": 92.7426666666667,
+   "x1": 73.32942708333333,
+   "y1": 96.2426666666667,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“But it is,” returned she; “for Mrs. Long has just",
+   "x0": 17.875,
+   "y0": 97.11711111111114,
+   "x1": 100.95833333333331,
+   "y1": 100.61711111111114,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "been here, and she told me all about it.”",
+   "x0": 12.0,
+   "y0": 101.49155555555559,
+   "x1": 75.0,
+   "y1": 104.99155555555559,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Mr. Bennet made no answer.",
+   "x0": 17.875,
+   "y0": 105.86600000000004,
+   "x1": 63.575520833333336,
+   "y1": 109.36600000000004,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“Do not you want to know who has taken it?” cried",
+   "x0": 17.875,
+   "y0": 110.24044444444449,
+   "x1": 100.95833333333336,
+   "y1": 113.74044444444449,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "his wife impatiently.",
+   "x0": 12.0,
+   "y0": 114.61488888888894,
+   "x1": 44.579427083333336,
+   "y1": 118.11488888888894,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“You want to tell me, and I have no objection to",
+   "x0": 17.875,
+   "y0": 118.98933333333339,
+   "x1": 100.95833333333333,
+   "y1": 122.48933333333339,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "hearing it.”",
+   "x0": 12.0,
+   "y0": 123.36377777777784,
+   "x1": 29.833333333333332,
+   "y1": 126.86377777777784,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "This was invitation enough.",
+   "x0": 17.875,
+   "y0": 127.73822222222229,
+   "x1": 61.833333333333336,
+   "y1": 131.2382222222223,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "“Why, my dear, you must know, Mrs. Long says",
+   "x0": 17.875,
+   "y0": 132.11266666666674,
+   "x1": 100.95833333333333,
+   "y1": 135.61266666666674,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "that Netherfield is taken by a young man of large for-",
+   "x0": 12.0,
+   "y0": 136.48711111111118,
+   "x1": 101.00000000000001,
+   "y1": 139.98711111111118,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "tune from the north of England; that he came down on",
+   "x0": 12.0,
+   "y0": 140.8615555555556,
+   "x1": 101.00000000000001,
+   "y1": 144.3615555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Monday in a chaise and four to see the place, and was",
+   "x0": 12.0,
+   "y0": 145.23600000000005,
+   "x1": 101.0,
+   "y1": 148.73600000000005,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "so much delighted with it that he agreed with Mr.",
+   "x0": 12.0,
+   "y0": 149.61044444444448,
+   "x1": 101.0,
+   "y1": 153.11044444444448,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Morris immediately; that he is to take possession before",
+   "x0": 12.0,
+   "y0": 153.98488888888892,
+   "x1": 101.0,
+   "y1": 157.48488888888892,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Michaelmas, and some of his servants are to be in the",
+   "x0": 12.0,
+   "y0": 158.35933333333335,
+   "x1": 101.0,
+   "y1": 161.85933333333335,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "page_number",
+   "text": "1",
+   "box": [
+    55.708333333333336,
+    172.0,
+    57.29166666666667,
+    175.21166666666667
+   ]
+  }
+ ]
+}

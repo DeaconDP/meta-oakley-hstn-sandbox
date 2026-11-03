@@ -20,8 +20,16 @@
 - [ ] Audio UX layer: earcons, verbosity levels, speech rate, barge-in, clause-chunked TTS queue, `USAGE_ASSISTANCE_ACCESSIBILITY` on Android
 - [ ] Session narrator demo (doff/fold/battery/thermal announcements + session rebuild), tested with Mock Device Kit
 - [ ] Read-aloud demo: ML Kit text recognition + framing guidance + uncertainty flags
-- [ ] Book-reader resolution experiment: ~20 book pages through the mock at stream LOW/MEDIUM/HIGH, in-stream capturePhoto, and standalone photo LARGE/FULL, ML Kit OCR, CER per setting (notes/book-reader.md > Experiment)
-- [ ] Book-reader demo: page-turn detection, spread split, header/page-number removal, pipelined capture during TTS, fold-as-bookmark
+- [x] Book-reader resolution experiment, synthetic pages + ML Kit on the emulator (2026-10-28, experiments/book-reader-resolution/results.md): GA works half a page at a time with crop + 2x upscale; full page needs Experimental FULL
+- [ ] Book-reader: crop to the page + 2x upscale before ML Kit in `MlKitOcr` (the experiment's best prep)
+- [ ] Book-reader: repeat the resolution check with real HSTN photos of real books
+- [x] Book-reader demo, first build on the mock (2026-10-27, notes/book-reader-android.md): page-turn detection, spread split, header/page-number removal, pipelined capture during TTS, bookmark
+- [ ] Book-reader on a real phone + HSTN: OCR time per page (16-19 s on the emulator), TTS over A2DP, page-turn signal
+- [x] Book-reader voice-first: "Open Book Reader" launches with no taps, conversational on-device voice control, spoken replies, glasses mic with phone fallback (2026-11-03, notes/book-reader-android.md > Voice control)
+- [x] Book-reader pitfalls spoken and recovered from: Bluetooth, not linked, disconnect/fold/reconnect, doff, battery, heat, update, covered/dark/no page/glare/obstructed, slow OCR (2026-11-03, notes/book-reader-android.md > Pitfalls)
+- [ ] Pitfalls on real HSTN: metadata values, ImageCheck thresholds on real photos, fold → reconnect
+- [ ] Voice on real HSTN: on-glasses speech alongside the stream + A2DP voice, echo from the open-ear speakers, restart after each capture; phone-recognizer fallback on a real phone (restart beeps); screen-off mic (FGS `microphone` type?)
+- [ ] "Hey Meta, start Book Reader" voice invocation (Experimental; needs Developer Center approval)
 - [ ] Look-closer demo with "can't tell" behaviour and on-device face blur before upload
 - [ ] Low-vision magnifier view on the phone
 - [ ] Offline eval harness: Mock Device Kit `setCameraFeed`/`setCapturedImage` + VizWiz/TextVQA subset, replay mode for CI

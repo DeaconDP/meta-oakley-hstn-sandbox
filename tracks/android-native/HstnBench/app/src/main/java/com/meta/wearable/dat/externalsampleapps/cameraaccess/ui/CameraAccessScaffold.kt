@@ -44,7 +44,13 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import android.media.AudioAttributes
+import android.os.Handler
+import android.os.Looper
+import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -67,6 +73,7 @@ fun CameraAccessScaffold(
     onRequestWearablesPermission: suspend (Permission) -> PermissionStatus,
     onRequestRecordAudioPermission: suspend () -> Boolean,
     modifier: Modifier = Modifier,
+    voiceFirst: Boolean = false,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
@@ -87,11 +94,15 @@ fun CameraAccessScaffold(
             wearablesViewModel = viewModel,
             onRequestWearablesPermission = onRequestWearablesPermission,
             onRequestRecordAudioPermission = onRequestRecordAudioPermission,
+            voiceFirst = voiceFirst,
         )
       } else {
         HomeScreen(
             viewModel = viewModel,
         )
+        // Voice-first launch but the app was never connected to Meta AI: say so rather than sit
+        // silently on a screen a blind user can't see. Registration happens once, in Meta AI's UI.
+        if (voiceFirst) SpeakOnce(stringResource(R.string.voice_needs_setup), delayMs = 3_000L)
       }
 
       SnackbarHost(
@@ -142,6 +153,35 @@ fun CameraAccessScaffold(
           }
         }
       }
+    }
+  }
+}
+
+/** Speaks [text] once after [delayMs] if this composable is still showing. Accessibility audio. */
+@Composable
+private fun SpeakOnce(text: String, delayMs: Long) {
+  val context = LocalContext.current
+  DisposableEffect(text) {
+    var tts: TextToSpeech? = null
+    val handler = Handler(Looper.getMainLooper())
+    val speak = Runnable {
+      tts =
+          TextToSpeech(context.applicationContext) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+              tts?.setAudioAttributes(
+                  AudioAttributes.Builder()
+                      .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                      .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                      .build(),
+              )
+              tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "setup")
+            }
+          }
+    }
+    handler.postDelayed(speak, delayMs)
+    onDispose {
+      handler.removeCallbacks(speak)
+      tts?.shutdown()
     }
   }
 }

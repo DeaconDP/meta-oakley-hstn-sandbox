@@ -1,0 +1,463 @@
+{
+ "id": "pa-06",
+ "kind": "paperback",
+ "image_mm": [
+  110,
+  178
+ ],
+ "px_per_mm": 12.0,
+ "font": "times.ttf",
+ "size_pt": 11,
+ "leading_pt": 12.4,
+ "x_height_mm": 1.833,
+ "pages": [
+  {
+   "page_no": 6,
+   "rect": [
+    0,
+    0,
+    110,
+    178
+   ],
+   "gutter": "right"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  110,
+  89.0
+ ],
+ "lines": [
+  {
+   "text": "water there be in all that region. Should you ever be",
+   "x0": 9.0,
+   "y0": 13.0,
+   "x1": 98.0,
+   "y1": 16.5,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "athirst in the great American desert, try this experiment,",
+   "x0": 9.0,
+   "y0": 17.374444444444443,
+   "x1": 98.0,
+   "y1": 20.874444444444443,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "if your caravan happen to be supplied with a",
+   "x0": 9.0,
+   "y0": 21.748888888888885,
+   "x1": 98.0,
+   "y1": 25.248888888888885,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "metaphysical professor. Yes, as every one knows,",
+   "x0": 9.0,
+   "y0": 26.123333333333328,
+   "x1": 98.0,
+   "y1": 29.623333333333328,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "meditation and water are wedded for ever.",
+   "x0": 9.0,
+   "y0": 30.49777777777777,
+   "x1": 76.07942708333333,
+   "y1": 33.99777777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "But here is an artist. He desires to paint you the",
+   "x0": 14.875,
+   "y0": 34.87222222222221,
+   "x1": 97.95833333333333,
+   "y1": 38.37222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "dreamiest, shadiest, quietest, most enchanting bit of",
+   "x0": 9.0,
+   "y0": 39.246666666666655,
+   "x1": 98.0,
+   "y1": 42.746666666666655,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "romantic landscape in all the valley of the Saco. What",
+   "x0": 9.0,
+   "y0": 43.6211111111111,
+   "x1": 97.99999999999999,
+   "y1": 47.1211111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "is the chief element he employs? There stand his trees,",
+   "x0": 9.0,
+   "y0": 47.99555555555554,
+   "x1": 98.0,
+   "y1": 51.49555555555554,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "each with a hollow trunk, as if a hermit and a crucifix",
+   "x0": 9.0,
+   "y0": 52.36999999999998,
+   "x1": 98.0,
+   "y1": 55.86999999999998,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "were within; and here sleeps his meadow, and there",
+   "x0": 9.0,
+   "y0": 56.744444444444426,
+   "x1": 98.0,
+   "y1": 60.244444444444426,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "sleep his cattle; and up from yonder cottage goes a",
+   "x0": 9.0,
+   "y0": 61.11888888888887,
+   "x1": 98.0,
+   "y1": 64.61888888888888,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "sleepy smoke. Deep into distant woodlands winds a",
+   "x0": 9.0,
+   "y0": 65.49333333333331,
+   "x1": 98.0,
+   "y1": 68.99333333333331,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "mazy way, reaching to overlapping spurs of mountains",
+   "x0": 9.0,
+   "y0": 69.86777777777776,
+   "x1": 97.99999999999999,
+   "y1": 73.36777777777776,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "bathed in their hill-side blue. But though the picture lies",
+   "x0": 9.0,
+   "y0": 74.24222222222221,
+   "x1": 98.0,
+   "y1": 77.74222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "thus tranced, and though this pine-tree shakes down its",
+   "x0": 9.0,
+   "y0": 78.61666666666666,
+   "x1": 98.0,
+   "y1": 82.11666666666666,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "sighs like leaves upon this shepherd’s head, yet all were",
+   "x0": 9.0,
+   "y0": 82.99111111111111,
+   "x1": 98.00000000000001,
+   "y1": 86.49111111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "vain, unless the shepherd’s eye were fixed upon the",
+   "x0": 9.0,
+   "y0": 87.36555555555556,
+   "x1": 98.0,
+   "y1": 90.86555555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "magic stream before him. Go visit the Prairies in June,",
+   "x0": 9.0,
+   "y0": 91.74000000000001,
+   "x1": 98.0,
+   "y1": 95.24000000000001,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "when for scores on scores of miles you wade knee-deep",
+   "x0": 9.0,
+   "y0": 96.11444444444446,
+   "x1": 98.00000000000001,
+   "y1": 99.61444444444446,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "among Tiger-lilies—what is the one charm wanting?—",
+   "x0": 9.0,
+   "y0": 100.48888888888891,
+   "x1": 97.99999999999999,
+   "y1": 103.98888888888891,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Water—there is not a drop of water there! Were",
+   "x0": 9.0,
+   "y0": 104.86333333333336,
+   "x1": 98.0,
+   "y1": 108.36333333333336,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Niagara but a cataract of sand, would you travel your",
+   "x0": 9.0,
+   "y0": 109.23777777777781,
+   "x1": 97.99999999999999,
+   "y1": 112.73777777777781,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "thousand miles to see it?",
+   "x0": 9.0,
+   "y0": 113.61222222222226,
+   "x1": 47.833333333333336,
+   "y1": 117.11222222222226,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Why did the poor poet of Tennessee, upon suddenly",
+   "x0": 14.875,
+   "y0": 117.98666666666671,
+   "x1": 97.95833333333333,
+   "y1": 121.48666666666671,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "receiving two handfuls of silver, deliberate whether to",
+   "x0": 9.0,
+   "y0": 122.36111111111116,
+   "x1": 98.0,
+   "y1": 125.86111111111116,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "buy him a coat, which he sadly needed, or invest his",
+   "x0": 9.0,
+   "y0": 126.7355555555556,
+   "x1": 98.0,
+   "y1": 130.2355555555556,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "money in a pedestrian trip to Rockaway Beach? Why is",
+   "x0": 9.0,
+   "y0": 131.11000000000004,
+   "x1": 98.0,
+   "y1": 134.61000000000004,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "almost every robust healthy boy with a robust healthy",
+   "x0": 9.0,
+   "y0": 135.48444444444448,
+   "x1": 98.0,
+   "y1": 138.98444444444448,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "soul in him, at some time or other crazy to go to sea?",
+   "x0": 9.0,
+   "y0": 139.8588888888889,
+   "x1": 98.0,
+   "y1": 143.3588888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Why upon your first voyage as a passenger, did you",
+   "x0": 9.0,
+   "y0": 144.23333333333335,
+   "x1": 98.00000000000001,
+   "y1": 147.73333333333335,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "yourself feel such a mystical vibration, when first told",
+   "x0": 9.0,
+   "y0": 148.60777777777778,
+   "x1": 98.0,
+   "y1": 152.10777777777778,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "that you and your ship were now out of sight of land?",
+   "x0": 9.0,
+   "y0": 152.98222222222222,
+   "x1": 97.99999999999999,
+   "y1": 156.48222222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Why did the old Persians hold the sea holy? Why did",
+   "x0": 9.0,
+   "y0": 157.35666666666665,
+   "x1": 98.00000000000001,
+   "y1": 160.85666666666665,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "header",
+   "text": "MOBY-DICK",
+   "box": [
+    44.419270833333336,
+    5.0,
+    62.58072916666667,
+    8.211666666666666
+   ]
+  },
+  {
+   "kind": "page_number",
+   "text": "6",
+   "box": [
+    9,
+    5.0,
+    10.583333333333334,
+    8.211666666666666
+   ]
+  }
+ ]
+}

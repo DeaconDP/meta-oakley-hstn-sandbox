@@ -55,6 +55,11 @@ class MainActivity : ComponentActivity() {
     // plugin's mcp/target_resolver.py.
     private const val MOCK_TEST_SERVER_PORT = 8237
 
+    // Launcher alias for the voice-first book reader ("Hey Google, open Book Reader").
+    private const val BOOK_READER_ALIAS = ".BookReaderLauncher"
+    // Same thing from adb/tests or a deep link: `--ez book_reader true`, or hstnbench://book.
+    const val EXTRA_BOOK_READER = "book_reader"
+
     // Required Android permissions for the DAT SDK to function properly
     val PERMISSIONS: Array<String> = arrayOf(BLUETOOTH, BLUETOOTH_CONNECT, INTERNET)
   }
@@ -121,11 +126,16 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     maybeStartMockDeviceTestServer()
     enableEdgeToEdge()
+    val voiceFirst =
+        intent.component?.className?.endsWith(BOOK_READER_ALIAS) == true ||
+            intent.getBooleanExtra(EXTRA_BOOK_READER, false) ||
+            (intent.data?.scheme == "hstnbench" && intent.data?.host == "book")
     setContent {
       CameraAccessScaffold(
           viewModel = viewModel,
           onRequestWearablesPermission = ::requestWearablesPermission,
           onRequestRecordAudioPermission = ::requestRecordAudioPermission,
+          voiceFirst = voiceFirst,
       )
     }
   }

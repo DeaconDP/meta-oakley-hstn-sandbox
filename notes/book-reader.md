@@ -1,6 +1,6 @@
 # Book reader: read a printed book aloud, page by page
 
-Idea logged 2026-10-22. Not built yet. This is a continuous-paging extension of the "Read it aloud" demo (ROADMAP step 5). Builds on `notes/hstn-capabilities.md`, `notes/a11y-perception-stack.md` and `notes/a11y-prior-art.md`.
+Idea logged 2026-10-22. First build 2026-10-27 on android-native, mock only (`notes/book-reader-android.md`). This is a continuous-paging extension of the "Read it aloud" demo (ROADMAP step 5). Builds on `notes/hstn-capabilities.md`, `notes/a11y-perception-stack.md` and `notes/a11y-prior-art.md`.
 
 ## Why it fits
 
@@ -30,13 +30,23 @@ stream LOW/7 fps (warm) ─► detect page turn: hand/motion in frame, then a st
 | 3 | **Page-turn detection** | Motion or hand in frame, then N stable frames with a text block that differs from the last page. Spoken or earcon confirmation. Manual "next page" as fallback |
 | 4 | **Two-page spreads and reading order** | Split on the gutter. Drop or announce headers, page numbers and footnotes (verbosity setting). Rejoin words hyphenated across lines and pages. Use a cloud VLM only for layout-heavy pages (columns, textbooks), never by default |
 | 5 | **Gaps between pages** | Pipeline: capture and OCR page N+1 while page N is spoken |
-| 6 | **Controls** | GA: phone buttons and screen-reader actions. Experimental: captouch tap = pause/resume, swipe = back a sentence / change speed, voice "go back a paragraph". User-set speech rate (experts run 2–3×) |
+| 6 | **Controls** | **Voice first** (2026-11-03): launch by voice into a reader that's already listening, then talk to it ("hang on", "go on", "say that again", "back a paragraph", "a bit faster", "where am I"). It answers out loud and can be talked over. On-device understanding; glasses mic, phone-mic fallback (`notes/book-reader-android.md` > Voice control). Phone buttons mirror it for helpers and TalkBack. Later: captouch tap = pause/resume, swipe = back a sentence. User-set speech rate (experts run 2–3×) |
 | 7 | **Long sessions** | Streaming for a whole chapter: watch `thermalLevel` and battery, drop to LOW between pages. Folding the hinges ends the session, so treat it as a bookmark: save the last sentence and resume from it |
 | 8 | **Privacy and copyright** | On-device OCR by default; nothing uploaded or stored unless the user opts into the cloud layout path. Personal-use read-aloud, same as existing accessibility readers |
 
 ## Experiment (do first)
 
 Resolution check. Photograph ~20 book pages (paperback, hardback, a two-column textbook). Feed each through the Mock Device Kit (`setCameraFeed` / `setCapturedImage`) at stream LOW / MEDIUM / HIGH, in-stream `capturePhoto` (GA), and standalone photo LARGE / FULL (Experimental). Run ML Kit Text Recognition v2 and score CER/WER against a hand transcription. Output: the smallest capture setting that reads body text at ≤ 2% CER, for a full page and for a half page. This decides whether a GA-only book reader can read a full page per capture.
+
+## Experiment result (2026-10-28)
+
+Synthetic pages through a simulated HSTN camera, scored with ML Kit on the emulator (`experiments/book-reader-resolution/results.md`).
+
+- **Half page per capture is shippable on GA.** In-stream `capturePhoto` at ~25 cm reads every page type at 1.2% CER, but only after cropping to the page and upscaling 2x. Raw, it scores 38%.
+- **Full page per capture needs Experimental FULL** (1.2% with crop + 2x). No GA setting reads a full paperback page at <= 2%.
+- **Don't enhance the image** (contrast, unsharp, grayscale): it made OCR worse.
+- **Not confirmed yet:** the field of view is a guess (100° diagonal), and there are no real-HSTN photos yet. A real-glasses photo set is the next check.
+- **App gap:** `MlKitOcr` doesn't crop or upscale yet.
 
 ## Open questions
 

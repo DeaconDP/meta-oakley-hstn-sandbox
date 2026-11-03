@@ -1,0 +1,487 @@
+{
+ "id": "ha-02",
+ "kind": "hardback",
+ "image_mm": [
+  152,
+  229
+ ],
+ "px_per_mm": 12.0,
+ "font": "pala.ttf",
+ "size_pt": 12,
+ "leading_pt": 14.5,
+ "x_height_mm": 2.0,
+ "pages": [
+  {
+   "page_no": 4,
+   "rect": [
+    0,
+    0,
+    152,
+    229
+   ],
+   "gutter": "right"
+  }
+ ],
+ "half_region": [
+  0,
+  0.0,
+  152,
+  114.5
+ ],
+ "lines": [
+  {
+   "text": "tant to the human race than any communications yet",
+   "x0": 17.0,
+   "y0": 20.0,
+   "x1": 133.0,
+   "y1": 23.166666666666668,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "received through any of the chickens of the Cock-lane brood.",
+   "x0": 17.0,
+   "y0": 25.115277777777777,
+   "x1": 131.74869791666666,
+   "y1": 28.281944444444445,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "France, less favoured on the whole as to matters spiritual",
+   "x0": 23.375,
+   "y0": 30.230555555555554,
+   "x1": 132.95833333333334,
+   "y1": 33.39722222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "than her sister of the shield and trident, rolled with",
+   "x0": 17.0,
+   "y0": 35.34583333333333,
+   "x1": 133.00000000000003,
+   "y1": 38.512499999999996,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "exceeding smoothness down hill, making paper money and",
+   "x0": 17.0,
+   "y0": 40.46111111111111,
+   "x1": 133.0,
+   "y1": 43.62777777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "spending it. Under the guidance of her Christian pastors, she",
+   "x0": 17.0,
+   "y0": 45.576388888888886,
+   "x1": 132.99999999999997,
+   "y1": 48.74305555555555,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "entertained herself, besides, with such humane achievements",
+   "x0": 17.0,
+   "y0": 50.69166666666666,
+   "x1": 133.0,
+   "y1": 53.85833333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "as sentencing a youth to have his hands cut off, his tongue",
+   "x0": 17.0,
+   "y0": 55.80694444444444,
+   "x1": 133.0,
+   "y1": 58.973611111111104,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "torn out with pincers, and his body burned alive, because he",
+   "x0": 17.0,
+   "y0": 60.92222222222222,
+   "x1": 133.0,
+   "y1": 64.08888888888889,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "had not kneeled down in the rain to do honour to a dirty",
+   "x0": 17.0,
+   "y0": 66.0375,
+   "x1": 132.99999999999997,
+   "y1": 69.20416666666667,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "procession of monks which passed within his view, at a dis-",
+   "x0": 17.0,
+   "y0": 71.15277777777777,
+   "x1": 133.00000000000003,
+   "y1": 74.31944444444444,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "tance of some fifty or sixty yards. It is likely enough that,",
+   "x0": 17.0,
+   "y0": 76.26805555555555,
+   "x1": 133.0,
+   "y1": 79.43472222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "rooted in the woods of France and Norway, there were",
+   "x0": 17.0,
+   "y0": 81.38333333333333,
+   "x1": 133.00000000000003,
+   "y1": 84.55,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "growing trees, when that sufferer was put to death, already",
+   "x0": 17.0,
+   "y0": 86.4986111111111,
+   "x1": 132.99999999999997,
+   "y1": 89.66527777777777,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "marked by the Woodman, Fate, to come down and be sawn",
+   "x0": 17.0,
+   "y0": 91.61388888888888,
+   "x1": 132.99999999999997,
+   "y1": 94.78055555555555,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "into boards, to make a certain movable framework with a",
+   "x0": 17.0,
+   "y0": 96.72916666666666,
+   "x1": 132.99999999999997,
+   "y1": 99.89583333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "sack and a knife in it, terrible in history. It is likely enough",
+   "x0": 17.0,
+   "y0": 101.84444444444443,
+   "x1": 133.0,
+   "y1": 105.0111111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "that in the rough outhouses of some tillers of the heavy lands",
+   "x0": 17.0,
+   "y0": 106.95972222222221,
+   "x1": 132.99999999999997,
+   "y1": 110.12638888888888,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "adjacent to Paris, there were sheltered from the weather that",
+   "x0": 17.0,
+   "y0": 112.07499999999999,
+   "x1": 132.99999999999997,
+   "y1": 115.24166666666666,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "very day, rude carts, bespattered with rustic mire, snuffed",
+   "x0": 17.0,
+   "y0": 117.19027777777777,
+   "x1": 133.0,
+   "y1": 120.35694444444444,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "about by pigs, and roosted in by poultry, which the Farmer,",
+   "x0": 17.0,
+   "y0": 122.30555555555554,
+   "x1": 133.0,
+   "y1": 125.47222222222221,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Death, had already set apart to be his tumbrils of the",
+   "x0": 17.0,
+   "y0": 127.42083333333332,
+   "x1": 133.0,
+   "y1": 130.58749999999998,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "Revolution. But that Woodman and that Farmer, though they",
+   "x0": 17.0,
+   "y0": 132.5361111111111,
+   "x1": 133.0,
+   "y1": 135.70277777777775,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "work unceasingly, work silently, and no one heard them as",
+   "x0": 17.0,
+   "y0": 137.65138888888887,
+   "x1": 132.99999999999997,
+   "y1": 140.81805555555553,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "they went about with muffled tread: the rather, forasmuch as",
+   "x0": 17.0,
+   "y0": 142.76666666666665,
+   "x1": 133.00000000000003,
+   "y1": 145.9333333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "to entertain any suspicion that they were awake, was to be",
+   "x0": 17.0,
+   "y0": 147.88194444444443,
+   "x1": 133.00000000000003,
+   "y1": 151.0486111111111,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "atheistical and traitorous.",
+   "x0": 17.0,
+   "y0": 152.9972222222222,
+   "x1": 65.33333333333333,
+   "y1": 156.16388888888886,
+   "col": 0,
+   "heading": false,
+   "para_end": true,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "In England, there was scarcely an amount of order and",
+   "x0": 23.375,
+   "y0": 158.11249999999998,
+   "x1": 132.95833333333334,
+   "y1": 161.27916666666664,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "protection to justify much national boasting. Daring",
+   "x0": 17.0,
+   "y0": 163.22777777777776,
+   "x1": 131.5,
+   "y1": 166.39444444444442,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "burglaries by armed men, and highway robberies, took place",
+   "x0": 17.0,
+   "y0": 168.34305555555554,
+   "x1": 133.0,
+   "y1": 171.5097222222222,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "in the capital itself every night; families were publicly",
+   "x0": 17.0,
+   "y0": 173.45833333333331,
+   "x1": 133.0,
+   "y1": 176.62499999999997,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "cautioned not to go out of town without removing their fur-",
+   "x0": 17.0,
+   "y0": 178.5736111111111,
+   "x1": 133.0,
+   "y1": 181.74027777777775,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "niture to upholsterers’ warehouses for security; the",
+   "x0": 17.0,
+   "y0": 183.68888888888887,
+   "x1": 129.66536458333334,
+   "y1": 186.85555555555553,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "highwayman in the dark was a City tradesman in the light,",
+   "x0": 17.0,
+   "y0": 188.80416666666665,
+   "x1": 133.0,
+   "y1": 191.9708333333333,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": false
+  },
+  {
+   "text": "and, being recognised and challenged by his fellow-",
+   "x0": 17.0,
+   "y0": 193.91944444444442,
+   "x1": 133.00000000000003,
+   "y1": 197.08611111111108,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": false,
+   "hard_break_hyphen": true
+  },
+  {
+   "text": "tradesman whom he stopped in his character of “the Cap-",
+   "x0": 17.0,
+   "y0": 199.0347222222222,
+   "x1": 133.00000000000003,
+   "y1": 202.20138888888886,
+   "col": 0,
+   "heading": false,
+   "para_end": false,
+   "soft_hyphen": true,
+   "hard_break_hyphen": false
+  }
+ ],
+ "meta": [
+  {
+   "kind": "header",
+   "text": "A TALE OF TWO CITIES",
+   "box": [
+    55.794921875,
+    12.0,
+    94.205078125,
+    15.485
+   ]
+  },
+  {
+   "kind": "page_number",
+   "text": "4",
+   "box": [
+    74.125,
+    215.0,
+    75.875,
+    218.485
+   ]
+  }
+ ]
+}

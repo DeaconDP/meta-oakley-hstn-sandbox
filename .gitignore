@@ -37,3 +37,8 @@ xcuserdata/
 .env
 *.keystore
 *.jks
+
+# Python / experiment outputs (regenerable; see each experiment's README)
+.venv/
+__pycache__/
+experiments/*/out/
