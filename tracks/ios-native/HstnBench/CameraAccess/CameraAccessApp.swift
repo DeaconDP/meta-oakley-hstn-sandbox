@@ -69,6 +69,8 @@ struct CameraAccessApp: App {
     }
     // Render the earcons now, so the first tone doesn't wait on engine setup.
     EarconPlayer.shared.prepare()
+    // And look up the voice, so the first word doesn't wait on that.
+    AppVoice.shared.prepare()
 
     let wearables = Wearables.shared
     self.wearables = wearables

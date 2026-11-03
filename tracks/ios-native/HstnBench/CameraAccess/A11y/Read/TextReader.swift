@@ -111,6 +111,8 @@ final class TextReader {
   /// older OCR run do nothing.
   @ObservationIgnored private var generation = 0
   @ObservationIgnored private var pendingFirstWord: PendingFirstWord?
+  /// This page has counted towards today's progress, so hearing its end again doesn't count twice.
+  @ObservationIgnored private var pageCounted = false
 
   private struct PendingFirstWord {
     var generation: Int
@@ -154,6 +156,7 @@ final class TextReader {
     sentences = []
     index = 0
     notice = nil
+    pageCounted = false
     phase = .preparing
     task = Task { await run(myGeneration) }
   }
@@ -378,6 +381,20 @@ final class TextReader {
       phase = .finished
       announcer.announce(
         SpokenMessage.readEnd(verbosity: A11yPreferences.shared.verbosity), earcon: .done, kind: .reply, interrupt: false)
+      recordFinishedPage()
+    }
+  }
+
+  /// The page was read to its end, the only thing that counts as reading it. A milestone queues
+  /// behind the end line, so it can't cut into the reading, and any new trigger cancels it.
+  private func recordFinishedPage() {
+    guard !pageCounted else { return }
+    pageCounted = true
+    let store = ReadingProgressStore.shared
+    let milestone = store.recordPage()
+    Celebrations.shared.pageRead(summary: store.summary, milestone: milestone)
+    if let milestone {
+      announcer.say(milestone.spokenLine, kind: .reply, interrupt: false)
     }
   }
 

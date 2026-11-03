@@ -33,7 +33,9 @@ final class A11yPreferencesTests: XCTestCase {
 
     XCTAssertEqual(preferences.verbosity, .normal)
     XCTAssertEqual(preferences.speechRate, AVSpeechUtteranceDefaultSpeechRate)
-    XCTAssertFalse(preferences.useAppVoice)
+    XCTAssertFalse(preferences.useVoiceOverVoice)
+    XCTAssertTrue(preferences.voiceControlEnabled)
+    XCTAssertFalse(preferences.voiceDownloadNoticeHeard)
     XCTAssertTrue(preferences.earconsEnabled)
     XCTAssertFalse(preferences.onboardingCompleted)
     XCTAssertNil(preferences.onboardingStep)
@@ -44,7 +46,7 @@ final class A11yPreferencesTests: XCTestCase {
     let preferences = A11yPreferences(defaults: defaults)
     preferences.verbosity = .detailed
     preferences.speechRate = 0.42
-    preferences.useAppVoice = true
+    preferences.useVoiceOverVoice = true
     preferences.earconsEnabled = false
     preferences.onboardingCompleted = true
     preferences.onboardingStep = "speakerTest"
@@ -54,7 +56,7 @@ final class A11yPreferencesTests: XCTestCase {
     let reloaded = A11yPreferences(defaults: defaults)
     XCTAssertEqual(reloaded.verbosity, .detailed)
     XCTAssertEqual(reloaded.speechRate, 0.42, accuracy: 0.0001)
-    XCTAssertTrue(reloaded.useAppVoice)
+    XCTAssertTrue(reloaded.useVoiceOverVoice)
     XCTAssertFalse(reloaded.earconsEnabled)
     XCTAssertTrue(reloaded.onboardingCompleted)
     XCTAssertEqual(reloaded.onboardingStep, "speakerTest")
@@ -82,7 +84,7 @@ final class A11yPreferencesTests: XCTestCase {
     let preferences = A11yPreferences(defaults: defaults)
     preferences.verbosity = .short
     preferences.speechRate = 0.6
-    preferences.useAppVoice = true
+    preferences.useVoiceOverVoice = true
     preferences.earconsEnabled = false
     preferences.onboardingCompleted = true
     preferences.onboardingStep = "permission"
@@ -96,7 +98,7 @@ final class A11yPreferencesTests: XCTestCase {
     XCTAssertFalse(reloaded.disclaimerHeard)
     XCTAssertEqual(reloaded.verbosity, .short)
     XCTAssertEqual(reloaded.speechRate, 0.6, accuracy: 0.0001)
-    XCTAssertTrue(reloaded.useAppVoice)
+    XCTAssertTrue(reloaded.useVoiceOverVoice)
     XCTAssertFalse(reloaded.earconsEnabled)
   }
 }

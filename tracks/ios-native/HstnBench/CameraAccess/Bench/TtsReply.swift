@@ -15,12 +15,11 @@
  */
 
 import AVFoundation
+import UIKit
 
 @MainActor
 final class TtsReply: NSObject, AVSpeechSynthesizerDelegate {
   private let synthesizer = AVSpeechSynthesizer()
-  // Female British voice, shared with the Announcer (see AppVoice).
-  private let voice = AppVoice.shared
   private let clock = BenchClock.shared
   /// The reply waiting on the audio session, if any. A newer reply cancels it.
   private var pendingReply: Task<Void, Never>?
@@ -49,7 +48,14 @@ final class TtsReply: NSObject, AVSpeechSynthesizerDelegate {
         return
       }
       let utterance = AVSpeechUtterance(string: text)
-      utterance.voice = voice
+      // Same rule as the Announcer: the British voice (AppVoice) unless the user follows VoiceOver.
+      let preferences = A11yPreferences.shared
+      if preferences.useVoiceOverVoice, UIAccessibility.isVoiceOverRunning {
+        utterance.prefersAssistiveTechnologySettings = true
+      } else {
+        utterance.voice = AppVoice.shared.voice
+        utterance.rate = preferences.speechRate
+      }
       if !isRecording { heldUtterances.insert(ObjectIdentifier(utterance)) }
       synthesizer.speak(utterance)
       pendingReply = nil

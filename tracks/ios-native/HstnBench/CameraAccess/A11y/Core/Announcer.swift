@@ -1,12 +1,11 @@
 /*
  * Announcer - every sentence the app speaks to the user goes through here
  *
- * Two outputs, one voice at a time (notes/a11y-perception-stack.md, "TTS"):
- * - Short status lines go to VoiceOver as announcements when it is running and the user hasn't
- *   picked the app's own voice. VoiceOver then speaks them in the user's voice and rate.
- * - Everything else (replies, and status without VoiceOver) uses this class's AVSpeechSynthesizer.
- *   With VoiceOver running it takes VoiceOver's voice and rate via
- *   prefersAssistiveTechnologySettings; otherwise the rate from A11yPreferences.
+ * One voice at a time. By default everything uses this class's AVSpeechSynthesizer with the app's
+ * British voice (AppVoice) and the rate from A11yPreferences, with or without VoiceOver.
+ * If the user opts in to VoiceOver's voice (A11yPreferences.useVoiceOverVoice) and VoiceOver is
+ * running, short status lines go to VoiceOver as announcements, and replies stay on the
+ * synthesizer with VoiceOver's voice and rate via prefersAssistiveTechnologySettings.
  * Replies never go through VoiceOver announcements: those can't be stopped or streamed, and the
  * phone may be in a pocket with VoiceOver focused elsewhere.
  *
@@ -48,8 +47,8 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
     case voiceOver
     case ownVoice(prefersAssistiveTechnologySettings: Bool)
 
-    static func choose(kind: AnnouncementKind, voiceOverRunning: Bool, useAppVoice: Bool) -> Output {
-      if voiceOverRunning, !useAppVoice {
+    static func choose(kind: AnnouncementKind, voiceOverRunning: Bool, useVoiceOverVoice: Bool) -> Output {
+      if voiceOverRunning, useVoiceOverVoice {
         return kind == .status ? .voiceOver : .ownVoice(prefersAssistiveTechnologySettings: true)
       }
       return .ownVoice(prefersAssistiveTechnologySettings: false)
@@ -66,8 +65,6 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
   @ObservationIgnored private let audio = A11yAudioSession.shared
   @ObservationIgnored private let preferences = A11yPreferences.shared
-  // Female British voice, shared with TtsReply (see AppVoice).
-  @ObservationIgnored private lazy var voice = AppVoice.shared
 
   private struct Line {
     let text: String
@@ -93,6 +90,10 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   @ObservationIgnored private var nextTag = 0
   /// Whether this class holds A11yAudioSession's speech hold (balanced begin/end).
   @ObservationIgnored private var holdsSession = false
+  /// Lines that ended in the last `echoWindow`, so voice control can tell its own speech from a
+  /// command after the line has ended (recognition finishes a moment after the words).
+  @ObservationIgnored private var recentLines: [(text: String, endedAt: Date)] = []
+  private static let echoWindow: TimeInterval = 1.5
 
   private override init() {
     super.init()
@@ -144,8 +145,19 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
 
   /// Speaks the last text again, interrupting.
   func repeatLast() {
-    guard let lastSpoken else { return }
+    guard let lastSpoken else {
+      say(SpokenMessage.launchNothingToRepeat, kind: .reply)
+      return
+    }
     say(lastSpoken, kind: .reply)
+  }
+
+  /// Everything being said, queued, or just finished, for voice control's "did we hear ourselves?"
+  /// check. Empty when nothing has been said lately.
+  func textBeingSpoken(now: Date = Date()) -> String {
+    recentLines.removeAll { now.timeIntervalSince($0.endedAt) > Self.echoWindow }
+    let lines = recentLines.map(\.text) + (current.map { [$0.text] } ?? []) + queue.map(\.text)
+    return lines.joined(separator: " ")
   }
 
   /// Where speech will be heard: "glasses", "headphones" or "phone speaker".
@@ -188,6 +200,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
       let finished = await play(line)
       guard generation == myGeneration else { return }  // cancelAll() already completed `line`
       current = nil
+      recentLines.append((line.text, Date()))
       line.onFinish?(finished)
     }
     guard generation == myGeneration else { return }
@@ -204,7 +217,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
       guard generation == myGeneration else { return false }
     }
     let output = Output.choose(
-      kind: line.kind, voiceOverRunning: UIAccessibility.isVoiceOverRunning, useAppVoice: preferences.useAppVoice)
+      kind: line.kind, voiceOverRunning: UIAccessibility.isVoiceOverRunning, useVoiceOverVoice: preferences.useVoiceOverVoice)
     switch output {
     case .voiceOver:
       // The app's own voice is idle here (the queue is serial), so nothing talks over this.
@@ -229,7 +242,8 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
         // VoiceOver's voice, rate and pitch override the utterance's own.
         utterance.prefersAssistiveTechnologySettings = true
       } else {
-        utterance.voice = voice
+        // Read per line, so a voice downloaded while the app runs takes over straight away.
+        utterance.voice = AppVoice.shared.voice
         utterance.rate = preferences.speechRate
       }
       currentUtteranceTag = utterance.tag
@@ -270,6 +284,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
     generation += 1
     runner?.cancel()
     runner = nil
+    if let current { recentLines.append((current.text, Date())) }
     let dropped = (current.map { [$0] } ?? []) + queue
     current = nil
     queue.removeAll()

@@ -13,9 +13,9 @@
 // This view is displayed when the app is not yet registered.
 //
 // HstnBench: made usable with VoiceOver and low vision (notes/a11y-onboarding.md): icons are
-// decorative, text uses Dynamic Type styles at 4.5:1 or better in light and dark mode, the page
-// scrolls instead of truncating at large sizes, the button is 60 pt tall, and the Meta AI handoff
-// is explained before it happens. Outcomes of connecting are spoken by WearablesViewModel.
+// decorative, text uses Dynamic Type styles, the page scrolls instead of truncating at large sizes,
+// the button is 60 pt tall, and the Meta AI handoff is explained before it happens. Outcomes of
+// connecting are spoken by WearablesViewModel. Styled from A11y/Theme.
 //
 
 import MWDATCore
@@ -24,66 +24,76 @@ import SwiftUI
 struct HomeScreenView: View {
   var viewModel: WearablesViewModel
 
-  @ScaledMetric(relativeTo: .largeTitle) private var logoWidth: CGFloat = 120
-
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 24) {
-        Image(.cameraAccessIcon)
-          .resizable()
-          .aspectRatio(contentMode: .fit)
-          // Grows with text size, but not past what leaves room for the text.
-          .frame(width: min(logoWidth, 200))
-          .frame(maxWidth: .infinity)
-          .a11yDecorative()
+    content
+      .onAppear { VoiceControl.shared.setScreen(.home, handler: handleVoice) }
+      .onDisappear { VoiceControl.shared.clearScreen { $0 == .home } }
+  }
+
+  /// Help, stop, repeat, faster and slower are VoiceControl's own.
+  private func handleVoice(_ command: VoiceCommand) -> Bool {
+    switch command {
+    case .connect: viewModel.connectGlasses()
+    case .status: Announcer.shared.announce(SpokenMessage.voiceHomeStatus, earcon: .attention)
+    default: return false
+    }
+    return true
+  }
+
+  private var content: some View {
+    VStack(spacing: 0) {
+      PinnedVoiceIndicator()
+      LessonPage {
+        FlowingVoiceIndicator()
 
         // The name VoiceOver reads for the app icon, so the user knows where they are.
         Text("HSTN Reader")
-          .font(.largeTitle.bold())
-          .foregroundStyle(.primary)
+          .font(.rounded(.largeTitle, weight: .black))
+          .foregroundStyle(Theme.ink)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
 
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 0) {
           HomeTipRow(
             systemImage: "eyeglasses",
+            tone: .green,
             title: "Start a session",
             text: "Connect to your glasses to get started."
           )
+          HomeTipDots()
           HomeTipRow(
-            systemImage: "video",
+            systemImage: "video.fill",
+            tone: .blue,
             title: "Start preview",
             text: "See the live camera feed from your glasses."
           )
+          HomeTipDots()
           HomeTipRow(
-            systemImage: "hand.tap",
+            systemImage: "hand.tap.fill",
+            tone: .purple,
             title: "Capture",
             text: "Take photos and record video with audio from your glasses' microphone."
           )
         }
 
-        VStack(alignment: .leading, spacing: 16) {
-          A11yNote(text: SpokenMessage.beforeMetaAIHandoff)
+        MascotSays(mood: viewModel.connectionNotice == nil ? .happy : .confused, text: SpokenMessage.beforeMetaAIHandoff)
 
-          if let notice = viewModel.connectionNotice {
-            ConnectionNoticeView(text: notice)
-          }
-
-          // Title kept: the UI tests find this button by "Connect my glasses".
-          Button(viewModel.isConnecting ? "Connecting…" : "Connect my glasses") {
-            viewModel.connectGlasses()
-          }
-          .buttonStyle(.a11yPrimary)
-          .disabled(viewModel.isConnecting)
-          .accessibilityHint(viewModel.isConnecting ? "" : "Opens the Meta AI app to confirm.")
-          .accessibilityIdentifier("connect_glasses_button")
+        if let notice = viewModel.connectionNotice {
+          ConnectionNoticeView(text: notice)
         }
+      } footer: {
+        // Title kept: the UI tests find this button by "Connect my glasses".
+        Button(viewModel.isConnecting ? "Connecting…" : "Connect my glasses") {
+          viewModel.connectGlasses()
+        }
+        .buttonStyle(.a11yPrimary)
+        .sayHint(.connect)
+        .disabled(viewModel.isConnecting)
+        .accessibilityHint(viewModel.isConnecting ? "" : "Opens the Meta AI app to confirm.")
+        .accessibilityIdentifier("connect_glasses_button")
       }
-      .padding(24)
-      .frame(maxWidth: 700, alignment: .leading)
-      .frame(maxWidth: .infinity)
     }
-    .background(Color(.systemBackground).ignoresSafeArea())
+    .background(Theme.page.ignoresSafeArea())
     // "Connecting…" otherwise only changes visually.
     .a11yAnnounce(onChangeOf: viewModel.isConnecting) { connecting in
       connecting ? "Connecting." : nil
@@ -91,31 +101,53 @@ struct HomeScreenView: View {
   }
 }
 
-/// TipRow (Components/) uses fixed sizes and grey text; this one scales and keeps contrast. The
-/// SF Symbols match the asset icons' meaning and scale with the text.
+/// One step of what's ahead, drawn like a lesson on the path. Not a button: it explains.
 private struct HomeTipRow: View {
   let systemImage: String
+  let tone: Tone
   let title: String
   let text: String
 
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @ScaledMetric(relativeTo: .title3) private var coinSize: CGFloat = 52
+
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 12) {
-      Image(systemName: systemImage)
-        .font(.title3)
-        .foregroundStyle(.primary)
-        .frame(minWidth: 28)
-        .a11yDecorative()
-      VStack(alignment: .leading, spacing: 4) {
+    let stacked = dynamicTypeSize.isAccessibilitySize
+    let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(alignment: .top, spacing: 14))
+    layout {
+      TileCoin(icon: systemImage, tone: tone, size: min(coinSize, 96))
+      VStack(alignment: .leading, spacing: 2) {
         Text(title)
-          .font(.headline)
-          .foregroundStyle(.primary)
+          .font(.rounded(.title3, weight: .heavy))
+          .foregroundStyle(Theme.ink)
+          .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
         Text(text)
-          .font(.body)
-          .foregroundStyle(.primary)
+          .font(.rounded(.body, weight: .medium))
+          .foregroundStyle(Theme.inkSoft)
           .fixedSize(horizontal: false, vertical: true)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+/// The dots joining the tips, under the coins.
+private struct HomeTipDots: View {
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+  var body: some View {
+    if dynamicTypeSize.isAccessibilitySize {
+      Color.clear.frame(height: 16).accessibilityHidden(true)
+    } else {
+      VStack(spacing: 3) {
+        ForEach(0..<2, id: \.self) { _ in
+          Circle().fill(Theme.stroke).frame(width: 7, height: 7)
+        }
+      }
+      .frame(width: 52)
+      .padding(.vertical, 3)
+      .accessibilityHidden(true)
+    }
   }
 }

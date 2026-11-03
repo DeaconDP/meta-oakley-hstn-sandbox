@@ -1,10 +1,11 @@
 /*
  * OnboardingSteps - the screens OnboardingView steps through
  *
- * Each step is one focused screen: its text in reading order, then its choices, then skip and
- * leave. Speech that the user should be able to cut off or replay (test phrases, samples, the
- * disclaimer) uses the app's own voice (`.reply`), so it goes down the same audio route the app
- * will use for answers and queues in order instead of overlapping VoiceOver announcements.
+ * Each step is one focused screen: the mascot saying its key line, then its choices, with the main
+ * button and skip and leave at the bottom. The bubble shows the words the step speaks. Speech that
+ * the user should be able to cut off or replay (test phrases, samples, the disclaimer) uses the
+ * app's own voice (`.reply`), so it goes down the same audio route the app will use for answers and
+ * queues in order instead of overlapping VoiceOver announcements.
  */
 
 import AVFoundation
@@ -20,18 +21,19 @@ struct WelcomeStep: View {
   var onSkip: () -> Void
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 24) {
-      A11yNote(text: SpokenMessage.welcome)
-      VStack(spacing: 12) {
-        Button("Start guided setup", action: onGuided)
-          .buttonStyle(.a11yPrimary)
-          .accessibilityHint("About five minutes. Every step can be skipped.")
-          .accessibilityIdentifier("onboarding_guided_button")
-        Button("Skip to the app", action: onSkip)
-          .buttonStyle(.a11ySecondary)
-          .accessibilityHint("You can replay setup later.")
-          .accessibilityIdentifier("onboarding_skip_button")
-      }
+    LessonPage {
+      MascotSays(mood: .happy, text: SpokenMessage.welcome, mascotSize: 96)
+    } footer: {
+      Button("Start guided setup", action: onGuided)
+        .buttonStyle(.a11yPrimary)
+        .sayHint(.yes)
+        .accessibilityHint("About five minutes. Every step can be skipped.")
+        .accessibilityIdentifier("onboarding_guided_button")
+      Button("Skip to the app", action: onSkip)
+        .buttonStyle(.a11ySecondary)
+        .sayHint(.skip)
+        .accessibilityHint("You can replay setup later.")
+        .accessibilityIdentifier("onboarding_skip_button")
     }
     .onAppear { speak(SpokenMessage.welcome, .status) }
   }
@@ -46,22 +48,27 @@ struct LearnSoundsStep: View {
   var onExit: () -> Void
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 24) {
-      A11yNote(text: SpokenMessage.learnSoundsIntro)
+    LessonPage {
+      MascotSays(mood: .listening, text: SpokenMessage.learnSoundsIntro)
       VStack(spacing: 12) {
         ForEach(Earcon.allCases, id: \.self) { earcon in
           Button {
             Announcer.shared.announce(earcon.spokenMeaning, earcon: earcon, kind: .reply)
           } label: {
-            VStack(alignment: .leading, spacing: 4) {
-              Text(earcon.displayName)
-                .font(.headline)
-              Text(earcon.spokenMeaning)
-                .font(.callout)
-                // Spoken on activation; reading it first as well would say it twice.
-                .accessibilityHidden(true)
+            HStack(spacing: 12) {
+              TileCoin(icon: "speaker.wave.2.fill", tone: .blue, size: 44)
+              VStack(alignment: .leading, spacing: 2) {
+                Text(earcon.displayName)
+                  .font(.rounded(.headline, weight: .heavy))
+                Text(earcon.spokenMeaning)
+                  .font(.rounded(.callout, weight: .medium))
+              }
+              .multilineTextAlignment(.leading)
+              .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // The button has the name. The meaning is spoken on activation; reading it first as
+            // well would say it twice.
+            .accessibilityHidden(true)
           }
           .buttonStyle(.a11ySecondary)
           .accessibilityLabel("\(earcon.displayName) sound")
@@ -69,8 +76,10 @@ struct LearnSoundsStep: View {
           .accessibilityIdentifier("onboarding_earcon_\(earcon.rawValue)")
         }
       }
+    } footer: {
       Button("Continue", action: onContinue)
         .buttonStyle(.a11yPrimary)
+        .sayHint(.continueOn)
         .accessibilityIdentifier("onboarding_continue_button")
       OnboardingSkipButtons(onSkip: onSkip, onExit: onExit)
     }
@@ -92,6 +101,7 @@ extension Earcon {
     case .error: "Problem"
     case .uncertain: "Not sure"
     case .attention: "Needs you"
+    case .heard: "Command understood"
     }
   }
 }
@@ -112,56 +122,72 @@ struct SpeakerTestStep: View {
   @State private var output = Announcer.shared.currentOutputDescription()
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 24) {
-      A11yNote(text: "You'll hear a tone and a short sentence. Then say whether it came from the glasses.")
+    LessonPage {
+      MascotSays(mood: showFixes ? .confused : .listening, text: SpokenMessage.speakerTestIntro(output: output))
       Text("Sound is going to: \(output)")
-        .font(.headline)
-        .foregroundStyle(.primary)
+        .font(.rounded(.headline, weight: .heavy))
+        .foregroundStyle(Theme.ink)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("onboarding_output_label")
 
       if !showFixes {
         Text(SpokenMessage.speakerTestQuestion)
-          .font(.title2.bold())
-          .foregroundStyle(.primary)
+          .font(.rounded(.title2, weight: .heavy))
+          .foregroundStyle(Theme.ink)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
-        VStack(spacing: 12) {
-          // First in reading order: with VoiceOver nothing plays until this is pressed.
-          replayButton
-          // No "good, it works" line: the next step's key line would cut it off anyway.
-          Button("Yes, I heard it", action: onContinue)
-            .buttonStyle(.a11yPrimary)
-            .accessibilityIdentifier("onboarding_heard_yes_button")
-          Button("No") {
-            showFixes = true
-            // Status, so with VoiceOver it is spoken by VoiceOver rather than over it.
-            Announcer.shared.say(SpokenMessage.speakerTestFixes)
-          }
-          .buttonStyle(.a11ySecondary)
-          .accessibilityHint("Gives a few things to check.")
-          .accessibilityIdentifier("onboarding_heard_no_button")
-        }
       } else {
         Text("Things to check")
-          .font(.title2.bold())
-          .foregroundStyle(.primary)
+          .font(.rounded(.title2, weight: .heavy))
+          .foregroundStyle(Theme.ink)
           .accessibilityAddTraits(.isHeader)
         VStack(alignment: .leading, spacing: 12) {
           bullet("Wear the glasses with the arms unfolded.")
           bullet("In the phone's Bluetooth settings, check the glasses are connected.")
           bullet("Turn the volume up with the phone's side buttons.")
         }
-        VStack(spacing: 12) {
-          replayButton
-          Button("Continue anyway", action: onContinue)
-            .buttonStyle(.a11ySecondary)
-            .accessibilityIdentifier("onboarding_continue_button")
+        .themeCard()
+      }
+      // First of the choices: with VoiceOver nothing plays until this is pressed.
+      replayButton
+    } footer: {
+      if !showFixes {
+        // No "good, it works" line: the next step's key line would cut it off anyway.
+        Button("Yes, I heard it", action: onContinue)
+          .buttonStyle(.a11yPrimary)
+          .sayHint(.yes)
+          .accessibilityIdentifier("onboarding_heard_yes_button")
+        Button("No") {
+          showFixes = true
+          // Status, so with VoiceOver it is spoken by VoiceOver rather than over it.
+          Announcer.shared.say(SpokenMessage.speakerTestFixes)
         }
+        .buttonStyle(.a11ySecondary)
+        .sayHint(.no)
+        .accessibilityHint("Gives a few things to check.")
+        .accessibilityIdentifier("onboarding_heard_no_button")
+      } else {
+        Button("Continue anyway", action: onContinue)
+          .buttonStyle(.a11yPrimary)
+          .sayHint(.continueOn)
+          .accessibilityIdentifier("onboarding_continue_button")
       }
       OnboardingSkipButtons(onSkip: onSkip, onExit: onExit)
     }
     .onAppear {
+      VoiceControl.shared.stepHandler = { command in
+        switch command {
+        case .yes: onContinue()
+        case .no:
+          showFixes = true
+          Announcer.shared.say(SpokenMessage.speakerTestFixes)
+        case .testSpeaker:
+          showFixes = false
+          playTest()
+        default: return false
+        }
+        return true
+      }
       // With VoiceOver the user reads the screen and presses Play test when ready: playing on
       // appear would talk over VoiceOver reading the title.
       guard !UIAccessibility.isVoiceOverRunning else { return }
@@ -179,19 +205,26 @@ struct SpeakerTestStep: View {
   }
 
   private var replayButton: some View {
-    Button(hasPlayed ? "Replay" : "Play test") {
+    Button {
       showFixes = false
       playTest()
+    } label: {
+      HStack(spacing: 8) {
+        Image(systemName: "play.fill")
+          .accessibilityHidden(true)
+        Text(hasPlayed ? "Replay" : "Play test")
+      }
     }
     .buttonStyle(.a11ySecondary)
+    .sayHint(.testSpeaker)
     .accessibilityHint("Plays a tone and a short sentence.")
     .accessibilityIdentifier("onboarding_replay_button")
   }
 
   private func bullet(_ text: String) -> some View {
     Text("•  \(text)")
-      .font(.body)
-      .foregroundStyle(.primary)
+      .font(.rounded(.body, weight: .medium))
+      .foregroundStyle(Theme.ink)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityLabel(text)
@@ -218,12 +251,13 @@ struct VerbosityStep: View {
   var onExit: () -> Void
 
   @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   private let preferences = A11yPreferences.shared
   private let rateStep: Float = 0.05
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 24) {
-      A11yNote(text: SpokenMessage.verbosityIntro)
+    LessonPage {
+      MascotSays(mood: .reading, text: SpokenMessage.verbosityIntro)
       VStack(spacing: 12) {
         ForEach(Verbosity.allCases) { level in
           let selected = preferences.verbosity == level
@@ -235,13 +269,13 @@ struct VerbosityStep: View {
             HStack(spacing: 12) {
               // Selection shown by a checkmark and the word, not only by colour.
               Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                .font(.title2)
+                .font(.rounded(.title2, weight: .bold))
                 .a11yDecorative()
               Text(selected ? "\(level.title), chosen" : level.title)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
           }
-          .buttonStyle(A11yButtonStyle(kind: selected ? .primary : .secondary))
+          .buttonStyle(ChunkyButtonStyle(tone: selected ? .green : .neutral))
           .accessibilityLabel(level.title)
           .accessibilityAddTraits(selected ? .isSelected : [])
           .accessibilityHint("Chooses this level and plays a sample answer.")
@@ -250,17 +284,18 @@ struct VerbosityStep: View {
       }
 
       Text("Speaking speed")
-        .font(.title2.bold())
-        .foregroundStyle(.primary)
+        .font(.rounded(.title2, weight: .heavy))
+        .foregroundStyle(Theme.ink)
         .accessibilityAddTraits(.isHeader)
-      if voiceOverEnabled, !preferences.useAppVoice {
+      if voiceOverEnabled, preferences.useVoiceOverVoice {
         A11yNote(text: SpokenMessage.speechRateFollowsVoiceOver)
       } else {
         Text("Speed: \(ratePercent) percent")
-          .font(.body)
-          .foregroundStyle(.primary)
+          .font(.rounded(.body, weight: .bold))
+          .foregroundStyle(Theme.ink)
           .accessibilityIdentifier("onboarding_rate_label")
-        HStack(spacing: 12) {
+        let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+        layout {
           Button("Slower") { changeRate(by: -rateStep) }
             .buttonStyle(.a11ySecondary)
             .accessibilityHint("Then plays a sample.")
@@ -269,9 +304,10 @@ struct VerbosityStep: View {
             .accessibilityHint("Then plays a sample.")
         }
       }
-
+    } footer: {
       Button("Continue", action: onContinue)
         .buttonStyle(.a11yPrimary)
+        .sayHint(.continueOn)
         .accessibilityIdentifier("onboarding_continue_button")
       OnboardingSkipButtons(onSkip: onSkip, onExit: onExit)
     }
@@ -302,29 +338,29 @@ struct DisclaimerStep: View {
   private let preferences = A11yPreferences.shared
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 24) {
+    LessonPage {
       Text("Safety")
-        .font(.title2.bold())
-        .foregroundStyle(.primary)
+        .font(.rounded(.title2, weight: .heavy))
+        .foregroundStyle(Theme.ink)
         .accessibilityAddTraits(.isHeader)
-      A11yNote(text: SpokenMessage.disclaimer)
+      MascotSays(mood: .idle, text: SpokenMessage.disclaimer)
       Text("Privacy")
-        .font(.title2.bold())
-        .foregroundStyle(.primary)
+        .font(.rounded(.title2, weight: .heavy))
+        .foregroundStyle(Theme.ink)
         .accessibilityAddTraits(.isHeader)
-      A11yNote(text: SpokenMessage.privacy)
-      VStack(spacing: 12) {
-        Button("I understand") {
-          // Heard means confirmed: with VoiceOver it was read from the screen, not spoken by us.
-          preferences.disclaimerHeard = true
-          onContinue()
-        }
-          .buttonStyle(.a11yPrimary)
-          .accessibilityIdentifier("onboarding_continue_button")
-        Button("Hear again", action: speakAll)
-          .buttonStyle(.a11ySecondary)
-          .accessibilityIdentifier("onboarding_hear_again_button")
+      MascotSays(mood: .happy, text: SpokenMessage.privacy)
+    } footer: {
+      Button("I understand") {
+        // Heard means confirmed: with VoiceOver it was read from the screen, not spoken by us.
+        preferences.disclaimerHeard = true
+        onContinue()
       }
+      .buttonStyle(.a11yPrimary)
+      .sayHint(.continueOn)
+      .accessibilityIdentifier("onboarding_continue_button")
+      Button("Hear again", action: speakAll)
+        .buttonStyle(.a11ySecondary)
+        .accessibilityIdentifier("onboarding_hear_again_button")
       OnboardingSkipButtons(onSkip: onSkip, onExit: onExit)
     }
     .onAppear {
@@ -355,30 +391,35 @@ struct ConnectStep: View {
   var onSkip: () -> Void
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 24) {
+    LessonPage {
       if viewModel.registrationState == .registered {
-        A11yNote(text: SpokenMessage.connectAlreadyRegistered)
-        Button("Finish setup", action: onFinish)
-          .buttonStyle(.a11yPrimary)
-          .accessibilityIdentifier("onboarding_finish_button")
+        MascotSays(mood: .happy, text: SpokenMessage.connectAlreadyRegistered)
       } else {
-        A11yNote(text: SpokenMessage.beforeMetaAIHandoff)
+        MascotSays(mood: viewModel.connectionNotice == nil ? .happy : .confused, text: SpokenMessage.beforeMetaAIHandoff)
         if let notice = viewModel.connectionNotice {
           ConnectionNoticeView(text: notice)
         }
-        VStack(spacing: 12) {
-          Button(viewModel.isConnecting ? "Connecting…" : "Connect my glasses") {
-            viewModel.connectGlasses()
-          }
+      }
+    } footer: {
+      if viewModel.registrationState == .registered {
+        Button("Finish setup", action: onFinish)
           .buttonStyle(.a11yPrimary)
-          .disabled(viewModel.isConnecting)
-          .accessibilityHint("Opens the Meta AI app.")
-          .accessibilityIdentifier("connect_glasses_button")
-          Button("Skip for now", action: onSkip)
-            .buttonStyle(.a11ySecondary)
-            .accessibilityHint("Goes to the app. You can connect from there.")
-            .accessibilityIdentifier("onboarding_skip_step_button")
+          .sayHint(.continueOn)
+          .accessibilityIdentifier("onboarding_finish_button")
+      } else {
+        Button(viewModel.isConnecting ? "Connecting…" : "Connect my glasses") {
+          viewModel.connectGlasses()
         }
+        .buttonStyle(.a11yPrimary)
+        .sayHint(.connect)
+        .disabled(viewModel.isConnecting)
+        .accessibilityHint("Opens the Meta AI app.")
+        .accessibilityIdentifier("connect_glasses_button")
+        Button("Skip for now", action: onSkip)
+          .buttonStyle(.a11ySecondary)
+          .sayHint(.skip)
+          .accessibilityHint("Goes to the app. You can connect from there.")
+          .accessibilityIdentifier("onboarding_skip_step_button")
       }
     }
     .onAppear {
@@ -404,17 +445,20 @@ struct ConnectionNoticeView: View {
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
       Image(systemName: "exclamationmark.triangle.fill")
-        .font(.title3)
-        .foregroundStyle(.primary)
+        .font(.rounded(.title3, weight: .bold))
+        .foregroundStyle(Theme.onFace(.orange))
         .a11yDecorative()
       Text(text)
-        .font(.body)
-        .foregroundStyle(.primary)
+        .font(.rounded(.body, weight: .semibold))
+        .foregroundStyle(Theme.onFace(.orange))
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     .padding(16)
-    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .background(Theme.face(.orange), in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).strokeBorder(Theme.lip(.orange), lineWidth: 2)
+    }
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Not connected. \(text)")
     .accessibilityIdentifier("connection_notice")

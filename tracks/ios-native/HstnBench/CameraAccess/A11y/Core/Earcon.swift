@@ -21,6 +21,8 @@ enum Earcon: String, CaseIterable, Sendable {
   case error
   case uncertain
   case attention
+  /// Voice control understood a command. Distinct from `listening`, which means it started.
+  case heard
 
   /// What the "learn the sounds" tutorial says after playing the earcon.
   var spokenMeaning: String {
@@ -35,6 +37,7 @@ enum Earcon: String, CaseIterable, Sendable {
     case .error: "This sound means something went wrong. You'll hear what happened next."
     case .uncertain: "This sound means the app isn't sure. Treat what follows with care."
     case .attention: "This sound means the app needs you to do something."
+    case .heard: "This sound means the app understood what you said."
     }
   }
 
@@ -67,13 +70,15 @@ enum Earcon: String, CaseIterable, Sendable {
       [EarconNote(622, duration: 0.1, gap: 0.05), EarconNote(622, duration: 0.11, vibrato: 0.03)]
     case .attention:
       [EarconNote(1319, duration: 0.04, gap: 0.035), EarconNote(1319, duration: 0.04, gap: 0.035), EarconNote(1319, duration: 0.04)]
+    case .heard:
+      [EarconNote(988, duration: 0.05, gap: 0.02), EarconNote(1175, duration: 0.06)]
     }
   }
 
   var timbre: EarconTimbre {
     switch self {
     case .ready, .connected, .disconnected, .working, .done, .uncertain: .soft
-    case .listening, .capturing, .attention: .bright
+    case .listening, .capturing, .attention, .heard: .bright
     case .error: .buzzy
     }
   }

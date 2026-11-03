@@ -12,6 +12,16 @@
  * The engine is the latency-critical part. Buffers are rendered once and nodes stay attached, so
  * a play is "schedule buffer, play". After use, the session and engine stay up for `idleDelay`,
  * so a burst of earcons and speech doesn't pay activation each time; then both are released.
+ *
+ * Phone voice commands (PhoneSpeechListener) need the phone mic, which the playback category
+ * doesn't give. While that listener holds the input (beginInput/endInput), the session is
+ * play-and-record with A2DP allowed and HFP not: the mic is the phone's and output stays on the
+ * glasses' high-quality route. Opening HFP for commands would drop output to mono, and the DAT docs
+ * want an HFP route settled before a stream starts. Earcons and speech play into that session, and
+ * the session stays up until endInput. Ducking can only be dropped by deactivating, which a running
+ * mic refuses, so once speech has been idle for `idleDelay` the mic is paused for a moment to let
+ * ducked music come back. A recording still takes priority: voice control hands the input back
+ * first (VoiceControl.recordingWillStart).
  */
 
 import AVFoundation
@@ -38,6 +48,15 @@ final class A11yAudioSession: @unchecked Sendable {
 
   // MARK: Queue-confined state
 
+  /// The phone mic's owner. Queue-confined, and its closures run on the queue.
+  struct InputHold {
+    /// Stop the engine so the session can be cycled; the tap may stay installed.
+    var pause: () -> Void
+    /// Start it again afterwards.
+    var resume: () -> Void
+  }
+
+  private var inputHold: InputHold?
   private var isActive = false
   private var isDucking = false
   /// Own-TTS speech in progress (Announcer holds at most one).
@@ -148,19 +167,58 @@ final class A11yAudioSession: @unchecked Sendable {
     scheduleIdleCheck(after: 0)
   }
 
+  // MARK: Phone mic
+
+  /// Takes the phone mic's hold and activates play-and-record. False while a recording owns the
+  /// session, or if activating failed.
+  func beginInput(_ hold: InputHold) -> Bool {
+    dispatchPrecondition(condition: .onQueue(queue))
+    guard !Self.recordingOwnsSession else { return false }
+    inputHold = hold
+    idleGeneration += 1
+    // A finished recording deactivated the session behind our back, in a category that may match.
+    isActive = false
+    activate(ducking: speechHolds > 0)
+    guard isActive else {
+      inputHold = nil
+      return false
+    }
+    return true
+  }
+
+  /// Hands the mic back. The caller has already stopped its engine.
+  func endInput() {
+    dispatchPrecondition(condition: .onQueue(queue))
+    guard inputHold != nil else { return }
+    inputHold = nil
+    scheduleIdleCheck(after: 0)
+  }
+
+  /// What the session should be set to. Pure, so the "no HFP for commands" rule is unit-testable.
+  static func sessionConfiguration(
+    phoneMic: Bool, ducking: Bool
+  ) -> (category: AVAudioSession.Category, mode: AVAudioSession.Mode, options: AVAudioSession.CategoryOptions) {
+    let mixing: AVAudioSession.CategoryOptions = ducking ? .duckOthers : .mixWithOthers
+    guard phoneMic else { return (.playback, .spokenAudio, mixing) }
+    // A2DP keeps output on the glasses at full quality. Without .defaultToSpeaker, output with no
+    // Bluetooth would drop to the earpiece, and the speaker test's "phone speaker" would be wrong.
+    return (.playAndRecord, .default, mixing.union([.allowBluetoothA2DP, .defaultToSpeaker]))
+  }
+
   // MARK: Session
 
-  /// Sets the playback category every time it isn't already ours, because a finished recording
-  /// leaves it at play-and-record (HFP). Ducking is only ever added while active, never removed:
-  /// removing it takes a deactivation, which the idle check does.
+  /// Sets our category every time it isn't already set, because a finished recording leaves it at
+  /// play-and-record (HFP). Ducking is only ever added while active, never removed: removing it
+  /// takes a deactivation, which the idle check does.
   private func activate(ducking: Bool) {
     guard !Self.recordingOwnsSession else { return }
     let session = AVAudioSession.sharedInstance()
     let wantsDucking = ducking || (isActive && isDucking)
-    let needsCategory = !isActive || session.category != .playback || wantsDucking != isDucking
+    let configuration = Self.sessionConfiguration(phoneMic: inputHold != nil, ducking: wantsDucking)
+    let needsCategory = !isActive || session.category != configuration.category || wantsDucking != isDucking
     guard needsCategory else { return }
     do {
-      try session.setCategory(.playback, mode: .spokenAudio, options: wantsDucking ? .duckOthers : .mixWithOthers)
+      try session.setCategory(configuration.category, mode: configuration.mode, options: configuration.options)
       try session.setActive(true)
       isActive = true
       isDucking = wantsDucking
@@ -181,6 +239,10 @@ final class A11yAudioSession: @unchecked Sendable {
   /// alone if it isn't a playback session any more (a recording took it over).
   private func deactivateIfIdle(generation: Int) {
     guard generation == idleGeneration, speechHolds == 0, !isTicking else { return }
+    if inputHold != nil {
+      releaseDuckingKeepingInput()
+      return
+    }
     if let engine, engine.isRunning {
       earconNode.stop()
       engine.stop()
@@ -189,12 +251,36 @@ final class A11yAudioSession: @unchecked Sendable {
     isActive = false
     isDucking = false
     let session = AVAudioSession.sharedInstance()
-    guard !Self.recordingOwnsSession, session.category == .playback else { return }
+    guard !Self.recordingOwnsSession else { return }
+    // A category or mode that isn't ours means something else took the session over.
+    guard session.category == .playback || (session.category == .playAndRecord && session.mode == .default) else { return }
     do {
       try session.setActive(false, options: .notifyOthersOnDeactivation)
     } catch {
       Self.logger.error("A11y audio session deactivation failed: \(error.localizedDescription)")
     }
+  }
+
+  /// Speech is over and the phone mic is still listening. Ducked audio only returns on a
+  /// deactivation, which running I/O refuses, so pause the mic, cycle the session, and carry on.
+  /// Without ducking to release, the earcon engine is left running while listening, so accepting
+  /// a command doesn't wait for an engine start.
+  private func releaseDuckingKeepingInput() {
+    guard let inputHold, isDucking, !Self.recordingOwnsSession else { return }
+    inputHold.pause()
+    if let engine, engine.isRunning {
+      earconNode.stop()
+      engine.stop()
+    }
+    do {
+      try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    } catch {
+      Self.logger.error("A11y audio session deactivation failed: \(error.localizedDescription)")
+    }
+    isActive = false
+    isDucking = false
+    activate(ducking: false)
+    inputHold.resume()
   }
 
   /// A route change (glasses connecting) or an interruption (a call) stops the engine and may
@@ -208,7 +294,7 @@ final class A11yAudioSession: @unchecked Sendable {
           // A change to play-and-record is most likely a recording starting. Don't switch the
           // category back from under it just to keep ticking; the next earcon restarts things.
           let category = AVAudioSession.sharedInstance().category
-          guard category == .playback || Self.recordingOwnsSession else { return }
+          guard category == .playback || Self.recordingOwnsSession || inputHold != nil else { return }
           resumeTick()
         }
       })

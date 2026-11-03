@@ -9,7 +9,8 @@
 //
 // CircleButton.swift
 //
-// Reusable circular button component used in streaming controls and UI actions.
+// Reusable button component used in streaming controls and UI actions.
+// HstnBench: with text, a chunky full-width button; without, a round chunky one, 60 pt across.
 //
 
 import SwiftUI
@@ -21,8 +22,6 @@ struct CircleButton: View {
   /// VoiceOver name for an icon-only button (the SF Symbol name would be read otherwise).
   let accessibilityLabel: String?
 
-  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
   init(icon: String, text: String?, accessibilityLabel: String? = nil, action: @escaping () -> Void) {
     self.icon = icon
     self.text = text
@@ -31,43 +30,24 @@ struct CircleButton: View {
   }
 
   var body: some View {
-    Button(action: action) {
-      if let text, dynamicTypeSize.isAccessibilitySize {
-        // Large text doesn't fit a circle: a capsule that grows with the text instead.
-        HStack(spacing: 8) {
-          Image(systemName: icon)
-            .accessibilityHidden(true)
-          Text(text)
+    Group {
+      if let text {
+        Button(action: action) {
+          HStack(spacing: 8) {
+            Image(systemName: icon)
+              .accessibilityHidden(true)
+            Text(text)
+          }
         }
-        .font(.headline)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .frame(minWidth: 60, minHeight: 60)
-        .background(.white, in: Capsule())
-      } else if let text {
-        VStack(spacing: 2) {
+        .buttonStyle(.a11yPrimary)
+      } else {
+        Button(action: action) {
           Image(systemName: icon)
-            .font(.system(size: 16))
+            .font(.rounded(.title3, weight: .heavy))
             .accessibilityHidden(true)
-          Text(text)
-            .font(.system(size: 11, weight: .semibold))
         }
-        .frame(width: 60, height: 60)
-        .background(.white, in: Circle())
-      } else {
-        Image(systemName: icon)
-          .font(.system(size: 20, weight: .semibold))
-          .frame(width: 60, height: 60)
-          .background(.white, in: Circle())
-      }
-    }
-    .foregroundStyle(.black)
-    // Dark outline: the white button stays distinct over a bright photo (3:1 boundary).
-    .overlay {
-      if text == nil || !dynamicTypeSize.isAccessibilitySize {
-        Circle().strokeBorder(Color.black.opacity(0.6), lineWidth: 1.5)
-      } else {
-        Capsule().strokeBorder(Color.black.opacity(0.6), lineWidth: 1.5)
+        .buttonStyle(ChunkyButtonStyle(tone: .neutral, lipHeight: 5, radius: 33))
+        .frame(width: 66)
       }
     }
     .accessibilityLabel(accessibilityLabel ?? text ?? icon)

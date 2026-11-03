@@ -70,29 +70,24 @@ struct MetaAIRegistrationRequestView: View {
   @AccessibilityFocusState private var titleFocused: Bool
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 24) {
-        Text("Connect to Meta AI?")
-          .font(.largeTitle.bold())
-          .foregroundStyle(.primary)
-          .fixedSize(horizontal: false, vertical: true)
-          .accessibilityAddTraits(.isHeader)
-          .accessibilityFocused($titleFocused)
-        A11yNote(text: SpokenMessage.metaAIRegistrationRequest)
-        VStack(spacing: 12) {
-          Button("Continue", action: onContinue)
-            .buttonStyle(.a11yPrimary)
-            .accessibilityHint("Opens the Meta AI app to finish connecting.")
-            .accessibilityIdentifier("registration_request_continue_button")
-          Button("Not now", action: onDecline)
-            .buttonStyle(.a11ySecondary)
-            .accessibilityHint("Tells Meta AI not to connect this app.")
-            .accessibilityIdentifier("registration_request_decline_button")
-        }
-      }
-      .padding(24)
+    LessonPage {
+      Text("Connect to Meta AI?")
+        .font(.rounded(.largeTitle, weight: .black))
+        .foregroundStyle(Theme.ink)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityFocused($titleFocused)
+      MascotSays(mood: .listening, text: SpokenMessage.metaAIRegistrationRequest)
+    } footer: {
+      Button("Continue", action: onContinue)
+        .buttonStyle(.a11yPrimary)
+        .accessibilityHint("Opens the Meta AI app to finish connecting.")
+        .accessibilityIdentifier("registration_request_continue_button")
+      Button("Not now", action: onDecline)
+        .buttonStyle(.a11ySecondary)
+        .accessibilityHint("Tells Meta AI not to connect this app.")
+        .accessibilityIdentifier("registration_request_decline_button")
     }
-    .background(Color(.systemBackground).ignoresSafeArea())
     .onAppear { titleFocused = true }
   }
 }

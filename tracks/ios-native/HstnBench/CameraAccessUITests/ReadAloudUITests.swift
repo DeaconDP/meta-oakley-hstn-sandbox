@@ -98,6 +98,36 @@ final class ReadAloudUITests: XCTestCase {
     XCTAssertTrue(app.buttons["read_repeat_button"].exists, "Repeat stays available after stopping")
   }
 
+  /// Reading a page to its end is what counts: one page, on the card, as one spoken value. Stopping
+  /// early (testReadAloud) doesn't count, and the card starts every run empty.
+  func testFinishingAPageCountsIt() async throws {
+    let connect = app.buttons["Connect my glasses"]
+    XCTAssertTrue(connect.waitForExistence(timeout: 10), "Should start on the home screen")
+    let card = app.descendants(matching: .any)["reading_progress"]
+    connect.tap()
+    XCTAssertTrue(app.staticTexts["Waiting for an active device"].waitForExistence(timeout: 15))
+    XCTAssertTrue(card.waitForExistence(timeout: 5), "The camera screen should show the progress card")
+    XCTAssertEqual(card.label, "Reading progress")
+    XCTAssertEqual(card.value as? String, "0 of 3 pages today. Read a page to start a streak.")
+
+    let paired = await mockClient.pairDevice()
+    let deviceId = try XCTUnwrap(paired, "pairDevice should return a deviceId")
+    pairedDeviceId = deviceId
+    _ = await mockClient.setCameraFeed(deviceId: deviceId, resourceName: "read_page", ext: "mp4")
+    _ = await mockClient.setCapturedImage(deviceId: deviceId, resourceName: "read_page", ext: "png")
+    startSessionAndStream()
+
+    let read = app.buttons["read_button"]
+    XCTAssertTrue(waitUntilEnabled(read), "Read should be enabled while streaming")
+    read.tap()
+
+    let status = app.staticTexts["read_status"]
+    XCTAssertTrue(
+      waitForLabel(status, timeout: 90) { $0 == "Finished, \(Self.pageSentences.count) sentences" },
+      "The page should be read to its end, got '\(status.label)'")
+    XCTAssertEqual(card.value as? String, "1 of 3 pages today. 1-day streak.")
+  }
+
   /// The fixture page (tools/make-read-fixtures.swift), in reading order.
   private static let pageSentences = [
     "Reading test",

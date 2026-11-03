@@ -234,7 +234,11 @@ final class CameraViewModel {
     backgroundStopSuppressionTask?.cancel()
     deviceSession?.stop()
     // Never leave earcons locked out of the audio session if the screen goes away mid-recording.
-    if isRecording { A11yAudioSession.recordingOwnsSession = false }
+    if isRecording {
+      A11yAudioSession.recordingOwnsSession = false
+      VoiceControl.shared.recordingDidEnd()
+    }
+    VoiceControl.shared.detachGlasses()
   }
 
   // MARK: - Lifecycle step 1: session
@@ -443,6 +447,8 @@ final class CameraViewModel {
     // Before the recorder takes the session (play-and-record for the glasses mic), so earcons and
     // speech from here on play into it instead of switching it back to playback.
     A11yAudioSession.recordingOwnsSession = true
+    // Voice control yields the mic and the session before the recorder configures them.
+    VoiceControl.shared.recordingWillStart()
     // If the glasses mic isn't available, flip the mic off so the button reflects that this
     // recording is video-only (the phone mic is never used). Left off afterward — the user can
     // re-tap the mic to turn it back on.
@@ -471,6 +477,7 @@ final class CameraViewModel {
     // if no newer recording has taken it since.
     if recordingGeneration == generation, !isRecording {
       A11yAudioSession.recordingOwnsSession = false
+      VoiceControl.shared.recordingDidEnd()
     }
     isFinishingRecording = false
     switch result {
@@ -615,8 +622,10 @@ final class CameraViewModel {
     sessionState = state
     if state == .started {
       benchClock.end("session_start")
+      if let deviceSession { VoiceControl.shared.attachGlasses(session: deviceSession, wearables: wearables) }
     }
     if state == .stopped {
+      VoiceControl.shared.detachGlasses()
       endBackgroundStopErrorSuppression()
       cleanupSession()
     }

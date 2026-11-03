@@ -55,5 +55,43 @@ Only once the demo is built (ROADMAP step 5).
 - [ ] Medicine box and banknote: unclear numbers are refused, not guessed.
 - [ ] Dim room: you're told it's too dark instead of hearing nothing.
 
+## 6. Voice control
+Delete any earlier install first for the first three items. On-device recognition has only ever run through fakes and the mock, so this is the first test of the real thing.
+
+**The voice**
+- [ ] Stock phone: settings shows "Voice: Daniel, British" (or whatever fallback), and after setup you hear once how to download a voice. Follow the spoken path exactly and write down what the screens are really called on this iOS: Settings > Accessibility > Spoken Content > Voices > English (the Simulator has no Voices row and some sources say "Read & Speak"; correct `SpokenMessage.voiceDownload` if it's wrong). It doesn't repeat next launch.
+- [ ] Download Serena while the app runs: the app says it's installed and the next line is Serena, no relaunch. Settings shows "Voice: Serena, British". Note the log line with name, identifier and language.
+- [ ] Install over the old copy, not fresh: with VoiceOver on, app lines are in the British voice. "Use VoiceOver's voice" switches back, and survives a relaunch.
+- [ ] With VoiceOver on and the British voice: how badly do the app's lines collide with VoiceOver reading the screen?
+
+**Starting**
+- [ ] Setup's Voice control step: the reason is spoken before the two dialogs. Allow both: the rising "listening" cue and "Voice control is on. Say help at any time."
+- [ ] iOS's own speech recognition dialog says speech data is sent to Apple, even though this app requires on-device recognition. Note whether that reads as a contradiction next to the app's privacy line.
+- [ ] Deny either one: you hear why and how to fix it, all buttons work, and after allowing in Settings and returning, listening starts by itself. Note where iOS really lists the two switches.
+- [ ] Update path: on an install with setup already done, the same explanation and dialogs come on the main screen.
+- [ ] en-ZA phone: note which recognition language was used. If there's no on-device model, you should hear the dictation message; write down what actually fixes it.
+
+**Phone mic (no session)**
+- [ ] Each command works by voice in a quiet room: read, stop, repeat, status, connect, take a photo, faster, slower, help, and in setup continue, next, back, skip, yes, no, test the speaker. Note words it mishears, and how long from your last word to the "heard" tone (about 0.7 s by design, plus the earcon).
+- [ ] A conversation next to the phone for two minutes: nothing happens, no speech and no tone.
+- [ ] Reading a page aloud on the phone speaker: the page's own words don't trigger anything. "Reader, stop" stops it. "Stop" alone doesn't. "Reader, gibberish" gets the brief reply and the reading carries on.
+- [ ] VoiceOver on, output on the phone speaker: bare commands are refused, "reader, ..." works, and VoiceOver reading a button label doesn't press anything. Then on the glasses speaker with the phone mic: bare commands work.
+
+**Audio, with the glasses on and connected**
+- [ ] While listening on the phone mic: the speaker test says "glasses" and the sound is clearly stereo-quality A2DP, not call quality. Check `currentRoute` if in doubt: output `bluetoothA2DP`, input built-in mic.
+- [ ] Without glasses, while listening: the speaker test says "phone speaker" and it comes from the loudspeaker, not the earpiece.
+- [ ] Music playing: it keeps playing when listening starts, ducks under speech, and comes back about 2 s after speech ends. Listen for a recognition gap or click at that moment (the mic is paused briefly to release the ducking).
+- [ ] Earcons while listening: still immediate. Film or time accepting a command: tone within 100 ms of acceptance.
+- [ ] Record a video: listening pauses, recording has glasses-mic sound (HFP), voice comes back with the cue afterwards. Do it twice quickly. The photo reply and "Recording stopped" still play properly.
+- [ ] A phone call, Siri, and unplugging or connecting Bluetooth while listening: listening resumes each time without a touch. Note how long it takes.
+- [ ] Lock the phone and background the app: the orange mic dot goes away. The screen doesn't auto-lock while listening; note the battery drain over 30 minutes.
+
+**Glasses mic (session, MWDATSpeech, experimental)**
+- [ ] Start a session with the wearable microphone not granted: stays on the phone mic and doesn't jump to Meta AI. "Listen through glasses" in settings explains, then goes to Meta AI; returning shows it in use. Write down whether Developer Center has to enable Speech for this app first.
+- [ ] Commands work through the glasses mic with the phone in a pocket. Does output stay on A2DP? Does a running camera stream or a read still work? This answers open question 4 in notes/a11y-sdk-mapping.md.
+- [ ] Does the glasses mic hear the glasses speaker? Note how often the "reader" guard is actually needed there. Does Speech stop by itself after inactivity, and does it come back?
+- [ ] Note the real confidence values on a clear command (`GlassesTranscriptFilter.minimumConfidence` is a guess), the locale reported, and which locale recognises an en-ZA accent best.
+- [ ] Pause and resume by tapping the glasses; fold them; end the session: back to the phone mic each time, with no silent gap you can't explain.
+
 ## Results
 (Date, iOS version, firmware, Meta AI app version, then findings per item. Turn each problem into a TODO.md item.)
