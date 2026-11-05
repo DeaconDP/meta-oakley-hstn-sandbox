@@ -136,8 +136,8 @@
     <string name="book_status_paused" description="Status when paused">Paused</string>
     <string name="book_status_stopped" description="Status after leaving the reader">Stopped. Bookmark saved.</string>
     <string name="book_status_same_page" description="Status when the capture is the page already read">Same page</string>
-    <string name="book_status_turn_page" description="Status when waiting for a page turn">Turn the page</string>
-    <string name="book_status_press_next" description="Status when waiting for Next page">Turn the page, then say or press Next page</string>
+    <string name="book_status_turn_page" description="Spoken and shown at the end of a page, auto turn on">End of page. Turn the page and I\'ll read it, or say next page.</string>
+    <string name="book_status_press_next" description="Spoken and shown at the end of a page, auto turn off">End of page. Turn the page, then say next page.</string>
     <string name="book_status_stream_lost" description="Spoken and shown when the glasses stream stops (fold, session end)">Glasses stream stopped. Bookmark saved.</string>
     <string name="book_say_started" description="Spoken when reading starts">Reading the page.</string>
     <string name="book_say_same_page" description="Spoken when a requested capture is the page already read">Same page. Turn the page, or say next page.</string>
@@ -166,6 +166,9 @@
     <string name="voice_where_waiting" description="Where am I between pages: pages read, rate">You\'ve read <xliff:g id="pages">%1$d</xliff:g> pages. I\'m waiting for the next page. <xliff:g id="rate">%2$s</xliff:g> times speed.</string>
     <string name="voice_waiting_auto" description="Spoken when asked to read while waiting with auto turn on">Turn the page and I\'ll read it, or say next page.</string>
     <string name="voice_waiting_manual" description="Spoken when asked to read while waiting with auto turn off">Turn the page, then say next page.</string>
+    <string name="voice_nudge_start" description="Reminder after a silence, before reading has started">I\'m ready when you are. Hold the book open in front of you and say read, or say help.</string>
+    <string name="voice_nudge_waiting" description="Reminder after a silence between pages; the waiting hint follows">I\'m waiting for the next page.</string>
+    <string name="voice_nudge_last" description="Added to the final reminder after a long silence">I\'ll stay quiet now. Say read whenever you\'re ready.</string>
     <string name="voice_furniture_on" description="Spoken after enabling page numbers and headers">OK, I\'ll read page numbers and headers.</string>
     <string name="voice_furniture_off" description="Spoken after disabling page numbers and headers">OK, I\'ll skip page numbers and headers.</string>
     <string name="voice_auto_turn_on" description="Spoken after enabling auto page turn detection">OK, I\'ll notice when you turn the page.</string>

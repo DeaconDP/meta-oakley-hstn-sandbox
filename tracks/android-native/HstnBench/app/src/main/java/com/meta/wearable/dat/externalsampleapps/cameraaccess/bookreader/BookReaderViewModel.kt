@@ -41,6 +41,7 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.EchoGuard
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.GlassesSnapshot
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.HealthAlert
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.HealthMonitor
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.IdleNudge
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.ImageCheck
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.ImageIssue
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.PhoneSnapshot
@@ -136,6 +137,7 @@ class BookReaderViewModel(
     private const val STREAM_LOST_SAY_DELAY_MS = 1_500L
     private const val ALERT_EXPLAINS_MS = 4_000L
     private const val RECONNECT_EVERY_MS = 4_000L
+    private const val NUDGE_CHECK_MS = 1_000L
     const val MIN_RATE = 0.5f
     const val MAX_RATE = 3f
   }
@@ -162,6 +164,7 @@ class BookReaderViewModel(
   private val speaker = BookSpeaker(application, this).apply { setRate(_uiState.value.speechRate) }
   private val voice = VoiceControl(application, viewModelScope)
   private val echo = EchoGuard()
+  private val nudge = IdleNudge()
 
   // Main thread only.
   private var current: Page? = null
@@ -218,7 +221,7 @@ class BookReaderViewModel(
   }
 
   fun start() {
-    earcons.play(Earcon.ACK)
+    userActed()
     if (!camera.isStreaming.value) {
       // "read" is also how to retry after a dropped or refused connection.
       reconnectThen { start() }
@@ -239,7 +242,7 @@ class BookReaderViewModel(
   }
 
   fun pause() {
-    earcons.play(Earcon.ACK)
+    userActed()
     hush()
     speakingAside = false
     retryJob?.cancel()
@@ -248,7 +251,7 @@ class BookReaderViewModel(
   }
 
   fun resume() {
-    earcons.play(Earcon.ACK)
+    userActed()
     if (current != null) {
       _uiState.update { it.copy(phase = ReaderPhase.READING) }
       speakCurrent()
@@ -267,7 +270,7 @@ class BookReaderViewModel(
 
   /** "I've turned the page": capture now. Works whether or not auto-detection is on. */
   fun nextPage() {
-    earcons.play(Earcon.ACK)
+    userActed()
     if (_uiState.value.phase == ReaderPhase.IDLE) {
       start()
       return
@@ -280,7 +283,7 @@ class BookReaderViewModel(
   }
 
   fun backSentence() {
-    earcons.play(Earcon.ACK)
+    userActed()
     val page = current ?: return
     chunkIndex = SpeechChunker.previousSentenceStart(page.chunks, chunkIndex)
     publishChunk()
@@ -289,6 +292,12 @@ class BookReaderViewModel(
       speakingAside = false
       speakCurrent()
     }
+  }
+
+  /** A button press or command: acknowledge it, and start silence reminders over. */
+  private fun userActed() {
+    earcons.play(Earcon.ACK)
+    nudge.userActed(SystemClock.elapsedRealtime())
   }
 
   fun setSpeechRate(rate: Float) {
@@ -505,7 +514,7 @@ class BookReaderViewModel(
           it.copy(
               phase = ReaderPhase.WAITING,
               queuedPages = 0,
-              status = str(if (it.autoTurn) R.string.book_status_turn_page else R.string.book_status_press_next),
+              status = pageDonePrompt(),
           )
         }
       }
@@ -583,9 +592,16 @@ class BookReaderViewModel(
     _uiState.update { it.copy(pagesRead = it.pagesRead + 1) }
     lastPage = current
     current = null
-    if (queue.isEmpty()) earcons.play(Earcon.PAGE_DONE)
+    if (queue.isEmpty()) {
+      earcons.play(Earcon.PAGE_DONE)
+      // Say what happens next, unless the next page is already being captured.
+      if (captureJob?.isActive != true) sayAside(pageDonePrompt())
+    }
     startNextPageOrWait()
   }
+
+  private fun pageDonePrompt(): String =
+      str(if (_uiState.value.autoTurn) R.string.book_status_turn_page else R.string.book_status_press_next)
 
   // MARK: - Voice
 
@@ -617,6 +633,8 @@ class BookReaderViewModel(
           Log.w(TAG, "health watch failed", e)
         }
       }
+      // A quiet user gets told what the reader is waiting for.
+      launch { remindWhenQuiet() }
       // Permission trouble, whoever started the connection.
       launch {
         camera.link.drop(1).collect { link ->
@@ -661,6 +679,51 @@ class BookReaderViewModel(
     phoneAllowed = null
     voice.stop()
     _uiState.update { it.copy(microphone = Microphone.NONE) }
+  }
+
+  /**
+   * Runs while voice is on. When the reader is waiting for the user (not started, or between pages)
+   * and nobody has said anything for a while, say what it's waiting for. IdleNudge spaces the
+   * reminders out and stops after the last one, until the user does something.
+   */
+  private suspend fun remindWhenQuiet() {
+    nudge.userActed(SystemClock.elapsedRealtime())
+    while (true) {
+      delay(NUDGE_CHECK_MS)
+      val now = SystemClock.elapsedRealtime()
+      if (!waitingForUser()) {
+        nudge.busy(now)
+        continue
+      }
+      val reminder = nudge.due(now) ?: continue
+      val ui = _uiState.value
+      val app = getApplication<Application>()
+      val what =
+          when {
+            ui.phase == ReaderPhase.IDLE -> str(R.string.voice_nudge_start)
+            ui.lastResult == CaptureResult.HINT -> str(R.string.book_say_cant_see_page)
+            else -> str(R.string.voice_nudge_waiting) + " " + waitingHint()
+          }
+      val text = if (nudge.isLast(reminder)) what + " " + app.getString(R.string.voice_nudge_last) else what
+      Log.i(TAG, "nudge reminder=$reminder text=$text")
+      sayAside(text)
+    }
+  }
+
+  /** Nothing to read, nothing in progress, glasses there: only the user can move things on. */
+  private fun waitingForUser(): Boolean {
+    val ui = _uiState.value
+    return (ui.phase == ReaderPhase.IDLE || ui.phase == ReaderPhase.WAITING) &&
+        !ui.closeRequested &&
+        !ui.isCapturing &&
+        !speakingAside &&
+        current == null &&
+        queue.isEmpty() &&
+        captureJob?.isActive != true &&
+        retryJob?.isActive != true &&
+        reconnectJob?.isActive != true &&
+        !streamLost &&
+        camera.isStreaming.value
   }
 
   private suspend fun bringUpLink(requestPermission: suspend (Permission) -> PermissionStatus) {
@@ -717,6 +780,8 @@ class BookReaderViewModel(
       return
     }
     _uiState.update { it.copy(heard = text) }
+    // Even speech that isn't a command means the user is there: no reminder needed yet.
+    nudge.userActed(now)
     val command = VoiceCommands.parse(text)
     Log.i(TAG, "voice heard=\"$text\" command=$command")
     if (command == null) {

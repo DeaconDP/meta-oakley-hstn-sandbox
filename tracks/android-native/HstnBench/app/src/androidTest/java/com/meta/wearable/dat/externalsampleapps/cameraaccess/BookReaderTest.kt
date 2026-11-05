@@ -57,6 +57,7 @@ class BookReaderTest {
     private const val STREAM_TIMEOUT = 20_000L
     // capturePhoto takes ~4 s on the mock; the first OCR also loads the model.
     private const val READ_TIMEOUT = 60_000L
+    private const val END_OF_PAGE_TIMEOUT = 120_000L
     // Rendered text OCRs almost perfectly; allow a stray character or two.
     private const val MAX_CER = 0.02f
   }
@@ -120,6 +121,22 @@ class BookReaderTest {
     composeTestRule.onNodeWithTag("book_next_page").performClick()
     val samePage = targetContext.getString(R.string.book_status_same_page)
     composeTestRule.waitUntil(timeoutMillis = READ_TIMEOUT) { statusText() == samePage }
+  }
+
+  @Test
+  fun saysWhatToDoAtTheEndOfAPage() {
+    pairHstnShowingPage(BookPageRenderer.houndPage)
+    startSessionAndStream()
+    openReaderWithAutoTurnOff()
+    // Top speed, so the page is finished quickly.
+    repeat(12) { composeTestRule.onNodeWithTag("book_rate_faster").performClick() }
+
+    composeTestRule.onNodeWithTag("book_start_pause").performClick()
+    waitForPageText("Penang")
+
+    // A blind reader can't see the status line: it's spoken too (BookReaderViewModel.pageFinished).
+    val endOfPage = targetContext.getString(R.string.book_status_press_next)
+    composeTestRule.waitUntil(timeoutMillis = END_OF_PAGE_TIMEOUT) { statusText() == endOfPage }
   }
 
   @Test
