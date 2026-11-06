@@ -136,17 +136,24 @@ object ToolTestKit {
               .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
       )
 
-  /** The activity's ToolHub (exists once the camera screen has been shown). */
+  /**
+   * The activity's ToolHub. The same instance the screens use: they ask the activity's
+   * ViewModelStore with the same key, so if the test asks first, the screens get this one.
+   */
   fun hub(scenario: ActivityScenario<MainActivity>): ToolHub {
+    val camera = camera(scenario)
     var hub: ToolHub? = null
-    scenario.onActivity { hub = ViewModelProvider(it)[ToolHub::class.java] }
+    scenario.onActivity { hub = ViewModelProvider(it, ToolHub.Factory(it.application, camera))[ToolHub::class.java] }
     return hub!!
   }
 
   /** The activity's CameraViewModel, which implements PageCamera (frames, capturePage). */
   fun camera(scenario: ActivityScenario<MainActivity>): CameraViewModel {
     var camera: CameraViewModel? = null
-    scenario.onActivity { camera = ViewModelProvider(it)[CameraViewModel::class.java] }
+    scenario.onActivity {
+      camera =
+          ViewModelProvider(it, CameraViewModel.Factory(it.application, it.viewModel))[CameraViewModel::class.java]
+    }
     return camera!!
   }
 

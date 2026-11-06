@@ -3,26 +3,30 @@
 // The preview decoder (HevcDecoder) renders straight to the screen's Surface, so the app never sees
 // the pixels. Tools like "watch for text" and "light and colour" need them several times a second,
 // and the in-stream photo (capturePhoto, ~1 s, interrupts glasses speech) is too slow for that.
-// This runs a second HevcDecoder into an ImageReader (YUV_420_888). Every frame has to be decoded
-// (HEVC P-frames depend on the ones before), but only [maxFps] frames a second are converted to
-// ARGB; the rest are released straight away. CameraViewModel only runs it while some tool is
-// collecting frames, and stops it when the last one stops. The decoder starts on the next keyframe
-// (twice a second on the mock's plant clip), primed with the stream's cached parameter sets.
+// This runs a second HevcDecoder with no Surface: the codec hands each decoded frame over as a YUV
+// Image (MediaCodec.getOutputImage), and at most [maxFps] frames a second are converted to ARGB.
+// The Image has the picture's real size (DAT's VideoFrame reports the MEDIUM preset, 504x896, even
+// for a 540x960 feed; an ImageReader sized from that crashed the hardware decoder). It uses the
+// phone's hardware HEVC decoder when there is one (the preview keeps the SDK's software choice; a
+// bad hardware decoder here costs frames, not the preview). Decoding is the expensive part (software HEVC, 24-30 frames a second on
+// top of the preview's own decode), so it decodes as little as it can: when keyframes come at least as often as frames are wanted (every 0.4 s on the
+// mock), only keyframes are decoded, each on its own (they don't depend on other frames). Only
+// when a tool wants frames faster than that does it decode every frame (P-frames depend on the
+// ones before). The choice is made at each keyframe, from the measured keyframe interval.
+// CameraViewModel only runs it while some tool is collecting frames, and stops it when the last one
+// stops. The decoder starts on the next keyframe, primed with the stream's cached parameter sets.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.stream
 
 import android.graphics.Bitmap
-import android.graphics.ImageFormat
 import android.media.Image
-import android.media.ImageReader
-import android.os.Handler
-import android.os.HandlerThread
 import android.os.SystemClock
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** [width] x [height] is what the stream says; the frames come out at the decoded picture's size. */
 class FrameGrabber(private val width: Int, private val height: Int) {
 
   /** A converted frame and when it was decoded (elapsedRealtime ms). */
@@ -43,12 +47,16 @@ class FrameGrabber(private val width: Int, private val height: Int) {
   @Volatile var convertMs = 0L
     private set
 
-  private val thread = HandlerThread("FrameGrabber").apply { start() }
-  private val handler = Handler(thread.looper)
-  private val reader = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 3)
-  private val decoder = HevcDecoder()
-  private var lastConvertMs = 0L
-  // Reused between conversions (only the grabber thread touches these).
+  private val decoder = HevcDecoder(preferHardware = true, onImage = ::onImage)
+  private var nextDueMs = 0L
+  private var lastKeyMs = 0L
+  /** Smoothed time between keyframes, ms; 0 until two have been seen. */
+  @Volatile var keyIntervalMs = 0L
+    private set
+  /** Decoding keyframes only (see the header). */
+  @Volatile var keyframesOnly = false
+    private set
+  // Reused between conversions (only the decoder's thread touches these).
   private var argb = IntArray(0)
   private var yBytes = ByteArray(0)
   private var uBytes = ByteArray(0)
@@ -56,43 +64,44 @@ class FrameGrabber(private val width: Int, private val height: Int) {
 
   @Volatile private var running = true
 
-  init {
-    reader.setOnImageAvailableListener({ r -> onImage(r) }, handler)
-  }
-
-  /** Starts decoding into the reader. [parameterSets] is the stream's VPS/SPS/PPS, if known. */
+  /** Starts decoding. [parameterSets] is the stream's VPS/SPS/PPS, if known. */
   fun start(parameterSets: ByteArray?) {
-    decoder.start(width, height, reader.surface)
+    decoder.start(width, height, null)
     parameterSets?.let { decoder.decodeFrame(it, 0) }
   }
 
-  /** One compressed HEVC frame from the stream, in order. */
+  /** One compressed HEVC frame from the stream, in order. Called on the stream's frame thread. */
   fun feed(data: ByteArray, presentationTimeUs: Long) {
-    if (running) decoder.decodeFrame(data, presentationTimeUs)
+    if (!running) return
+    val kind = HevcNal.kind(data)
+    if (kind == HevcNal.Kind.KEY) {
+      val now = SystemClock.elapsedRealtime()
+      if (lastKeyMs > 0) {
+        val gap = now - lastKeyMs
+        keyIntervalMs = if (keyIntervalMs == 0L) gap else (keyIntervalMs * 7 + gap * 3) / 10
+      }
+      lastKeyMs = now
+      val wantedGap = 1000f / maxFps.coerceIn(0.1f, 30f)
+      keyframesOnly = keyIntervalMs in 1..(wantedGap * 1.15f).toLong()
+    }
+    if (kind != HevcNal.Kind.OTHER || !keyframesOnly) decoder.decodeFrame(data, presentationTimeUs)
   }
 
   fun stop() {
     running = false
     decoder.stop()
-    handler.post {
-      reader.close()
-      thread.quitSafely()
-    }
   }
 
-  private fun onImage(r: ImageReader) {
-    val image = try {
-      r.acquireLatestImage()
-    } catch (e: IllegalStateException) {
-      null
-    } ?: return
+  /** On the decoder's thread, for every decoded frame. [image] is only valid during the call. */
+  private fun onImage(image: Image) {
     try {
       decodedCount++
       if (!running) return
       val now = SystemClock.elapsedRealtime()
       val gap = (1000f / maxFps.coerceIn(0.1f, 30f)).toLong()
-      if (now - lastConvertMs < gap) return
-      lastConvertMs = now
+      // Paced on average, so frames arriving every 400 ms still give 2 a second when 2 are wanted.
+      if (now < nextDueMs) return
+      nextDueMs = maxOf(nextDueMs + gap, now - gap / 2)
       val started = SystemClock.elapsedRealtime()
       val bitmap = toBitmap(image)
       convertMs += SystemClock.elapsedRealtime() - started
@@ -100,8 +109,6 @@ class FrameGrabber(private val width: Int, private val height: Int) {
       _latest.value = Frame(bitmap, now)
     } catch (e: Exception) {
       Log.w(TAG, "frame conversion failed", e)
-    } finally {
-      image.close()
     }
   }
 
@@ -152,5 +159,33 @@ class FrameGrabber(private val width: Int, private val height: Int) {
 
   private companion object {
     const val TAG = "FrameGrabber"
+  }
+}
+
+/** Just enough HEVC NAL parsing to tell parameter sets and keyframes from other frames. */
+internal object HevcNal {
+  enum class Kind {
+    /** VPS/SPS/PPS only. */
+    CONFIG,
+    /** Contains an IRAP picture (IDR, CRA, BLA): decodable on its own. */
+    KEY,
+    OTHER,
+  }
+
+  fun kind(data: ByteArray): Kind {
+    var sawConfig = false
+    var i = 0
+    while (i + 3 < data.size) {
+      // Start code 00 00 01 (a 4-byte 00 00 00 01 ends in the same three bytes).
+      if (data[i].toInt() == 0 && data[i + 1].toInt() == 0 && data[i + 2].toInt() == 1) {
+        val type = (data[i + 3].toInt() and 0x7E) shr 1
+        if (type in 16..21) return Kind.KEY
+        if (type in 32..34) sawConfig = true
+        i += 3
+      } else {
+        i++
+      }
+    }
+    return if (sawConfig) Kind.CONFIG else Kind.OTHER
   }
 }

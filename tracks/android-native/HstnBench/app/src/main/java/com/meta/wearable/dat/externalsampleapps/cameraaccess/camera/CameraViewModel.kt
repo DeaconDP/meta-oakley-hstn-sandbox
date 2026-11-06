@@ -12,8 +12,9 @@
 // start a DeviceSession, add and start a Stream, capture a photo or record video, stop the stream,
 // end the session. Owns the screen-scoped pieces — the DeviceSession, its Stream, the on-device
 // HEVC preview decoder, and the passthrough video recorder. It is also the tools' camera
-// (PageCamera): in-stream photos, frame sizes for page-turn detection, and decoded frames for
-// continuous tools (a second decoder into an ImageReader, FrameGrabber, only while collected). The UI binds to the SDK's own
+// (PageCamera): in-stream photos, frame sizes for page-turn detection, and frames for continuous
+// tools: copied off the preview Surface (PixelCopy) while it's on screen, else decoded by a second
+// decoder (FrameGrabber) only while collected. The UI binds to the SDK's own
 // DeviceSessionState / StreamState so the sample shows the real state machine.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.camera
@@ -23,6 +24,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.util.Log
+import android.view.PixelCopy
 import android.view.Surface
 import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.AndroidViewModel
@@ -100,6 +102,7 @@ class CameraViewModel(
     private const val KEYFRAME_WAIT_STEP_MS = 25L
     private const val KEYFRAME_WAIT_MAX_MS = 500L
     private const val FRAME_FALLBACK_MS = 4_000L
+    private const val COPY_GRACE_MS = 1_500L
   }
 
   private class RecorderFrame(
@@ -694,48 +697,105 @@ class CameraViewModel(
     grabberJob?.cancel()
     grabberJob = null
     grabberFrames.value = null
-    Log.i(TAG, "frame grabber stopped decoded=${g.decodedCount} converted=${g.convertedCount} convertMs=${g.convertMs}")
+    Log.i(TAG, "frame grabber stopped decoded=${g.decodedCount} converted=${g.convertedCount} convertMs=${g.convertMs} keyIntervalMs=${g.keyIntervalMs}")
     g.stop()
   }
 
-  /** Grabber counters (decoded, converted, ms converting), for tests and the cost measurement. */
-  fun frameGrabberStats(): Triple<Int, Int, Long>? =
-      frameGrabber?.let { Triple(it.decodedCount, it.convertedCount, it.convertMs) }
+  /** Grabber counters, for tests and the cost measurement in notes/tools-layer.md. */
+  fun frameGrabberStats(): String? =
+      frameGrabber?.let {
+        "decoded=${it.decodedCount} converted=${it.convertedCount} convertMs=${it.convertMs} " +
+            "keyIntervalMs=${it.keyIntervalMs} keyframesOnly=${it.keyframesOnly}"
+      }
+
+  /**
+   * The frame on screen right now, copied off the preview Surface by the GPU (PixelCopy), at the
+   * decoded picture's size. Costs almost nothing: the preview decoder has already done the work.
+   * Null when there's no preview Surface (screen off, app in the background) or no frame yet.
+   */
+  private suspend fun copyPreviewFrame(): Bitmap? {
+    val (surface, width, height) =
+        synchronized(decoderLock) {
+          if (!previewCopyEnabled) return null
+          val d = hevcDecoder ?: return null.also { copyMiss("no preview decoder") }
+          val surface = decoderSurface ?: return null.also { copyMiss("no preview surface") }
+          if (d.outputWidth <= 0 || !surface.isValid) return null.also { copyMiss("no frame size yet") }
+          Triple(surface, d.outputWidth, d.outputHeight)
+        }
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val result =
+        kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+          try {
+            PixelCopy.request(surface, bitmap, { r -> cont.resumeWith(Result.success(r)) }, pixelCopyHandler)
+          } catch (e: IllegalArgumentException) {
+            // The Surface went away between the check and the request.
+            cont.resumeWith(Result.success(PixelCopy.ERROR_SOURCE_INVALID))
+          }
+        }
+    if (result != PixelCopy.SUCCESS) {
+      copyFailures++
+      if (copyFailures % 20 == 1) Log.w(TAG, "preview PixelCopy failed result=$result (x$copyFailures)")
+      return null
+    }
+    return bitmap
+  }
+
+  @Volatile private var copyFailures = 0
+  private var lastCopyMiss: String? = null
+
+  private fun copyMiss(why: String) {
+    if (why != lastCopyMiss) Log.i(TAG, "preview copy unavailable: $why")
+    lastCopyMiss = why
+  }
+
+  private val pixelCopyHandler by lazy {
+    android.os.Handler(android.os.HandlerThread("PixelCopy").apply { start() }.looper)
+  }
 
   override fun frames(maxFps: Float): Flow<Bitmap> = channelFlow {
-    val token = Any()
     val gapMs = (1000f / maxFps.coerceIn(0.1f, 30f)).toLong()
-    frameDemand[token] = maxFps
+    val token = Any()
+    var lastSentAt = 0L
+    var nothingSince = android.os.SystemClock.elapsedRealtime()
+    var lastCopyOk = 0L
     try {
-      // Decoded frames, throttled per collector.
-      val decoded = launch {
-        var lastAt = 0L
-        grabberFrames.filterNotNull().collect { frame ->
-          if (frame.atMs - lastAt >= gapMs - 5) {
-            lastAt = frame.atMs
-            send(frame.bitmap)
-          }
-        }
-      }
-      // Fallback: streaming, but no decoded frame for a while (no decoder that can write to an
-      // ImageReader on this phone): in-stream photos, at most one a second.
-      launch {
-        while (true) {
+      while (true) {
+        val tickStart = android.os.SystemClock.elapsedRealtime()
+        if (!isStreaming.value) {
+          frameDemand.remove(token)
+          nothingSince = tickStart
           isStreaming.first { it }
-          val got = withTimeoutOrNull(FRAME_FALLBACK_MS) { grabberFrames.filterNotNull().first() }
-          if (got != null) break
-          if (!isStreaming.value) continue
-          Log.w(TAG, "no decoded frames after ${FRAME_FALLBACK_MS}ms; falling back to capturePhoto")
-          decoded.cancel()
-          val fallbackGap = maxOf(gapMs, 1000L)
-          while (true) {
-            val started = System.currentTimeMillis()
-            if (isStreaming.value) capturePage()?.let { send(it) }
-            delay((fallbackGap - (System.currentTimeMillis() - started)).coerceAtLeast(50L))
+          continue
+        }
+        // 1. The preview Surface (normal case: a tool screen is over the live preview).
+        val copied = copyPreviewFrame()
+        if (copied != null) {
+          lastCopyOk = android.os.SystemClock.elapsedRealtime()
+          lastCopyMiss = null
+          frameDemand.remove(token)
+          send(copied)
+          nothingSince = lastCopyOk
+        } else if (tickStart - lastCopyOk < COPY_GRACE_MS) {
+          // A copy that worked a moment ago and missed once (a frame being swapped, a layout
+          // pass): try again next tick rather than spinning up a decoder.
+        } else {
+          // 2. No preview Surface: decode frames ourselves (FrameGrabber).
+          frameDemand[token] = maxFps
+          val frame = grabberFrames.value
+          if (frame != null && frame.atMs > lastSentAt) {
+            lastSentAt = frame.atMs
+            send(frame.bitmap)
+            nothingSince = android.os.SystemClock.elapsedRealtime()
+          } else if (tickStart - nothingSince > FRAME_FALLBACK_MS) {
+            // 3. Nothing decodes on this phone: in-stream photos, at most one a second.
+            Log.w(TAG, "no stream frames for ${FRAME_FALLBACK_MS} ms; using capturePhoto")
+            capturePage()?.let { send(it) }
+            delay((1000L - (android.os.SystemClock.elapsedRealtime() - tickStart)).coerceAtLeast(0L))
+            continue
           }
         }
+        delay((gapMs - (android.os.SystemClock.elapsedRealtime() - tickStart)).coerceAtLeast(1L))
       }
-      awaitCancellation()
     } finally {
       frameDemand.remove(token)
     }
@@ -743,6 +803,7 @@ class CameraViewModel(
 
   override suspend fun latestFrame(maxAgeMs: Long, timeoutMs: Long): Bitmap? {
     if (!_uiState.value.isStreaming) return null
+    copyPreviewFrame()?.let { return it }
     val now = android.os.SystemClock.elapsedRealtime()
     grabberFrames.value?.takeIf { now - it.atMs <= maxAgeMs }?.let { return it.bitmap }
     val token = Any()
@@ -756,6 +817,9 @@ class CameraViewModel(
     }
     return capturePage()
   }
+
+  /** Test hook: force the decoder path (as if there were no preview Surface). */
+  @Volatile var previewCopyEnabled = true
 
   // MARK: - Recording
 

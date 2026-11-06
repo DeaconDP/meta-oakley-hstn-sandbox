@@ -3,8 +3,10 @@
 // The mock glasses stream a video built on the phone from two rendered scenes (a bright block on
 // the left, then on the right, one second each). A tool opened voice-first brings the stream up; the
 // test then collects CameraViewModel.frames and checks that frames arrive at about the asked rate,
-// have the video's size, and change over time (both scenes seen). It also measures what frame
-// decoding costs the app in CPU (logged as "FrameCost"; see notes/tools-layer.md).
+// have the video's size, and change over time (both scenes seen), on both paths: copied off the
+// preview Surface (the normal case) and decoded by the fallback FrameGrabber (as with the screen
+// off). It also measures what each costs the app in CPU (logged as "FrameCost"; see
+// notes/tools-layer.md).
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess
 
@@ -67,19 +69,25 @@ class FrameStreamTest {
   }
 
   @Test
-  fun framesArriveWithTheStreamSizeAndChange() {
+  fun framesArriveWithTheStreamSizeAndChange() = checkFrames(previewCopy = true)
+
+  @Test
+  fun framesArriveWhenDecodedWithoutThePreview() = checkFrames(previewCopy = false)
+
+  private fun checkFrames(previewCopy: Boolean) {
     val glasses = ToolTestKit.pairHstn()
     ToolTestKit.playFrames(glasses, listOf(scene(left = true), scene(left = false)), holdMs = 1_000L)
     // The light tool is a stub that only connects: a quiet way to bring the stream up voice-first.
     scenario = ToolTestKit.launch(ToolRequest(ToolId.LIGHT))
     val camera = ToolTestKit.camera(scenario!!)
+    camera.previewCopyEnabled = previewCopy
     composeTestRule.waitUntil(timeoutMillis = 30_000L) { camera.isStreaming.value }
 
     val started = SystemClock.elapsedRealtime()
     val frames = runBlocking { withTimeout(30_000L) { camera.frames(maxFps = 5f).take(20).toList() } }
     val seconds = (SystemClock.elapsedRealtime() - started) / 1000f
     val signs = frames.map { leftMinusRight(it) }
-    Log.i("FrameStreamTest", "20 frames in ${seconds}s sizes=${frames.map { "${it.width}x${it.height}" }.distinct()} leftMinusRight=$signs")
+    Log.i("FrameStreamTest", "previewCopy=$previewCopy 20 frames in ${seconds}s sizes=${frames.map { "${it.width}x${it.height}" }.distinct()} leftMinusRight=$signs")
 
     frames.forEach {
       assertEquals(MockVideo.WIDTH, it.width)
@@ -120,15 +128,22 @@ class FrameStreamTest {
 
     val window = 10_000L
     val (base, _) = cpuPercent(window, null)
-    val (at2, n2) = cpuPercent(window, 2f)
-    val (at5, n5) = cpuPercent(window, 5f)
-    val (at10, n10) = cpuPercent(window, 10f)
-    val stats = camera.frameGrabberStats()
-    Log.i(
-        "FrameCost",
-        "app CPU (% of one core) streaming only=%.1f, frames(2)=%.1f (%d frames), frames(5)=%.1f (%d), frames(10)=%.1f (%d); grabber=%s"
-            .format(base, at2, n2, at5, n5, at10, n10, stats),
-    )
+    Log.i("FrameCost", "streaming only (preview decode, no frames collected): app CPU %.1f%% of one core".format(base))
+    var n2 = 0
+    var n5 = 0
+    for (copy in listOf(true, false)) {
+      camera.previewCopyEnabled = copy
+      for (fps in listOf(2f, 5f, 10f)) {
+        val (cpu, n) = cpuPercent(window, fps)
+        val path = if (copy) "preview copy" else "decoder"
+        Log.i("FrameCost", "%s frames(%.0f): app CPU %.1f%% of one core, %d frames in %d s; %s".format(path, fps, cpu, n, window / 1000, camera.frameGrabberStats()))
+        if (copy && fps == 2f) n2 = n
+        if (copy && fps == 5f) n5 = n
+      }
+    }
+    camera.previewCopyEnabled = true
+    val (baseAfter, _) = cpuPercent(window, null)
+    Log.i("FrameCost", "streaming only, again at the end: app CPU %.1f%% of one core".format(baseAfter))
     assertTrue("no frames at 2 fps", n2 >= 10)
     assertTrue("no frames at 5 fps", n5 >= 25)
   }
