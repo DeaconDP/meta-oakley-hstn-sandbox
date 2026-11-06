@@ -134,6 +134,22 @@ class PageLayoutTest {
   }
 
   @Test
+  fun misreadLineEndFragmentIsRepairedWhenRejoined() {
+    fun join(a: String, b: String) = StringBuilder(a).also { PageLayout.joinLine(it, b) }.toString()
+    // ML Kit on a Galaxy A26 read the fragment "oc-" as "0C-" (BookReaderTest).
+    assertEquals("not infrequent occasions", join("not infrequent 0C-", "casions"))
+    assertEquals("It was. Occasions", join("It was. 0C-", "casions"))
+    assertEquals("strong words", join("strong w0r-", "ds"))
+    assertEquals("exxample", join("exX-", "ample")) // case fixed; the doubled glyph stays
+    // Not rejoined (next line starts with a capital): nothing is repaired.
+    assertEquals("0C-Casions", join("0C-", "Casions"))
+    // Real capitals and digits are left alone.
+    assertEquals("McCarthy", join("McCar-", "thy"))
+    assertEquals("B2Bthing", join("B2B-", "thing"))
+    assertEquals("pages 10-14", join("pages 10-", "14"))
+  }
+
+  @Test
   fun emptyPageGivesEmptyResult() {
     assertTrue(PageLayout.layout(OcrPage(960, 1440, emptyList())).isEmpty)
   }
