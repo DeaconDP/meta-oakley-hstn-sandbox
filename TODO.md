@@ -36,7 +36,7 @@
 - [ ] Mail reader (sender, recipient, subject, amount and deadline; read all; abstain on unsure amounts)
 - [ ] Watch for text (continuous OCR, fuzzy words / exact numbers, earcon + left/ahead/right)
 - [ ] Labels and barcodes (on-device barcode, label read-out, Open Food Facts on request, no medicine doses)
-- [ ] Ask about the text (book/mail text only to Claude Haiku 5.5 on request, short spoken answers, "the text doesn't say")
+- [x] Ask about the text (2026-11-06, notes/ask-about-the-text.md: on-device, no cloud needed: bundled WordNet 3.0 definitions with inflections, British/American spellings, "did you mean" from the text and "spell it"; who-is mentions, recap (survives a restart, kept with the bookmark), find + "next"; question barge-in, then "carry on". Claude Haiku 5.5 optional for open questions, only with an API key in local.properties; untested live)
 - [ ] Light and colour (brightness tone, colour naming with hedging)
 - [ ] Offline eval harness: Mock Device Kit `setCameraFeed`/`setCapturedImage` + VizWiz/TextVQA subset, replay mode for CI
 - [ ] TalkBack pass + WCAG 2.2 AA check of the companion UI

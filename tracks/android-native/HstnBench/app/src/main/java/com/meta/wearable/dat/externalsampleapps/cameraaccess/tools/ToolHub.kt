@@ -448,7 +448,7 @@ class ToolHub(
     viewModelScope.launch {
       val result =
           try {
-            askAboutText.answer(question, snapshot)
+            askAboutText.answer(question, snapshot) { note -> sayAside(note) }
           } catch (e: CancellationException) {
             throw e
           } catch (e: Exception) {

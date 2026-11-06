@@ -35,6 +35,8 @@ import androidx.lifecycle.viewModelScope
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bench.BenchClock
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.Bookmark
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ask.AskGrammar
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ask.AskMemory
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.FrameSignal
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.FrameSizeMotion
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.PageOutcome
@@ -604,11 +606,20 @@ class BookReaderViewModel(
     _uiState.update { it.copy(status = text) }
   }
 
-  /** Barge-in: stop talking on the partial, don't wait for the recogniser to finish. */
+  /**
+   * Barge-in: stop talking on the partial, don't wait for the recogniser to finish. A question
+   * about the text ("what does recondite mean") pauses too, silently: the answer follows, then
+   * "carry on" reads on from the interrupted sentence.
+   */
   override fun onPartial(text: String): Boolean {
     if (_uiState.value.phase == ReaderPhase.READING && VoiceCommands.isBargeIn(text)) {
       Log.i(TAG, "voice barge-in on partial: \"$text\"")
       voicePause()
+      return true
+    }
+    if (_uiState.value.phase == ReaderPhase.READING && AskGrammar.isQuestion(text)) {
+      Log.i(TAG, "voice barge-in on question partial: \"$text\"")
+      pause()
       return true
     }
     return false
@@ -643,7 +654,12 @@ class BookReaderViewModel(
         if (command.request.tool != ToolId.BOOK) return false
         handle(VoiceCommand.Resume)
       }
-      is GlobalCommand.Ask -> return false
+      is GlobalCommand.Ask -> {
+        // Stay paused after the answer (follow-ups like "more" or "spell it" may come); "carry on"
+        // reads on. ToolHub answers.
+        if (_uiState.value.phase == ReaderPhase.READING) pause()
+        return false
+      }
     }
     return true
   }
@@ -858,7 +874,8 @@ class BookReaderViewModel(
     val page = current
     val chunk = spoken ?: page?.chunks?.getOrNull(chunkIndex - 1) ?: return
     val bookmark = Bookmark(_uiState.value.pagesRead, chunk.sentenceText)
-    prefs.edit().putString(KEY_BOOKMARK, bookmark.encode()).apply()
+    // The recent text goes next to the bookmark, for "what happened last time" after a restart.
+    AskMemory.save(prefs.edit().putString(KEY_BOOKMARK, bookmark.encode()), hub.recentText.snapshot(ToolId.BOOK)).apply()
   }
 
   private fun str(@StringRes id: Int): String = getApplication<Application>().getString(id)
