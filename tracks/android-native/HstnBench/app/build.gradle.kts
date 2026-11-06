@@ -45,6 +45,14 @@ android {
         localProperties.getProperty("mwdat_application_id", "")
     manifestPlaceholders["mwdat_client_token"] =
         localProperties.getProperty("mwdat_client_token", "")
+
+    // Ask about the text: optional Claude path for open questions, off unless local.properties
+    // has anthropic_api_key (tools/ask/AskProvider). Empty = on-device answers only, no network.
+    buildConfigField(
+        "String",
+        "ANTHROPIC_API_KEY",
+        "\"" + localProperties.getProperty("anthropic_api_key", "").replace("\\", "").replace("\"", "") + "\"",
+    )
   }
 
   buildTypes {

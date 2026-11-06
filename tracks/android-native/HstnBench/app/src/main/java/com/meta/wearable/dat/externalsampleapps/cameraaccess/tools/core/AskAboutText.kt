@@ -29,6 +29,13 @@ sealed interface AskResult {
 fun interface AskAboutText {
   /** Answers [question] (as the user said it) from [text], or says why it can't. */
   suspend fun answer(question: GlobalCommand.Ask, text: RecentText.Snapshot?): AskResult
+
+  /**
+   * As [answer], with [aside] to speak a short note while the answer is on its way ("Asking
+   * online."). ToolHub calls this one.
+   */
+  suspend fun answer(question: GlobalCommand.Ask, text: RecentText.Snapshot?, aside: (String) -> Unit): AskResult =
+      answer(question, text)
 }
 
 /** The stub: always [AskResult.Unavailable] ("I can't answer questions yet."). */

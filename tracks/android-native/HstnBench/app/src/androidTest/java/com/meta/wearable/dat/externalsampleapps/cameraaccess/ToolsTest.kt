@@ -2,7 +2,7 @@
 //
 // Launches voice-first into the mail reader (a stub) with mock HSTN glasses, then drives everything
 // through the glasses' recogniser: "open the book reader" switches to the book with the same glasses
-// session and stream; the page is read; a question about it goes to the ask seam (not ready yet);
+// session and stream; the page is read; a question about it is answered on the device;
 // "watch for 42" switches to Watch for text with its target and keeps the bookmark; "back to my book"
 // returns. The stream must never drop during the switches. Also: a deep link with a mode, and each
 // stub opens and says it isn't ready yet.
@@ -91,10 +91,11 @@ class ToolsTest {
     val snapshot = hub.recentText.snapshot(ToolId.BOOK)
     assertNotNull(snapshot)
     assertTrue(snapshot!!.fullText.contains("Penang lawyer"))
-    // ...and a question about it reaches AskAboutText (a stub for now).
+    // ...and a question about it reaches AskAboutText (on-device: WordNet has no "Penang lawyer").
+    // The question pauses reading; "carry on" reads on (AskAboutTextTest covers the rest).
     ToolTestKit.say(glasses, "what does Penang lawyer mean")
-    val cantYet = ctx.getString(R.string.tool_ask_unavailable)
-    composeTestRule.waitUntil(timeoutMillis = TIMEOUT) { hub.recentSpeech().contains(cantYet) }
+    composeTestRule.waitUntil(timeoutMillis = TIMEOUT) { hub.recentSpeech().any { it.contains("penang lawyer in my dictionary") } }
+    ToolTestKit.say(glasses, "carry on")
 
     // Wait for a sentence or two to be read, so there's a place to keep.
     composeTestRule.waitUntil(timeoutMillis = READ_TIMEOUT) {
