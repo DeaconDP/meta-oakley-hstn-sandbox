@@ -31,7 +31,7 @@ The phone screen has big yellow buttons (What is this letter?, Read it all / Pau
 
 ## Pipeline
 
-`MailViewModel`: `capturePage` → `ImageCheck`, the book reader's instant check for a covered lens, dark room or nothing in view → `MailOcr` (ML Kit v2, like `MlKitOcr`, but it keeps each line's block plus every word's and character's confidence and box) → `FramingCheck` (no text, blurred, too small, cut off; for a cut-off letter it still summarises and then says which way to turn) → `LetterReader` → `LetterSpeech`. While working it plays a soft tick every 1.5 s and says "Still reading the letter" after 6 s. Every failure is spoken with the error earcon. The full text goes to `hub.recentText` (`clear(MAIL)` for a new letter, `addPassage(key = "letter")`, `setTitle("Letter from …")`, and `setCurrent` while reading) for the ask tool.
+`MailViewModel`: `capturePage` → `ImageCheck`, the book reader's instant check for a covered lens, dark room or nothing in view → `MailOcr` (ML Kit v2, like `MlKitOcr`, but it keeps each line's block plus every word's and character's confidence and box) → `FramingCheck` (no text, blurred, too small, cut off; for a cut-off letter it still summarises and then says which way to turn) → `LetterReader` → `LetterSpeech`. While working it plays a soft tick every 1.5 s and says "Still reading the letter" after 6 s. Every failure is spoken with the error earcon. The text goes to `hub.recentText` (`clear(MAIL)` for a new letter, `addPassage(key = "letter")`, `setTitle("Letter from …")`, and `setCurrent` while reading) for the ask tool.
 
 Pure, JVM-tested files: `LetterModel` (scan, words, characters, the missing-character check), `LetterText` (money, dates, postcodes, spelling out numbers), `LetterLayout`, `LetterReader`, `LetterSpeech`, `MailGrammar`.
 
@@ -76,6 +76,10 @@ Why the money rule checks every character and the boxes: **the first run on the 
   - `neverSaysAFigureThatIsNotOnTheLetter`: the 4 smudged; "how much" (no letter yet, so it photographs first) refuses. The test fails if any figure other than £84.17 is spoken.
 - `ToolsTest` (shared, edited) 3/3 pass on the A26.
 - Speed: from "what is this letter" heard to the summary ready, about 0.5 s on the A26 (ML Kit plus the rules, on a 960x1440 render).
+
+## Integration fix: asking couldn't bypass the money rule (2026-11-06)
+
+Once "ask about the text" was merged, `MailToolTest#askingDoesNotBypassTheMoneyRule` showed a real hole: with the 4 of "£84.17" smudged, the summary correctly refused the amount, but "what did it say about the amount due" read the raw OCR back: "About the amount due: Amount due £8.17." The mail tool was publishing `Letter.fullText`, and the phone screen showed it too, so TalkBack would have read it. Now both get `Letter.safeText`: the same paragraphs, with every unsure amount replaced by "an amount I can't read for sure" (`LetterSpeech.masked`, which `forReading` now builds on). Nothing else changes, so sure amounts and reference numbers stay as printed. That also covers the optional Claude path, which only ever sees the published text. Tests: `LetterReaderTest#theScreenAndTheAskSeamGetTheMaskedText` and the box-check cases (JVM), plus `MailToolTest#answersQuestionsAboutTheLetter` and `#askingDoesNotBypassTheMoneyRule` on the A26.
 
 ## Shared files touched
 

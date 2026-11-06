@@ -76,6 +76,10 @@ data class Letter(
 
   val fullText: String
     get() = paragraphs.joinToString("\n\n")
+
+  /** [fullText] with unsure amounts replaced: what the screen shows and the ask seam gets. */
+  val safeText: String
+    get() = paragraphs.joinToString("\n\n") { LetterSpeech.masked(it, unsureMoney) }
 }
 
 object LetterReader {

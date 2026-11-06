@@ -92,7 +92,7 @@ fun MailScreen(ctx: ToolScreenContext) {
       }
       mail.letter?.let { letter ->
         Text(stringResource(R.string.mail_text_heading), color = Color.White, fontSize = 18.sp, modifier = Modifier.semantics { heading() })
-        Text(letter.fullText, color = Color.White, fontSize = 20.sp, modifier = Modifier.testTag("mail_text"))
+        Text(letter.safeText, color = Color.White, fontSize = 20.sp, modifier = Modifier.testTag("mail_text"))
       }
     }
   }

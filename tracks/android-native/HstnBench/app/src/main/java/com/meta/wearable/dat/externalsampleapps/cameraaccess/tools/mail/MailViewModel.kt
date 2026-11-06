@@ -359,7 +359,7 @@ class MailViewModel(application: Application, hub: ToolHub) :
   private fun publish(read: Letter, fresh: Boolean) {
     val recent = hub.recentText
     if (fresh) recent.clear(ToolId.MAIL)
-    recent.addPassage(ToolId.MAIL, read.fullText, key = "letter")
+    recent.addPassage(ToolId.MAIL, read.safeText, key = "letter")
     recent.setTitle(ToolId.MAIL, read.sender?.let { str(R.string.mail_title, it) })
   }
 

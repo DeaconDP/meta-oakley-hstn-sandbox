@@ -147,10 +147,7 @@ object LetterSpeech {
    * every amount that couldn't be read for sure replaced by [NOT_SURE_FIGURE].
    */
   fun forReading(paragraph: String, unsureMoney: Set<String>): String {
-    var t = paragraph
-    for (tok in LetterText.money(paragraph).reversed()) {
-      if (tok.money == null || tok.raw in unsureMoney) t = t.replaceRange(tok.range, NOT_SURE_FIGURE)
-    }
+    var t = masked(paragraph, unsureMoney)
     // Account and reference numbers, digit by digit ("8842 1937 55" isn't "eight thousand...").
     t = LetterReader.REFERENCE.replace(t) { m ->
       val value = m.groups[2]!!
@@ -158,6 +155,20 @@ object LetterSpeech {
       else m.value.substring(0, value.range.first - m.range.first) + LetterText.spellOut(value.value)
     }
     return LetterText.forSpeech(t)
+  }
+
+  /**
+   * [paragraph] with every amount that couldn't be read for sure replaced by [NOT_SURE_FIGURE] and
+   * nothing else changed. Used for everything that isn't speech but still reaches the user: the
+   * screen (and so TalkBack) and the text handed to "ask about the text", so asking can't bypass
+   * the money rule.
+   */
+  fun masked(paragraph: String, unsureMoney: Set<String>): String {
+    var t = paragraph
+    for (tok in LetterText.money(paragraph).reversed()) {
+      if (tok.money == null || tok.raw in unsureMoney) t = t.replaceRange(tok.range, NOT_SURE_FIGURE)
+    }
+    return t
   }
 
   private fun count(n: Int, word: String): String = if (n == 1) "one $word" else "$n ${word}s"

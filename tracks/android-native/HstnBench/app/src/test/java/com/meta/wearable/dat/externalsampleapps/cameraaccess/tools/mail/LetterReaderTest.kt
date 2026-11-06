@@ -231,6 +231,23 @@ class LetterReaderTest {
     assertEquals(AmountDue.Unsure, amount(line(stretched)))
     assertEquals(AmountDue.Unsure, amount(line(gap)))
     assertEquals(AmountDue.Unsure, amount(line(wideDot)))
+    // What the screen shows and "ask about the text" searches can't carry the wrong figure either.
+    fun safe(l: LetterLine) = LetterReader.read(listOf(LetterScan(960, 1440, listOf(l)))).safeText
+    assertTrue(safe(line(normal)), safe(line(normal)).contains("£8.17"))
+    for (b in listOf(stretched, gap, wideDot)) {
+      assertFalse(safe(line(b)), safe(line(b)).contains("£8.17"))
+      assertTrue(safe(line(b)), safe(line(b)).contains(LetterSpeech.NOT_SURE_FIGURE))
+    }
+  }
+
+  @Test
+  fun theScreenAndTheAskSeamGetTheMaskedText() {
+    val l = read(LetterFixtures.utilityBill(amountLow = mapOf(2 to 0.3f)))
+    assertFalse(l.safeText, l.safeText.contains("£84.17"))
+    assertTrue(l.safeText, l.safeText.contains("Amount due an amount I can't read for sure"))
+    // Only the unsure amount is touched: sure ones and reference numbers stay as printed.
+    assertTrue(l.safeText, l.safeText.contains("£12.30"))
+    assertEquals(read(LetterFixtures.utilityBill()).fullText, read(LetterFixtures.utilityBill()).safeText)
   }
 
   @Test

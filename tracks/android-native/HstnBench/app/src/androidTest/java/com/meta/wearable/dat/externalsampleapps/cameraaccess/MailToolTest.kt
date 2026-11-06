@@ -111,6 +111,43 @@ class MailToolTest {
     assertTrue(read.indexOf("Standing charge") < read.indexOf("Amount due £84.17"))
   }
 
+  /** Mail and "ask about the text" were built apart: questions must work on a letter too. */
+  @Test
+  fun answersQuestionsAboutTheLetter() {
+    val (glasses, hub) = open(LetterRenderer.utilityBill())
+    ToolTestKit.say(glasses, "what is this letter")
+    summaryOf(hub)
+
+    ToolTestKit.say(glasses, "what did it say about the standing charge")
+    compose.waitUntil(TIMEOUT) { hub.recentSpeech().any { it.startsWith("About the standing charge") } }
+    val found = hub.recentSpeech().last { it.startsWith("About the standing charge") }
+    Log.i(TAG, "find: $found")
+    assertTrue(found, found.contains("12.30"))
+
+    ToolTestKit.say(glasses, "what does sincerely mean")
+    compose.waitUntil(TIMEOUT) { hub.recentSpeech().any { it.startsWith("Sincerely, adverb") } }
+
+    ToolTestKit.say(glasses, "who is Sam Lee")
+    compose.waitUntil(TIMEOUT) { hub.recentSpeech().any { it.contains("Sam Lee") && it.contains("mentioned") } }
+    Log.i(TAG, "who: " + hub.recentSpeech().last { it.contains("mentioned") })
+  }
+
+  /** The money rule can't be bypassed by asking: a smudged amount must not come back through search. */
+  @Test
+  fun askingDoesNotBypassTheMoneyRule() {
+    val (glasses, hub) = open(LetterRenderer.utilityBill(smudgeDigit = 2))
+    ToolTestKit.say(glasses, "what is this letter")
+    summaryOf(hub)
+    ToolTestKit.say(glasses, "what did it say about the amount due")
+    compose.waitUntil(TIMEOUT) {
+      hub.recentSpeech().any { it.startsWith("About the amount due") || it.startsWith("I didn't find anything") }
+    }
+    val answer = hub.recentSpeech().last { it.startsWith("About the amount due") || it.startsWith("I didn't find anything") }
+    Log.i(TAG, "ask amount: $answer")
+    val figures = Regex("£[0-9][0-9,]*(?:\\.[0-9]{2})?").findAll(answer).map { it.value }.toList()
+    assertTrue("ask said a figure not on the letter: $answer", figures.all { it == "£84.17" })
+  }
+
   @Test
   fun refusesConflictingAmounts() {
     val (glasses, hub) = open(LetterRenderer.utilityBill(secondTotal = "£48.17"))
