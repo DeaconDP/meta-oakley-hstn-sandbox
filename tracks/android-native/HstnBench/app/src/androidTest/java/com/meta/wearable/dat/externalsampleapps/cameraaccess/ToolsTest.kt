@@ -145,6 +145,7 @@ class ToolsTest {
       phrase?.let { ToolTestKit.say(glasses, it) }
       waitFor("tool_screen_${id.id}")
       composeTestRule.waitUntil(timeoutMillis = TIMEOUT) { ToolTestKit.text(composeTestRule, "tool_voice_mic") == onGlasses }
+      if (id == ToolId.WATCH) continue // built: WatchForTextTest covers it
       val name = ctx.getString(ToolRegistryNames.of(id))
       val notReady = ctx.getString(R.string.tool_not_ready, name)
       composeTestRule.waitUntil(timeoutMillis = TIMEOUT) { ToolTestKit.text(composeTestRule, "tool_status") == notReady }
