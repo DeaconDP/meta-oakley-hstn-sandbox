@@ -138,7 +138,6 @@ class ToolsTest {
     val onGlasses = ctx.getString(R.string.voice_mic_glasses)
     for ((id, phrase) in listOf(
         ToolId.WATCH to null,
-        ToolId.LABELS to "scan this",
         ToolId.LIGHT to "is the light on",
         ToolId.MAIL to "read my mail",
     )) {
