@@ -8,7 +8,7 @@
 // "Quiet" means quiet on both sides: while the reader is busy (speaking, capturing, retrying) the
 // caller reports [busy], which restarts the gap without using up a reminder.
 
-package com.meta.wearable.dat.externalsampleapps.cameraaccess.book
+package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core
 
 class IdleNudge(private val gapsMs: List<Long> = listOf(30_000L, 60_000L, 120_000L)) {
 

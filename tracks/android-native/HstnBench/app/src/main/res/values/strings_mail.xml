@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mail reader (tools/mail/). Only this tool uses these; its feature work edits this file only. -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="mail_name" description="Spoken and shown name of the tool">Mail reader</string>
+    <string name="mail_launcher_label" description="Launcher name, so the user can say Open Mail Reader">Mail Reader</string>
+    <string name="mail_button" description="Button on the camera screen that opens the tool">Mail</string>
+    <string name="mail_button_description" description="Accessibility description of that button">Open mail reader. Says who a letter is from and what it\'s about, then reads it.</string>
+    <string name="mail_help" description="Spoken list of what can be said in this tool (stub: update when the tool is built)">Mail reader isn\'t ready yet. You can say: open the book reader, read my mail, watch for, then a word, scan this, is the light on, battery, or close.</string>
+</resources>

@@ -11,7 +11,9 @@
 // Drives the camera screen by exercising the SDK's camera lifecycle as explicit steps: create and
 // start a DeviceSession, add and start a Stream, capture a photo or record video, stop the stream,
 // end the session. Owns the screen-scoped pieces — the DeviceSession, its Stream, the on-device
-// HEVC preview decoder, and the passthrough video recorder. The UI binds to the SDK's own
+// HEVC preview decoder, and the passthrough video recorder. It is also the tools' camera
+// (PageCamera): in-stream photos, frame sizes for page-turn detection, and decoded frames for
+// continuous tools (a second decoder into an ImageReader, FrameGrabber, only while collected). The UI binds to the SDK's own
 // DeviceSessionState / StreamState so the sample shows the real state machine.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.camera
@@ -44,9 +46,10 @@ import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bench.BenchClock
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bench.TtsReply
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.CameraLink
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.PageCamera
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.StreamFrameSize
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.CameraLink
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.PageCamera
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.StreamFrameSize
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.FrameGrabber
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.AudioInputHandler
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.HevcDecoder
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.HevcParameterSetCollector
@@ -63,7 +66,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -74,6 +83,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -89,6 +99,7 @@ class CameraViewModel(
     private const val FRAME_RATE = 24
     private const val KEYFRAME_WAIT_STEP_MS = 25L
     private const val KEYFRAME_WAIT_MAX_MS = 500L
+    private const val FRAME_FALLBACK_MS = 4_000L
   }
 
   private class RecorderFrame(
@@ -168,6 +179,13 @@ class CameraViewModel(
   override val deviceSession: DeviceSession?
     get() = session
   private val pageCaptureMutex = Mutex()
+
+  // Decoded frames for tools (PageCamera.frames). One FrameGrabber, run while any collector wants
+  // frames, converting at the highest rate any of them asked for. Guarded by decoderLock.
+  private val frameDemand = ConcurrentHashMap<Any, Float>()
+  @Volatile private var frameGrabber: FrameGrabber? = null
+  private val grabberFrames = MutableStateFlow<FrameGrabber.Frame?>(null)
+  private var grabberJob: Job? = null
 
   // Voice-first launch: bring the stream up as soon as the session starts, without dialogs.
   private var autoStream = false
@@ -478,6 +496,8 @@ class CameraViewModel(
 
     _frameSizes.tryEmit(StreamFrameSize(byteArray.size, videoFrame.isCodecConfig))
 
+    feedFrameGrabber(byteArray, presentationTimeUs, width, height)
+
     // Hand off to the recorder thread; never blocks the preview.
     if (videoRecorder.isRecording.value) {
       recorderChannel.trySend(
@@ -519,6 +539,7 @@ class CameraViewModel(
     synchronized(decoderLock) {
       hevcDecoder?.stop()
       hevcDecoder = null
+      stopFrameGrabberLocked()
     }
     csdCollector.reset()
     StreamingService.stop(getApplication())
@@ -644,6 +665,97 @@ class CameraViewModel(
             .onFailure { error, _ -> Log.e(TAG, "Book page capture failed: ${error.description}") }
         bitmap
       }
+
+  // MARK: - Decoded frames (continuous tools)
+
+  /** Runs on the frame thread for every compressed frame. Starts/stops the grabber with demand. */
+  private fun feedFrameGrabber(data: ByteArray, presentationTimeUs: Long, width: Int, height: Int) {
+    synchronized(decoderLock) {
+      if (frameDemand.isEmpty()) {
+        stopFrameGrabberLocked()
+        return
+      }
+      val grabber =
+          frameGrabber
+              ?: FrameGrabber(width, height).also { g ->
+                g.start(csdCollector.complete())
+                frameGrabber = g
+                grabberJob = viewModelScope.launch { g.latest.collect { grabberFrames.value = it } }
+                Log.i(TAG, "frame grabber started ${width}x$height")
+              }
+      grabber.maxFps = frameDemand.values.maxOrNull() ?: 2f
+      grabber.feed(data, presentationTimeUs)
+    }
+  }
+
+  private fun stopFrameGrabberLocked() {
+    val g = frameGrabber ?: return
+    frameGrabber = null
+    grabberJob?.cancel()
+    grabberJob = null
+    grabberFrames.value = null
+    Log.i(TAG, "frame grabber stopped decoded=${g.decodedCount} converted=${g.convertedCount} convertMs=${g.convertMs}")
+    g.stop()
+  }
+
+  /** Grabber counters (decoded, converted, ms converting), for tests and the cost measurement. */
+  fun frameGrabberStats(): Triple<Int, Int, Long>? =
+      frameGrabber?.let { Triple(it.decodedCount, it.convertedCount, it.convertMs) }
+
+  override fun frames(maxFps: Float): Flow<Bitmap> = channelFlow {
+    val token = Any()
+    val gapMs = (1000f / maxFps.coerceIn(0.1f, 30f)).toLong()
+    frameDemand[token] = maxFps
+    try {
+      // Decoded frames, throttled per collector.
+      val decoded = launch {
+        var lastAt = 0L
+        grabberFrames.filterNotNull().collect { frame ->
+          if (frame.atMs - lastAt >= gapMs - 5) {
+            lastAt = frame.atMs
+            send(frame.bitmap)
+          }
+        }
+      }
+      // Fallback: streaming, but no decoded frame for a while (no decoder that can write to an
+      // ImageReader on this phone): in-stream photos, at most one a second.
+      launch {
+        while (true) {
+          isStreaming.first { it }
+          val got = withTimeoutOrNull(FRAME_FALLBACK_MS) { grabberFrames.filterNotNull().first() }
+          if (got != null) break
+          if (!isStreaming.value) continue
+          Log.w(TAG, "no decoded frames after ${FRAME_FALLBACK_MS}ms; falling back to capturePhoto")
+          decoded.cancel()
+          val fallbackGap = maxOf(gapMs, 1000L)
+          while (true) {
+            val started = System.currentTimeMillis()
+            if (isStreaming.value) capturePage()?.let { send(it) }
+            delay((fallbackGap - (System.currentTimeMillis() - started)).coerceAtLeast(50L))
+          }
+        }
+      }
+      awaitCancellation()
+    } finally {
+      frameDemand.remove(token)
+    }
+  }
+
+  override suspend fun latestFrame(maxAgeMs: Long, timeoutMs: Long): Bitmap? {
+    if (!_uiState.value.isStreaming) return null
+    val now = android.os.SystemClock.elapsedRealtime()
+    grabberFrames.value?.takeIf { now - it.atMs <= maxAgeMs }?.let { return it.bitmap }
+    val token = Any()
+    frameDemand[token] = 2f
+    try {
+      withTimeoutOrNull(timeoutMs) {
+        grabberFrames.filterNotNull().first { it.atMs >= now }
+      }?.let { return it.bitmap }
+    } finally {
+      frameDemand.remove(token)
+    }
+    return capturePage()
+  }
 
   // MARK: - Recording
 

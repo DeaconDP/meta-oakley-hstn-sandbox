@@ -52,6 +52,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- hstnbench://<tool id> opens that tool (book, mail, watch, labels, light). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -66,6 +67,54 @@
             android:name=".BookReaderLauncher"
             android:exported="true"
             android:label="@string/book_reader_launcher_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- "Hey Google, open Mail Reader": straight into that tool (ToolLaunch.LAUNCHER_ALIASES). -->
+        <activity-alias
+            android:name=".MailReaderLauncher"
+            android:exported="true"
+            android:label="@string/mail_launcher_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- "Hey Google, open Watch For Text": straight into that tool (ToolLaunch.LAUNCHER_ALIASES). -->
+        <activity-alias
+            android:name=".WatchForTextLauncher"
+            android:exported="true"
+            android:label="@string/watch_launcher_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- "Hey Google, open Label Reader": straight into that tool (ToolLaunch.LAUNCHER_ALIASES). -->
+        <activity-alias
+            android:name=".LabelReaderLauncher"
+            android:exported="true"
+            android:label="@string/labels_launcher_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- "Hey Google, open Light Detector": straight into that tool (ToolLaunch.LAUNCHER_ALIASES). -->
+        <activity-alias
+            android:name=".LightDetectorLauncher"
+            android:exported="true"
+            android:label="@string/light_launcher_label"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

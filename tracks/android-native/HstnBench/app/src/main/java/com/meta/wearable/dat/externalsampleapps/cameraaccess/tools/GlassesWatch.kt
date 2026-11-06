@@ -1,11 +1,11 @@
-// ReaderWatch - live snapshots of the glasses and the phone for HealthMonitor
+// GlassesWatch - live snapshots of the glasses and the phone for HealthMonitor
 //
 // Glasses: DAT device metadata (link, worn, battery, charging, thermal, compatibility) for every
 // linked pair, preferring the one that's connected and worn (as Meta's BirdSpotter sample does).
 // Folding the glasses has no signal of its own; it shows up as the link dropping.
 // Phone: Bluetooth on/off and battery, from system broadcasts.
 
-package com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader
+package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
@@ -21,9 +21,9 @@ import com.meta.wearable.dat.core.types.DeviceCompatibility
 import com.meta.wearable.dat.core.types.DonState
 import com.meta.wearable.dat.core.types.LinkState
 import com.meta.wearable.dat.core.types.ThermalLevel
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.GlassesSnapshot
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.Heat
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.PhoneSnapshot
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlassesSnapshot
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.Heat
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.PhoneSnapshot
 import com.meta.wearable.dat.mockdevice.MockDeviceKit
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
@@ -34,7 +34,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 
-class ReaderWatch(context: Context) {
+class GlassesWatch(context: Context) {
 
   private val appContext = context.applicationContext
 

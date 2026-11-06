@@ -18,7 +18,7 @@
 // A photo capture puts the glasses' recogniser down (seen in Meta's BirdSpotter sample), and the
 // reader captures a photo every page, so GlassesSpeechInput restarts it whenever it stops on its own.
 
-package com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader
+package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools
 
 import android.content.Context
 import android.content.Intent

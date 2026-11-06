@@ -1,11 +1,13 @@
-// PageCamera - what the book reader needs from the glasses camera
+// PageCamera - what the tools need from the glasses camera
 //
-// CameraViewModel owns the DAT session and stream; the reader only needs a still for OCR, a cheap
-// per-frame signal for page-turn detection, the session (to attach on-glasses speech recognition),
-// and a way to bring the stream up with no taps when the app is launched straight into the reader.
-// Keeping it to this interface leaves the reader independent of the camera screen's lifecycle code.
+// CameraViewModel owns the DAT session and stream; a tool only needs a still for OCR, a cheap
+// per-frame signal for page-turn detection, decoded stream frames for tools that look continuously
+// (watch for text, light and colour), the session (to attach on-glasses speech recognition), and a
+// way to bring the stream up with no taps when the app is launched straight into a tool. Keeping it
+// to this interface leaves the tools independent of the camera screen's lifecycle code. (It started
+// as the book reader's seam, hence the name.)
 
-package com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader
+package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools
 
 import android.graphics.Bitmap
 import com.meta.wearable.dat.core.session.DeviceSession
@@ -55,6 +57,24 @@ interface PageCamera {
    * not streaming or the capture failed. Doesn't open the photo preview.
    */
   suspend fun capturePage(): Bitmap?
+
+  /**
+   * Decoded stream frames, at most [maxFps] per second, for as long as the flow is collected.
+   * ARGB_8888 at the stream's own size (the mock streams its feed video's size, 540x960 for
+   * plant.mp4; the real HSTN's MEDIUM stream is smaller than the 960x1440 in-stream photo). A second
+   * HEVC decoder writes into an ImageReader only while someone collects, and only [maxFps] frames a
+   * second are converted, so the cost is one decode plus a few conversions (notes/tools-layer.md has
+   * the measured cost). If decoding isn't possible (no frame within a few seconds of streaming), it
+   * falls back to capturePage() at most once a second. Emits nothing while not streaming.
+   * Each emitted Bitmap is new; the receiver may keep it.
+   */
+  fun frames(maxFps: Float = 2f): Flow<Bitmap>
+
+  /**
+   * The newest decoded frame if one is under [maxAgeMs] old; otherwise decodes until one arrives
+   * (up to [timeoutMs]), and as a last resort captures a photo (capturePage). Null if not streaming.
+   */
+  suspend fun latestFrame(maxAgeMs: Long = 1_000L, timeoutMs: Long = 2_500L): Bitmap?
 
   /**
    * Starts the session if needed, then the stream, with no confirmation dialogs: a blind user

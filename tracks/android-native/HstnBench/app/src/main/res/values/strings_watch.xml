@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Watch for text (tools/watch/). Only this tool uses these; its feature work edits this file only. -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="watch_name" description="Spoken and shown name of the tool">Watch for text</string>
+    <string name="watch_launcher_label" description="Launcher name, so the user can say Open Watch For Text">Watch For Text</string>
+    <string name="watch_button" description="Button on the camera screen that opens the tool">Watch</string>
+    <string name="watch_button_description" description="Accessibility description of that button">Open watch for text. Tells you when it sees a word or number you ask for.</string>
+    <string name="watch_help" description="Spoken list of what can be said in this tool (stub: update when the tool is built)">Watch for text isn\'t ready yet. You can say: open the book reader, read my mail, watch for, then a word, scan this, is the light on, battery, or close.</string>
+</resources>

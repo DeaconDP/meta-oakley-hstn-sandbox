@@ -1,4 +1,4 @@
-// BookSpeaker - chunked TTS for the book reader
+// ToolSpeaker - chunked TTS for every tool (it started as the book reader's BookSpeaker)
 //
 // Same idea as bench/TtsReply (platform TextToSpeech, route follows the system, so the glasses'
 // A2DP speakers when connected), but built for long reading: one chunk per utterance so pause,
@@ -10,7 +10,7 @@
 // off by stop() can't advance the reader. If the engine fails to initialise, utterances "finish"
 // immediately so the reading loop (and the on-screen text) still moves; the failure is reported.
 
-package com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader
+package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -22,7 +22,7 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.bench.BenchClock
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
-class BookSpeaker(context: Context, private val listener: Listener) {
+class ToolSpeaker(context: Context, private val listener: Listener) {
 
   interface Listener {
     /** [tag] is what the caller passed to [speak]. Called on the main thread. */

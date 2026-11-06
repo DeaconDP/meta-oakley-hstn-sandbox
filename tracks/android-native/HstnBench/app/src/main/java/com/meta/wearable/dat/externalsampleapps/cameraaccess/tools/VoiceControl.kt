@@ -4,7 +4,7 @@
 // recogniser if the glasses can't: no session, permission refused, speech won't attach, or the
 // glasses report no recogniser, either at start or later. See VoiceInput.kt.
 
-package com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader
+package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools
 
 import android.content.Context
 import android.util.Log

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Light detector (tools/light/). Only this tool uses these; its feature work edits this file only. -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="light_name" description="Spoken and shown name of the tool">Light detector</string>
+    <string name="light_launcher_label" description="Launcher name, so the user can say Open Light Detector">Light Detector</string>
+    <string name="light_button" description="Button on the camera screen that opens the tool">Light</string>
+    <string name="light_button_description" description="Accessibility description of that button">Open light detector. Plays a tone that rises with brightness, and names colours.</string>
+    <string name="light_help" description="Spoken list of what can be said in this tool (stub: update when the tool is built)">Light detector isn\'t ready yet. You can say: open the book reader, read my mail, watch for, then a word, scan this, is the light on, battery, or close.</string>
+</resources>

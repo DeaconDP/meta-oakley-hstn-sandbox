@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared by every tool (tools/ToolHub, ToolViewModel, ToolScaffold). Each tool's own strings are in
+     strings_<id>.xml; the book reader's are still in strings.xml. -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="tool_switched" description="Spoken when switching to another tool by voice; %1$s is the tool name, e.g. Mail reader"><xliff:g id="tool">%1$s</xliff:g>.</string>
+    <string name="tool_connecting" description="Spoken on voice-first launch while connecting; %1$s is the tool name"><xliff:g id="tool">%1$s</xliff:g>. Connecting to your glasses.</string>
+    <string name="tool_reconnecting" description="Spoken when reconnecting to use the camera">Connecting to your glasses.</string>
+    <string name="tool_ready" description="Spoken once the glasses are connected on voice-first launch">Your glasses are ready. Say help at any time.</string>
+    <string name="tool_welcome" description="Spoken when a tool opens with the glasses already streaming; %1$s is the tool name"><xliff:g id="tool">%1$s</xliff:g>. Say help at any time.</string>
+    <string name="tool_stream_lost" description="Spoken when the glasses camera stops">The glasses camera stopped. I\'ll reconnect when the glasses are back.</string>
+    <string name="tool_paused_by_glasses" description="Spoken when the glasses paused the camera">The glasses paused the camera. Tap the side of the glasses to carry on.</string>
+    <string name="tool_camera_back" description="Spoken when the glasses camera comes back">The glasses camera is back.</string>
+    <string name="tool_camera_denied" description="Spoken when camera permission was refused">Camera access wasn\'t allowed, so I can\'t see anything. Close and open me again to ask again.</string>
+    <string name="tool_goodbye" description="Spoken when a tool closes by voice">Goodbye.</string>
+    <string name="tool_paused" description="Spoken after pausing by voice">Paused.</string>
+    <string name="tool_removed" description="Glasses taken off, generic tools">You took your glasses off, so I\'ve paused. Put them on to carry on.</string>
+    <string name="tool_disconnected" description="Glasses disconnected, generic tools">Your glasses disconnected. Check they\'re on, unfolded and nearby.</string>
+    <string name="tool_worn_again" description="Glasses put back on, generic tools">Glasses on.</string>
+    <string name="tool_too_hot" description="Glasses too hot, generic tools">Your glasses are too hot, so I\'ve paused. Take them off for a few minutes to cool down.</string>
+    <string name="tool_needs_setup" description="Spoken on voice-first launch when the app isn't registered with Meta AI; %1$s is the tool name"><xliff:g id="tool">%1$s</xliff:g> needs a one-time setup with the Meta AI app before it can use your glasses. TalkBack works on this screen, or ask someone to help.</string>
+    <string name="tool_not_ready" description="Spoken by a tool that isn't built yet; %1$s is the tool name"><xliff:g id="tool">%1$s</xliff:g> isn\'t ready yet. You can say open the book reader, or close.</string>
+    <!-- Ask about the text (AskAboutText results) -->
+    <string name="tool_ask_unavailable" description="Spoken when questions about the text can't be answered (not built yet)">I can\'t answer questions yet.</string>
+    <string name="tool_ask_not_in_text" description="Spoken when the text doesn't answer the question">The text doesn\'t say.</string>
+    <string name="tool_ask_nothing_read" description="Spoken when a question is asked before anything was read">I haven\'t read anything yet, so I can\'t answer that.</string>
+    <string name="tool_ask_failed" description="Spoken when answering a question failed">Sorry, I couldn\'t answer that just now.</string>
+    <!-- Screen -->
+    <string name="tool_close" description="Close button on a tool screen; %1$s is the tool name">Close <xliff:g id="tool">%1$s</xliff:g></string>
+    <string name="tool_status_idle" description="Tool status line before anything happens">Ready</string>
+    <string name="tools_heading" description="Heading above the tool buttons on the camera screen">Tools</string>
+</resources>

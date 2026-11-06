@@ -6,7 +6,7 @@
 // required. HealthMonitor gets snapshots of the world and returns only the edges: no repeats while a
 // condition holds, and battery warnings fire once per threshold until the battery recovers.
 
-package com.meta.wearable.dat.externalsampleapps.cameraaccess.book
+package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core
 
 enum class Heat {
   NORMAL,
