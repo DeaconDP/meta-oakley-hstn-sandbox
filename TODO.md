@@ -34,7 +34,7 @@
 - [ ] Low-vision magnifier view on the phone
 - [x] Shared tools layer: lift connect/narrate, voice, pitfalls and the idle nudge out of BookReaderViewModel; open a tool by launcher, deep link or voice; latest stream frame for continuous tools (2026-11-06, notes/tools-layer.md: ToolHub, global grammar + switching by voice, five tools registered with stubs, ask-about-the-text seam, PageCamera.frames (preview copy, decoder fallback), ToolTestKit; book-reader hyphen failure on the A26 fixed)
 - [ ] Mail reader (sender, recipient, subject, amount and deadline; read all; abstain on unsure amounts)
-- [ ] Watch for text (continuous OCR, fuzzy words / exact numbers, earcon + left/ahead/right)
+- [x] Watch for text (continuous OCR, fuzzy words / exact numbers, earcon + left/ahead/right) (2026-11-06, notes/watch-for-text.md: two-of-four-frame confirmation, gone/reappear, near misses, alive tick, covered/dark/slow spoken; ML Kit 61-64 ms per 480x864 frame on the A26. Real HSTN not tried)
 - [ ] Labels and barcodes (on-device barcode, label read-out, Open Food Facts on request, no medicine doses)
 - [ ] Ask about the text (book/mail text only to Claude Haiku 5.5 on request, short spoken answers, "the text doesn't say")
 - [ ] Light and colour (brightness tone, colour naming with hedging)
