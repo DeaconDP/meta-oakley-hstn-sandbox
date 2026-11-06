@@ -19,7 +19,6 @@ object AskWording {
   const val NOTHING_TO_UNDO = "Say the word again, or say spell, then the word."
   const val NOT_READY = "The dictionary is still loading. Ask me again in a moment."
   const val CARRY_ON_HINT = "Say carry on to keep reading."
-  const val NOTHING_READ = "I haven't read anything yet. Once I've read something, you can ask me about it."
 
   private val POS_NAMES = mapOf('n' to "noun", 'v' to "verb", 'a' to "adjective", 'r' to "adverb")
 
