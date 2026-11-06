@@ -3,7 +3,7 @@
 - [ ] Pair HSTN with the Meta AI app and turn on Developer Mode
 - [ ] Register an app in the Wearables Developer Center and get the application ID
 - [x] Build and run sdks/meta-wearables-dat-android/samples/CameraAccess against the Mock Device Kit (2026-10-21, emulator `HSTN_Mock_API34`; see notes/baseline-android-mock.md)
-- [ ] Get an Android 12+ (API 31+) phone for real-HSTN testing. The USB Galaxy S7 is Android 8.0 and can't install the sample
+- [ ] Get an Android 12+ (API 31+) phone for real-HSTN testing. The USB Galaxy S7 is Android 8.0 and can't install the sample. (2026-11-06: a Galaxy A26, SM-A266B, Android 16, is on wireless adb and runs the Mock Device Kit tests; Meta AI isn't installed on it yet)
 - [ ] Run CameraAccess against the real HSTN (needs both items above)
 - [x] Step-2 benchmark in android-native on the mock (2026-10-22, notes/bench-android-native.md)
 - [ ] Re-run `tracks/android-native/bench.sh` on a real phone + HSTN and confirm `route=a2dp`
@@ -32,6 +32,12 @@
 - [ ] "Hey Meta, start Book Reader" voice invocation (Experimental; needs Developer Center approval)
 - [ ] Look-closer demo with "can't tell" behaviour and on-device face blur before upload
 - [ ] Low-vision magnifier view on the phone
+- [ ] Shared tools layer: lift connect/narrate, voice, pitfalls and the idle nudge out of BookReaderViewModel; open a tool by launcher, deep link or voice; latest stream frame for continuous tools
+- [ ] Mail reader (sender, recipient, subject, amount and deadline; read all; abstain on unsure amounts)
+- [ ] Watch for text (continuous OCR, fuzzy words / exact numbers, earcon + left/ahead/right)
+- [ ] Labels and barcodes (on-device barcode, label read-out, Open Food Facts on request, no medicine doses)
+- [ ] Ask about the text (book/mail text only to Claude Haiku 5.5 on request, short spoken answers, "the text doesn't say")
+- [ ] Light and colour (brightness tone, colour naming with hedging)
 - [ ] Offline eval harness: Mock Device Kit `setCameraFeed`/`setCapturedImage` + VizWiz/TextVQA subset, replay mode for CI
 - [ ] TalkBack pass + WCAG 2.2 AA check of the companion UI
 - [ ] Accessible onboarding and launch: spoken handoffs around the Meta AI registration and permission flows, speaker and camera check, practice-based tutorial, launch status line, spoken recovery messages, and App Intents / Back Tap / Magic Tap triggers (notes/a11y-onboarding.md)
