@@ -59,14 +59,13 @@ interface PageCamera {
   suspend fun capturePage(): Bitmap?
 
   /**
-   * Decoded stream frames, at most [maxFps] per second, for as long as the flow is collected.
-   * ARGB_8888 at the stream's own size (the mock streams its feed video's size, 540x960 for
-   * plant.mp4; the real HSTN's MEDIUM stream is smaller than the 960x1440 in-stream photo). A second
-   * HEVC decoder writes into an ImageReader only while someone collects, and only [maxFps] frames a
-   * second are converted, so the cost is one decode plus a few conversions (notes/tools-layer.md has
-   * the measured cost). If decoding isn't possible (no frame within a few seconds of streaming), it
-   * falls back to capturePage() at most once a second. Emits nothing while not streaming.
-   * Each emitted Bitmap is new; the receiver may keep it.
+   * Stream frames, at most [maxFps] per second, for as long as the flow is collected. ARGB_8888 at
+   * the decoded picture's size (the mock streams its feed video's size: 540x960 for plant.mp4,
+   * 480x864 for MockVideo feeds). Normally copied off the preview Surface (PixelCopy: no extra
+   * decode); with no preview Surface (screen off, app in the background) a second, hardware HEVC
+   * decoder runs only while collected; if neither works, capturePage() at most once a second.
+   * Measured cost: notes/tools-layer.md > Frames. Emits nothing while not streaming. Each Bitmap is
+   * new; the receiver may keep it.
    */
   fun frames(maxFps: Float = 2f): Flow<Bitmap>
 

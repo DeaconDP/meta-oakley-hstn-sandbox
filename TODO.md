@@ -32,7 +32,7 @@
 - [ ] "Hey Meta, start Book Reader" voice invocation (Experimental; needs Developer Center approval)
 - [ ] Look-closer demo with "can't tell" behaviour and on-device face blur before upload
 - [ ] Low-vision magnifier view on the phone
-- [ ] Shared tools layer: lift connect/narrate, voice, pitfalls and the idle nudge out of BookReaderViewModel; open a tool by launcher, deep link or voice; latest stream frame for continuous tools
+- [x] Shared tools layer: lift connect/narrate, voice, pitfalls and the idle nudge out of BookReaderViewModel; open a tool by launcher, deep link or voice; latest stream frame for continuous tools (2026-11-06, notes/tools-layer.md: ToolHub, global grammar + switching by voice, five tools registered with stubs, ask-about-the-text seam, PageCamera.frames (preview copy, decoder fallback), ToolTestKit; book-reader hyphen failure on the A26 fixed)
 - [ ] Mail reader (sender, recipient, subject, amount and deadline; read all; abstain on unsure amounts)
 - [ ] Watch for text (continuous OCR, fuzzy words / exact numbers, earcon + left/ahead/right)
 - [ ] Labels and barcodes (on-device barcode, label read-out, Open Food Facts on request, no medicine doses)

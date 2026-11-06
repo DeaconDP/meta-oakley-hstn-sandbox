@@ -167,11 +167,22 @@ suspend fun latestFrame(maxAgeMs: Long = 1_000L, timeoutMs: Long = 2_500L): Bitm
 suspend fun capturePage(): Bitmap?
 ```
 
-- How: `CameraViewModel` feeds every compressed HEVC frame to a `FrameGrabber` (a second `HevcDecoder` rendering into an `ImageReader`, YUV_420_888, converted to ARGB in Kotlin) only while at least one collector exists; the last collector leaving stops it. When the stream's keyframes come at least as often as you asked for frames (every 0.4 s on the mock), only keyframes are decoded; otherwise every frame is. Delivery is paced on average, so 2 fps means 2 frames a second even if frames arrive every 400 ms.
-- Frame size is the **video's** size: 480x864 for MockVideo feeds, 540x960 for plant.mp4. (DAT's `VideoFrame.width/height` says 504x896, the MEDIUM preset, for both; the decoder output is what you get.) The real HSTN stream size is unverified.
-- Fallback: if no decoded frame arrives within 4 s of streaming (a phone whose decoder can't write to an ImageReader), `frames()` switches to `capturePage()` at most once a second. Not exercised on the A26, where decoding works.
+- How, in order of preference (`CameraViewModel.frames`):
+  1. **Preview copy.** A tool screen sits over the live preview, whose decoder already renders every frame to a Surface. `PixelCopy` copies the frame on screen into a Bitmap (a GPU copy) at the decoded picture's size, once per tick. No second decode. A single missed copy is retried for 1.5 s before falling back.
+  2. **Decoder (no preview Surface: screen off, app in the background).** `FrameGrabber` runs a second `HevcDecoder`, the phone's hardware decoder if there is one (`c2.exynos.hevc.decoder` on the A26), with ByteBuffer output (`getOutputImage`, YUV converted to ARGB in Kotlin, ~11 ms per frame), only while someone collects. When keyframes come at least as often as frames are wanted (every 0.4 s on the mock), only keyframes are decoded. The last collector leaving stops it. Force this path in a test with `camera.previewCopyEnabled = false`.
+  3. **Photos.** If neither gives a frame for 4 s while streaming, `capturePage()` at most once a second. Not exercised on the A26.
+  Delivery is paced on average, so 2 fps means 2 frames a second.
+- Frame size is the **video's** size: 480x864 for MockVideo feeds, 540x960 for plant.mp4. DAT's `VideoFrame.width/height` says 504x896 (the MEDIUM preset) for both, and an ImageReader sized from that crashed the hardware decoder (SIGSEGV), which is why the decoder path reads the codec's own output images. The real HSTN stream size is unverified.
 - Collect on `Dispatchers.Default` and do your work there; each Bitmap is new and yours. Don't hold more than you need (about 2 MB each).
-- Phone cost (Galaxy A26, mock HSTN, plant.mp4 at 30 fps; `FrameStreamTest#measuresTheCostOfDecodingFrames`, app process CPU over 10 s, % of one core): FRAME_COST_TABLE
+- Phone cost (Galaxy A26, mock HSTN streaming plant.mp4 at 30 fps, a light-tool screen over the preview; `FrameStreamTest#measuresTheCostOfDecodingFrames`; app process CPU time over 10 s windows, as % of one core, so it includes the preview decode):
+
+  | | nothing collected | 2 fps | 5 fps | 10 fps |
+  |---|---|---|---|---|
+  | Preview copy (normal path) | 21 % | 30 % | 51 % | 92 % |
+  | Decoder fallback (hardware HEVC) | | 41–77 % | 61–106 % | 61–110 % |
+  | Decoder, earlier software-decoder build (ImageReader) | 22–26 % | 46–75 % | 55–84 % | 56–88 % |
+
+  The measurement is noisy: in the same run the "nothing collected" baseline rose from 21 % at the start to 37 % at the end (CPU frequency scaling on an idle-ish phone, other processes), and repeated runs of one row differ by up to 30 points. The decoder rows are ranges over 2–3 runs. What holds across runs: preview copy at **2 fps costs about a tenth of a core over streaming**, 5 fps about a third. Ask for the lowest rate that works (watch for text: 1–2 fps; light probe: 2–5 fps on a small crop), and do your own work (OCR) on `Dispatchers.Default`. Per-frame conversion is 11–16 ms on the decoder path.
 
 ## How to test a tool on the mock
 
@@ -207,4 +218,17 @@ class MailToolTest {
 
 ## Results (2026-11-06, Galaxy A26 SM-A266B, Android 16, mock HSTN)
 
-RESULTS_SECTION
+- **JVM:** `./gradlew testDebugUnitTest`: 101 tests, 0 failures. That's 87 before this work, plus `GlobalGrammarTest` (9: every tool-opening phrase above, the everyday commands, questions, room chatter, and the book grammar winning inside the book reader), `ToolCoreTest` (4: launcher aliases, extras and deep links, RecentText, Phrases), and `PageLayoutTest#misreadLineEndFragmentIsRepairedWhenRejoined`.
+- **Instrumented, whole suite** (`am instrument`, no class filter): 37 tests. 35 pass, `MlKitFolderScore` skips (no data folder, by design), and 1 failed: `BookReaderTest#saysWhatToDoAtTheEndOfAPage`, "No compose hierarchies found". The logcat shows why: 90 s into the test, `com.android.shell` started another app (`io.worldbuild.pawnly`) on the shared phone and took the foreground. Another session was using adb without the phone lock. Run on its own straight after, `BookReaderTest` passes 4/4. So: no failures from this code.
+- New instrumented tests, all passing: `ToolsTest` (3) runs a voice-first launch into the mail stub, then "open the book reader", reading a page by voice, the page appearing in RecentText, "what does Penang lawyer mean" answered "I can't answer questions yet.", "tell me when you see 42" (Watch with argument 42; bookmark kept), "what colour is this" (light, colour mode), "back to my book" (bookmark unchanged), with no stream drop through all the switches, then "close". It also covers the deep link `hstnbench://light?mode=colour`, and every stub opening, listening on the glasses and saying it isn't ready. `FrameStreamTest` (3): frames on the preview-copy path and on the decoder path are 480x864, alternate between the two scenes, and are paced (20 frames in ~4 s at 5 fps); plus the cost measurement above.
+- **Before this work** on the same phone: `BookReaderTest#readsABookPageFromTheGlassesCamera` failed ("line-end hyphen not rejoined"; cause and fix in notes/book-reader-android.md > Tools layer), and `BookOcrPipelineTest` passed. The rest of the suite wasn't run on the phone before the change.
+- Timings seen on the phone: session start to streaming ~2 s on the mock; ML Kit 160–320 ms per 960x1440 page (`metric=book_ocr`); encoding a 2-scene MockVideo ~1.2 s.
+
+## Not done / not verified
+
+- Nothing has run on real glasses: real stream size and keyframe interval (which decide the decoder path's cost), PixelCopy with the real stream, and glasses speech staying up across tool switches with a real recogniser.
+- The capturePhoto fallback in `frames()` isn't exercised (decoding works on the A26).
+- A launcher alias doesn't re-route an app that is already running (see "Opening a tool").
+- The stubs have no tool grammar yet (`parse` returns null), and their help text says only what works now.
+- The silence reminders still haven't fired in an instrumented test (they need 30 s of quiet).
+- Frame cost numbers are noisy (see the table). A per-thread profile showed the extra CPU spread over codec IPC, dispatcher and GC threads, not one hot spot.

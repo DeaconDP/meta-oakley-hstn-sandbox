@@ -1,6 +1,8 @@
 # Book reader on Android (HstnBench)
 
-2026-10-27. The first build of the book reader from `notes/book-reader.md`, in `tracks/android-native/HstnBench`. It has only been tested on the Mock Device Kit (emulator `HSTN_Mock_API34`, mock `OAKLEY_META_HSTN`). Real glasses haven't been tried yet.
+2026-10-27. The first build of the book reader from `notes/book-reader.md`, in `tracks/android-native/HstnBench`. It has only been tested on the Mock Device Kit (emulator `HSTN_Mock_API34`, then a Galaxy A26 phone, mock `OAKLEY_META_HSTN`). Real glasses haven't been tried yet.
+
+**2026-11-06: the book reader now runs on the shared tools layer** (notes/tools-layer.md). Its voice-first machinery (connect and narrate, mic and echo guard, speech and earcons, spoken pitfalls, silence reminders) moved into `tools/ToolHub`, and `BookReaderViewModel` is a `ToolHost`. Behaviour is unchanged, apart from two additions: from inside the reader you can open another tool by voice ("read my mail", "watch for 42"), and questions about the page ("what does … mean") go to the ask seam. See "Tools layer" at the end for what moved where. Commands below that say `./gradlew.bat` are from the old Windows setup; on the Mac use `./gradlew`.
 
 ## What was built
 
@@ -120,7 +122,7 @@ Nothing that stops reading is reported only on screen. Each condition is spoken 
 | No mic (glasses speech and phone both unavailable) | `VoiceControl` | "Voice control is off… The buttons on the phone screen still work." Glasses speech that won't restart (glasses gone) falls back to the phone mic, and moves back to the glasses on reconnect |
 | App never registered with Meta AI | Registration state on voice-first launch | "Book Reader needs a one-time setup with the Meta AI app…" |
 
-Code: `book/ReaderHealth.kt` (`HealthMonitor`, edge-triggered, pure), `book/ImageCheck.kt` (pure), `bookreader/ReaderWatch.kt` (DAT metadata + system broadcasts → snapshots), all wired in `BookReaderViewModel`. 18 JVM tests in `PitfallTest.kt`.
+Code: `tools/core/Health.kt` (`HealthMonitor`, edge-triggered, pure; was `book/ReaderHealth.kt`), `book/ImageCheck.kt` (pure), `tools/GlassesWatch.kt` (DAT metadata + system broadcasts → snapshots; was `bookreader/ReaderWatch.kt`), wired in `tools/ToolHub` since 2026-11-06 (the reader pauses and saves its bookmark in `onHealthAlert`). 18 JVM tests in `PitfallTest.kt`.
 
 `PitfallsTest` (instrumented, mock HSTN, voice-first, no taps) passes: covered lens → dark room → readable page via the automatic retries, battery 9 %, doff/don, thermal critical/none, fold, then unfold + don → reconnects by itself (session restart 89 ms). The full instrumented suite passes, 30/30, on a fresh emulator. That includes `InstrumentationTest#photoCapture*`, which failed in the earlier session.
 
@@ -137,3 +139,26 @@ Code: `book/ReaderHealth.kt` (`HealthMonitor`, edge-triggered, pure), `book/Imag
 - Framing hint strings and dedup are English-only and hard-coded in the core. UI strings are resources.
 - Hints aren't spoken over a page being read; the next capture repeats them. A hint during reading is shown on screen and marked with the error earcon.
 - Voice control is in (see Voice control above). No captouch controls yet.
+
+## Tools layer (2026-11-06)
+
+The second tool needed the book reader's voice-first parts, so they moved into a shared layer (notes/tools-layer.md). What changed for the book reader:
+
+| Was | Now |
+|---|---|
+| `bookreader/BookSpeaker.kt`, `Earcons.kt`, `VoiceControl.kt`, `VoiceInput.kt`, `ReaderWatch.kt`, `PageCamera.kt` | `tools/ToolSpeaker.kt`, `Earcons.kt`, `VoiceControl.kt`, `VoiceInput.kt`, `GlassesWatch.kt`, `PageCamera.kt` (one shared instance each, in ToolHub) |
+| `book/IdleNudge.kt`, `book/ReaderHealth.kt`, `EchoGuard` in `book/VoiceCommands.kt` | `tools/core/IdleNudge.kt`, `tools/core/Health.kt`, `tools/core/EchoGuard.kt` |
+| `VoiceCommands.normalize/parseNumber` | delegate to `tools/core/Phrases.kt` (same behaviour) |
+| `BookReaderViewModel.openVoice/closeVoice`, `bringUpLink`, `remindWhenQuiet`, `onHealth`, reconnect loop, `explainNoGlasses` | `ToolHub` (the router starts voice while any tool is open). The reader supplies its lines through `texts()` (the same strings as before) and its parts through `ToolHost` callbacks: `onCommand` (its grammar, tried first), `onPartial` (barge-in), `isWaitingForUser` + `reminder`, `onHealthAlert` (pause, save the bookmark), `onStreamLost` (pause, keep the page), `onAsideDone` (carry on reading after a reply) |
+| `CameraScreen.showBookReader`, `MainActivity` voice-first flag | `ToolHub.activeTool` and `ToolLaunch.parse` (the alias, `--ez book_reader true` and `hstnbench://book` still work; so does `--es tool book`) |
+| `BookReaderScreen(viewModel, onClose, permissions…, voiceFirst)` | `BookReaderScreen(viewModel, onClose)`, attached by `bookreader/BookTool.kt` |
+
+New behaviour:
+- Phrases the book grammar doesn't know go to `GlobalGrammar`: opening another tool ("read my mail", "scan this", "watch for 42", "what colour is this"; ToolHub says the tool's name, the reader stops and keeps its bookmark, and the glasses session and stream stay up), or a question about the text ("what does ephemeral mean?" → "I can't answer questions yet." until the ask feature lands; the interrupted sentence is then read again). Global synonyms of the book's own commands map to the book's handlers. "Read a book" / "open the book reader" inside the reader mean "read".
+- When switched to from another tool, the reader says "Book reader. Say read to start, or help at any time." (`voice_welcome_after_switch`).
+- Each page is published to `ToolHub.recentText` as reading starts (`key = page-N`), and the current sentence as each is spoken.
+- The connect line when "read" has to reconnect is still `voice_connecting` ("Book reader. Connecting to your glasses.").
+
+**Hyphen fix (Galaxy A26).** `BookReaderTest#readsABookPageFromTheGlassesCamera` failed on the A26 with "line-end hyphen not rejoined". The join was fine; the OCR wasn't: ML Kit read the two-letter line-end fragment `oc-` as `0C-` (no word context, so a round o became a zero and the case look-alike c became C), and the correct rejoin gave `0Ccasions`. `BookOcrPipelineTest` shows the same misread without the mock, and CER stayed under 2 %, which is why only the hyphen check failed. The font is the same Noto Serif as on the emulator. The likely difference is the Android 16 font build or ML Kit's inference on this CPU; that can't be confirmed without the old emulator. Fix in the reader, not the test: `PageLayout.joinLine` now repairs the fragment of a word it rejoins (0 → o, and look-alike capitals c o s u v w x z → lower case when the fragment starts lower case; "McCar-thy" is left alone). JVM test `misreadLineEndFragmentIsRepairedWhenRejoined`. The instrumented test now reports a failed join ("oc-" still there) separately from a misread fragment.
+
+Results on the A26 (2026-11-06): all four `BookReaderTest` cases, `BookOcrPipelineTest` (2), `VoiceFirstLaunchTest` and `PitfallsTest` pass on the refactored reader. ML Kit takes ~0.4 s per 960x1440 page on the phone (16–19 s on the emulator). Full-suite numbers are in notes/tools-layer.md > Results.
