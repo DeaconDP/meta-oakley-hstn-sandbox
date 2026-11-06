@@ -11,6 +11,7 @@ testRules = "1.7.0"
 uiJunit4 = "1.11.2"
 exifInterface = "1.4.2"
 mlkitTextRecognition = "16.0.1"
+mlkitBarcodeScanning = "17.3.0"
 junit = "4.13.2"
 
 [libraries]
@@ -30,6 +31,7 @@ androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version.ref = "uiJunit4" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifInterface" }
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
+mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcodeScanning" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
