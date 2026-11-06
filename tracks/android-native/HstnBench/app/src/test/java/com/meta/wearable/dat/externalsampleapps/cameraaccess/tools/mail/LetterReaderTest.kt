@@ -7,6 +7,7 @@
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.mail
 
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.Box
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -193,10 +194,43 @@ class LetterReaderTest {
   }
 
   @Test
-  fun lowConfidenceInTheLabelDoesNotMatter() {
-    // Only the digits of the amount count: a smudged "£" sign or word next to it doesn't.
-    val l = read(LetterFixtures.utilityBill(amountLow = mapOf(0 to 0.2f)))
+  fun aSmudgedCurrencySignOrPointCountsToo() {
+    // A digit lost to a smudge lowers its neighbours: the "£" or the point counts as much as a digit.
+    assertEquals(AmountDue.Unsure, read(LetterFixtures.utilityBill(amountLow = mapOf(0 to 0.2f))).amount)
+    assertEquals(AmountDue.Unsure, read(LetterFixtures.utilityBill(amountLow = mapOf(3 to 0.3f))).amount)
+  }
+
+  @Test
+  fun anUnsureChargeIsNotReadButTheAmountDueStillIs() {
+    val l = read(LetterFixtures.utilityBill(chargeLow = mapOf(1 to 0.2f)))
     assertEquals(AmountDue.Sure(Money("£", 8417)), l.amount)
+    val reading = l.readingParagraphs.joinToString(" ")
+    assertTrue(reading, reading.contains("Standing charge an amount I can't read for sure."))
+    assertTrue(reading, reading.contains("Amount due £84.17."))
+  }
+
+  @Test
+  fun aDigitThatWentMissingIsCaughtFromTheCharacterBoxes() {
+    // What the A26 returned for "£84.17" with the 4 smudged: "£8.17", every digit confident, but
+    // the 8's box stretched over where the 4 was (or a gap left behind).
+    fun line(boxes: List<Pair<Float, Float>>): LetterLine {
+      val text = "£8.17"
+      val word = LetterWord(text, 0.9f, List(text.length) { 0.9f }, boxes.map { (l, r) -> Box(l, 100f, r, 124f) })
+      return LetterLine("Amount due $text", Box(80f, 100f, 886f, 124f), 0, 0.9f,
+          listOf(LetterWord("Amount", 0.9f), LetterWord("due", 0.9f), word))
+    }
+    // Real boxes for a clean "£84.17" on the A26, minus the 4: note the 8 px gap before the 7,
+    // beside the narrow 1, which is normal.
+    val normal = listOf(804f to 817f, 819f to 831f, 836f to 838f, 843f to 850f, 858f to 870f)
+    // And the smudged one as the A26 returned it: the point stretched over where the 4 was.
+    val wideDot = listOf(804f to 824f, 827f to 840f, 849f to 862f, 867f to 877f, 882f to 894f)
+    val stretched = listOf(804f to 818f, 819f to 846f, 847f to 852f, 853f to 866f, 867f to 880f)
+    val gap = listOf(804f to 818f, 819f to 832f, 846f to 851f, 852f to 865f, 866f to 879f)
+    fun amount(l: LetterLine) = LetterReader.read(listOf(LetterScan(960, 1440, listOf(l)))).amount
+    assertEquals(AmountDue.Sure(Money("£", 817)), amount(line(normal)))
+    assertEquals(AmountDue.Unsure, amount(line(stretched)))
+    assertEquals(AmountDue.Unsure, amount(line(gap)))
+    assertEquals(AmountDue.Unsure, amount(line(wideDot)))
   }
 
   @Test

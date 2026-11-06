@@ -62,13 +62,13 @@ class ToolsTest {
     val hub = ToolTestKit.hub(scenario!!)
     val camera = ToolTestKit.camera(scenario!!)
 
-    // Voice-first into the mail stub: connects, listens on the glasses, says it isn't ready.
+    // Voice-first into the mail reader: connects, listens on the glasses, says what to do.
     waitFor("tool_screen_mail")
     composeTestRule.waitUntil(timeoutMillis = TIMEOUT) { camera.isStreaming.value }
     val onGlasses = ctx.getString(R.string.voice_mic_glasses)
     composeTestRule.waitUntil(timeoutMillis = TIMEOUT) { ToolTestKit.text(composeTestRule, "tool_voice_mic") == onGlasses }
-    val notReady = ctx.getString(R.string.tool_not_ready, ctx.getString(R.string.mail_name))
-    composeTestRule.waitUntil(timeoutMillis = TIMEOUT) { ToolTestKit.text(composeTestRule, "tool_status") == notReady }
+    val mailWelcome = ctx.getString(R.string.mail_welcome)
+    composeTestRule.waitUntil(timeoutMillis = TIMEOUT) { ToolTestKit.text(composeTestRule, "tool_status") == mailWelcome }
 
     // From here on the stream must not drop: switching keeps the session.
     val dropped = AtomicBoolean(false)
@@ -146,7 +146,8 @@ class ToolsTest {
       waitFor("tool_screen_${id.id}")
       composeTestRule.waitUntil(timeoutMillis = TIMEOUT) { ToolTestKit.text(composeTestRule, "tool_voice_mic") == onGlasses }
       val name = ctx.getString(ToolRegistryNames.of(id))
-      val notReady = ctx.getString(R.string.tool_not_ready, name)
+      // The mail reader is built: it says what to do instead.
+      val notReady = if (id == ToolId.MAIL) ctx.getString(R.string.mail_welcome) else ctx.getString(R.string.tool_not_ready, name)
       composeTestRule.waitUntil(timeoutMillis = TIMEOUT) { ToolTestKit.text(composeTestRule, "tool_status") == notReady }
     }
   }

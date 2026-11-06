@@ -45,7 +45,12 @@ fun letter(body: LetterBuilder.() -> Unit): LetterScan = LetterBuilder().apply(b
 object LetterFixtures {
 
   /** An electricity bill: letterhead, window address, account number, heading, a table, a due date. */
-  fun utilityBill(amountDue: String = "£84.17", amountLow: Map<Int, Float> = emptyMap(), secondTotal: String? = null): LetterScan = letter {
+  fun utilityBill(
+      amountDue: String = "£84.17",
+      amountLow: Map<Int, Float> = emptyMap(),
+      secondTotal: String? = null,
+      chargeLow: Map<Int, Float> = emptyMap(),
+  ): LetterScan = letter {
     block { line("Northgate Energy", 80f, 70f, h = 48f) }
     block {
       line("PO Box 512, Leeds LS1 4AB", 560f, 80f, h = 18f)
@@ -74,7 +79,7 @@ object LetterFixtures {
       line("Amount due", 80f, 764f)
     }
     block {
-      line("£12.30", 760f, 700f)
+      line("£12.30", 760f, 700f, low = chargeLow)
       line("£71.87", 760f, 732f)
       line(amountDue, 760f, 764f, low = amountLow)
     }

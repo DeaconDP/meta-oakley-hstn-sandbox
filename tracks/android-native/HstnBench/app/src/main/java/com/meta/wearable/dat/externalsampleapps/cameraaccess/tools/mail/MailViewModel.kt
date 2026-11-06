@@ -387,6 +387,15 @@ class MailViewModel(application: Application, hub: ToolHub) :
     for (l in scan.lines) {
       val low = l.words.mapNotNull { w -> (w.symbolConfidences.minOrNull() ?: w.confidence)?.let { w.text to it } }.minByOrNull { it.second }
       Log.i(TAG, "ocr b=${l.block} box=${l.box.left.toInt()},${l.box.top.toInt()},${l.box.right.toInt()},${l.box.bottom.toInt()} conf=${l.confidence} low=$low \"${l.text}\"")
+      if (LetterText.money(l.text).isNotEmpty()) {
+        for (w in l.words) {
+          val chars = w.text.indices.joinToString(" ") { i ->
+            val b = w.symbolBoxes.getOrNull(i)
+            "${w.text[i]}:${w.symbolConfidences.getOrNull(i)?.let { "%.2f".format(it) }}@${b?.left?.toInt()}-${b?.right?.toInt()}"
+          }
+          Log.i(TAG, "ocr money word=\"${w.text}\" conf=${w.confidence} $chars")
+        }
+      }
     }
   }
 

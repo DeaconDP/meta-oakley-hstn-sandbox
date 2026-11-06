@@ -11,9 +11,10 @@
 //     due..." (else "total"), deadline = a date on a line that says "due / pay by / before...";
 //   - kind = keyword scores (bill, bank, official, medical, personal, advert);
 //   - envelope = no "Dear", no paragraphs, few words, an address block or postal markings.
-// The money rule: if any digit of the amount due was read with low confidence, or a letter sits
-// where a digit should be, or two different amounts are both "due", the amount is Unsure or
-// Conflict and no figure is spoken. Pages after the first add amounts and text, and fill in any
+// The money rule: if any character of the amount due was read with low confidence, or a letter
+// sits where a digit should be, or the character boxes show a digit went missing (a smudged "£84.17"
+// read as "£8.17"), or two different amounts are both "due", the amount is Unsure or Conflict and
+// no figure is spoken. Pages after the first add amounts and text, and fill in any
 // header field the first page didn't have. Pure Kotlin.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.mail
@@ -79,7 +80,7 @@ data class Letter(
 
 object LetterReader {
 
-  /** A digit read below this (character confidence) is unsure. */
+  /** A character of an amount read below this (character confidence) is unsure. */
   const val MIN_DIGIT_CONFIDENCE = 0.5f
   /** When only a word or line confidence is known, below this is unsure. */
   const val MIN_WORD_CONFIDENCE = 0.6f
@@ -131,12 +132,14 @@ object LetterReader {
   private val APPOINTMENT = Regex("\\bappointment\\b", RegexOption.IGNORE_CASE)
   private val WITHIN = Regex("\\bwithin (\\d{1,3}|seven|fourteen|twenty[- ]eight|thirty) (?:working )?days\\b", RegexOption.IGNORE_CASE)
 
-  private val REFERENCE =
+  internal val REFERENCE =
       Regex(
           "\\b(account number|account no\\.?|acct no\\.?|customer number|customer no\\.?|reference number|reference|our ref(?:erence)?|" +
               "your ref(?:erence)?|ref|policy number|nhs number|hospital number|invoice number|national insurance number|" +
               "council tax reference|claim number|case number|membership number|account ending(?: in)?|sort code)" +
-              "\\s*[:.#]?\\s*([A-Z0-9][A-Z0-9 \\-/]*[A-Z0-9])",
+              // The value: groups that each contain a digit ("8842 1937 55", "20-45-77", "AB123456C"), so
+              // the words after it ("55 and your...") aren't taken.
+              "\\s*[:.#]?\\s*([A-Z]{0,4}\\d[A-Z0-9]*(?:[ \\-/][A-Z]{0,2}\\d[A-Z0-9]*)*)",
           RegexOption.IGNORE_CASE,
       )
 
@@ -194,13 +197,7 @@ object LetterReader {
     val amount = amountOf(allLines)
     val references = referencesOf(allLines)
     val amountsMentioned = allLines.sumOf { LetterText.money(it.text).size }
-    val unsureMoney =
-        allLines.flatMap { l ->
-          LetterText.money(l.text).filter { tok ->
-            val c = l.minConfidence(tok.range.first, tok.range.last + 1, digitsOnly = true)
-            c != null && c < threshold(l, tok.range.first, tok.range.last + 1)
-          }.map { it.raw }
-        }.toSet()
+    val unsureMoney = allLines.flatMap { l -> LetterText.money(l.text).filter { !isSure(l, it) }.map { it.raw } }.toSet()
 
     val words = text.split(Regex("\\s+")).count { it.isNotBlank() }
     val longLines = allLines.count { it.box.width > first.scan.width * 0.5f && it.text.length > 40 }
@@ -382,15 +379,25 @@ object LetterReader {
 
   private class Mention(val money: Money?, val sure: Boolean)
 
+  /**
+   * The money rule for one amount as printed: every character parsed as a digit (no O for 0), every
+   * character of it (the digits, the point and the currency sign: a digit lost to a smudge lowers
+   * its neighbours) read at or above the threshold, and no sign of a character gone missing.
+   */
+  internal fun isSure(line: LetterLine, tok: MoneyToken): Boolean {
+    if (tok.money == null) return false
+    val start = tok.range.first
+    val end = tok.range.last + 1
+    val c = line.minConfidence(start, end)
+    if (c != null && c < threshold(line, start, end)) return false
+    return !line.looksLikeAMissingCharacter(start, end)
+  }
+
   /** The money rule lives here. See the file header. */
   internal fun amountOf(lines: List<LetterLine>): AmountDue {
     fun mentions(filter: (String) -> Boolean): List<Mention> =
         lines.filter { filter(it.text) && !NOT_DUE.containsMatchIn(it.text) }.flatMap { l ->
-          LetterText.money(l.text).filter { !it.credit }.map { tok ->
-            val c = l.minConfidence(tok.range.first, tok.range.last + 1, digitsOnly = true)
-            val sure = tok.money != null && (c == null || c >= threshold(l, tok.range.first, tok.range.last + 1))
-            Mention(tok.money, sure)
-          }
+          LetterText.money(l.text).filter { !it.credit }.map { tok -> Mention(tok.money, isSure(l, tok)) }
         }
     var due = mentions { DUE_WORDS.containsMatchIn(it) && !MINIMUM_WORDS.containsMatchIn(it) }
     val isTotal = due.isEmpty()

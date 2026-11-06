@@ -143,13 +143,19 @@ object LetterSpeech {
   }
 
   /**
-   * One paragraph made safe to read aloud: digit runs spaced out, and every amount that couldn't
-   * be read for sure replaced by [NOT_SURE_FIGURE].
+   * One paragraph made safe to read aloud: reference numbers and digit runs spelled out, and
+   * every amount that couldn't be read for sure replaced by [NOT_SURE_FIGURE].
    */
   fun forReading(paragraph: String, unsureMoney: Set<String>): String {
     var t = paragraph
     for (tok in LetterText.money(paragraph).reversed()) {
       if (tok.money == null || tok.raw in unsureMoney) t = t.replaceRange(tok.range, NOT_SURE_FIGURE)
+    }
+    // Account and reference numbers, digit by digit ("8842 1937 55" isn't "eight thousand...").
+    t = LetterReader.REFERENCE.replace(t) { m ->
+      val value = m.groups[2]!!
+      if (value.value.count(Char::isDigit) < 3) m.value
+      else m.value.substring(0, value.range.first - m.range.first) + LetterText.spellOut(value.value)
     }
     return LetterText.forSpeech(t)
   }

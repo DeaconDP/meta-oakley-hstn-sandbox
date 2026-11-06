@@ -51,11 +51,9 @@ object LetterLayout {
     val textRight = joined.maxOf { it.box.right }
     val textWidth = (textRight - textLeft).coerceAtLeast(1f)
 
+    val groups = joined.groupBy { it.block }.values.flatMap { splitAtGaps(it.sortedBy { l -> l.box.top }, bodyHeight) }
     val blocks =
-        joined
-            .groupBy { it.block }
-            .values
-            .flatMap { splitAtGaps(it.sortedBy { l -> l.box.top }, bodyHeight) }
+        mergeStacked(groups, textWidth)
             .map { group ->
               val short = group.count { it.box.width < textWidth * 0.55f }
               LetterBlock(group, isShortLines = group.size >= 2 && short * 10 >= group.size * 7)
@@ -121,6 +119,39 @@ object LetterLayout {
     return out
   }
 
+  /**
+   * ML Kit often gives each line of an address (and each label of a table) a block of its own.
+   * Blocks stacked tightly (gap under ~0.9 of a line), aligned on the left (or, for short lines, on
+   * the right) and with the same text size are one block.
+   */
+  internal fun mergeStacked(groups: List<List<LetterLine>>, textWidth: Float): List<List<LetterLine>> {
+    val out = groups.map { it.toMutableList() }.sortedBy { it.first().box.top }.toMutableList()
+    var i = 0
+    while (i < out.size) {
+      val a = out[i]
+      val aLast = a.last().box
+      val h = aLast.height
+      val below =
+          out.drop(i + 1).firstOrNull { b ->
+            val bFirst = b.first().box
+            val gap = bFirst.top - aLast.bottom
+            // Loose: a line with descenders (g, y) has a taller box than one without.
+            val sameSize = bFirst.height in h * 0.6f..h * 1.67f
+            val left = kotlin.math.abs(a.minOf { it.box.left } - b.minOf { it.box.left }) <= h * 0.6f
+            val short = (a + b).all { it.box.width < textWidth * 0.55f }
+            val right = short && kotlin.math.abs(a.maxOf { it.box.right } - b.maxOf { it.box.right }) <= h * 0.6f
+            gap >= -2f && gap <= h * 0.9f && sameSize && (left || right)
+          }
+      if (below != null) {
+        a += below
+        out.remove(below)
+      } else {
+        i++
+      }
+    }
+    return out
+  }
+
   /** Top to bottom; of blocks side by side (overlapping rows), the left one first. */
   internal fun order(blocks: List<LetterBlock>): List<LetterBlock> {
     val rest = blocks.toMutableList()
@@ -153,7 +184,7 @@ object LetterLayout {
           LetterText.money(t).lastOrNull()?.let { it.range.last >= t.length - 1 } == true ||
               LetterText.dates(t).lastOrNull()?.let { it.range.last >= t.length - 1 } == true
       // (Short lines only: a long body line can end in a date mid-sentence.)
-      PageLayout.joinLine(sb, if (endsInValue && texts.size > 1 && t.length <= 50) "$t." else t)
+      PageLayout.joinLine(sb, if (endsInValue && t.length <= 50) "$t." else t)
     }
     return sb.toString()
   }

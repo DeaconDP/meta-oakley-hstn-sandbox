@@ -1,9 +1,9 @@
 // MailOcr - on-device text recognition for the mail reader
 //
 // The same ML Kit Text Recognition v2 (Latin, bundled model, offline) as the book reader's
-// MlKitOcr, but it keeps more of the result: the block each line came from, and the confidence of
-// every word and every character, which the money rule needs (one unsure digit and the amount is
-// not spoken). Converts ML Kit's Text into the pure LetterScan. Nothing leaves the phone.
+// MlKitOcr, but it keeps more of the result: the block each line came from, and the confidence and
+// box of every word and character, which the money rule needs (one unsure or missing digit and the
+// amount is not spoken). Converts ML Kit's Text into the pure LetterScan. Nothing leaves the phone.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.mail
 
@@ -45,10 +45,12 @@ class MailOcr : Closeable {
           val words =
               line.elements.map { e ->
                 val symbols = e.symbols.mapNotNull { s -> score(s.confidence) }
+                val boxes = e.symbols.mapNotNull { s -> s.boundingBox?.let { Box(it.left.toFloat(), it.top.toFloat(), it.right.toFloat(), it.bottom.toFloat()) } }
                 LetterWord(
                     text = e.text,
                     confidence = score(e.confidence),
                     symbolConfidences = if (symbols.size == e.text.length) symbols else emptyList(),
+                    symbolBoxes = if (boxes.size == e.text.length) boxes else emptyList(),
                 )
               }
           // Rebuild the line from its words when ML Kit dropped the spaces (see MlKitOcr).
