@@ -78,6 +78,8 @@ dependencies {
   implementation(libs.mwdat.mockdevice)
   // Book reader: on-device OCR, Latin script, model bundled in the APK (no Play Services download).
   implementation(libs.mlkit.text.recognition)
+  // Label reader: on-device barcode scanning, model bundled in the APK.
+  implementation(libs.mlkit.barcode.scanning)
   testImplementation(libs.junit)
   androidTestImplementation(libs.androidx.ui.test.junit4)
   androidTestImplementation(libs.androidx.test.uiautomator)

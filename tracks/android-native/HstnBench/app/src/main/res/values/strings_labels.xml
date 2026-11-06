@@ -1,9 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Label reader (tools/labels/). Only this tool uses these; its feature work edits this file only. -->
+<!-- Label reader (tools/labels/). Only this tool uses these; its feature work edits this file only.
+     Spoken lines are written to be heard: short sentences, the next thing to say at the end. -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="labels_name" description="Spoken and shown name of the tool">Label reader</string>
     <string name="labels_launcher_label" description="Launcher name, so the user can say Open Label Reader">Label Reader</string>
     <string name="labels_button" description="Button on the camera screen that opens the tool">Labels</string>
     <string name="labels_button_description" description="Accessibility description of that button">Open label reader. Scans barcodes and reads labels word for word.</string>
-    <string name="labels_help" description="Spoken list of what can be said in this tool (stub: update when the tool is built)">Label reader isn\'t ready yet. You can say: open the book reader, read my mail, watch for, then a word, scan this, is the light on, battery, or close.</string>
+    <string name="labels_help" description="Spoken list of what can be said in this tool">Hold up a packet, tin or box. You can say: scan this, look it up, read the label, read it all, when does it expire, ingredients, cooking instructions, allergens, does it contain nuts, what is it, stop, or close. Only the barcode number goes online, and only when you say look it up.</string>
+
+    <!-- Searching for a barcode -->
+    <string name="labels_searching">Looking for a barcode. Hold it up and turn it slowly.</string>
+    <string name="labels_turn_hint">Turn it slowly. Barcodes are usually on the back or bottom.</string>
+    <string name="labels_bars_closer">I can see a barcode. Bring it a little closer and hold it steady.</string>
+    <string name="labels_bars_steady">I can see a barcode. Hold it steady.</string>
+    <string name="labels_no_barcode">I couldn\'t find a barcode. I\'ll read the label instead.</string>
+    <string name="labels_found_product">Found a barcode. Say look it up to get the product name, or read the label.</string>
+    <string name="labels_found_other">Found a barcode, but it isn\'t a product barcode. It reads %1$s. Say read the label to hear the text.</string>
+    <string name="labels_qr_more">Say read the label to hear the text around it.</string>
+    <string name="labels_stopped">Stopped. Say scan this to look again.</string>
+
+    <!-- Product lookup -->
+    <string name="labels_no_code_yet">I haven\'t found a barcode yet. Say scan this to look for one, or read the label.</string>
+    <string name="labels_still_searching">I\'m still looking for a barcode. Turn it slowly, or say read the label.</string>
+    <string name="labels_not_product">That isn\'t a product barcode, so I can\'t look it up. Say read the label.</string>
+    <string name="labels_looking_up">Looking it up.</string>
+    <string name="labels_lookup_more">Say allergens or ingredients for more, or read the label.</string>
+    <string name="labels_not_found">Open Food Facts doesn\'t know this product. Say read the label, and I\'ll read it to you.</string>
+    <string name="labels_offline">I can\'t reach the internet, so I can\'t look it up. Say read the label, and I\'ll read it to you.</string>
+    <string name="labels_lookup_failed">The product lookup didn\'t work just now. Say look it up to try again, or read the label.</string>
+    <string name="labels_ingredients_from_off">From Open Food Facts, the ingredients are: %1$s</string>
+
+    <!-- Reading the label -->
+    <string name="labels_reading">Reading the label.</string>
+    <string name="labels_capture_failed">I couldn\'t get a picture from the glasses. Say read the label to try again.</string>
+    <string name="labels_no_text">I can\'t read any writing. Hold it about a hand\'s length from your face, keep it steady, and say read the label again.</string>
+    <string name="labels_text_small">The writing is too small. Bring it closer and say read the label again.</string>
+    <string name="labels_ocr_failed">Sorry, reading the label failed. Say read the label to try again.</string>
+    <string name="labels_hint_covered">Something is covering the camera. Check the glasses, then say read the label.</string>
+    <string name="labels_hint_dark">It\'s too dark to read. Turn on a light, then say read the label.</string>
+    <string name="labels_hint_nothing">I can\'t see a label. Hold it in front of you, about a hand\'s length away.</string>
+    <string name="labels_hint_glare">There\'s glare on the label. Tilt it away from the light a little, then say read the label.</string>
+    <string name="labels_hint_blocked">Part of the label is covered, maybe by your hand. Hold it by the edges, then say read the label.</string>
+    <string name="labels_read_more">That\'s all I can see. You can ask when does it expire, ingredients, allergens or cooking instructions.</string>
+    <string name="labels_no_expiry">I can\'t find a date on this side. Dates are often on the top, the bottom or the back. Turn it and ask again.</string>
+    <string name="labels_no_ingredients">I can\'t find the ingredients on this side. Turn it slowly and ask again.</string>
+    <string name="labels_no_cooking">I can\'t find cooking instructions on this side. Turn it slowly and ask again.</string>
+    <string name="labels_no_allergens">I can\'t find allergy information on this side. Turn it and ask again, or say ingredients.</string>
+    <string name="labels_no_name">I don\'t know what it is yet. Say scan this, or read the label.</string>
+    <string name="labels_name_label">The biggest writing says: %1$s.</string>
+
+    <!-- Medicine: the name only, never doses (ROADMAP ground rule). -->
+    <string name="labels_medicine_name">This looks like medicine: %1$s.</string>
+    <string name="labels_medicine_only_name">For medicine I only tell you the name and the date.</string>
+    <string name="labels_medicine_dose">I won\'t read medicine doses. Please check with a pharmacist or a trusted person.</string>
+    <string name="labels_medicine_screen">Medicine: %1$s. Only the name is shown. Doses are not read.</string>
+
+    <!-- Silence reminders -->
+    <string name="labels_reminder_found">Say look it up, or read the label.</string>
+    <string name="labels_reminder_idle">Say scan this to find a barcode, or read the label.</string>
+
+    <!-- Screen -->
+    <string name="labels_phase_idle">Ready. Say scan this.</string>
+    <string name="labels_phase_searching">Looking for a barcode</string>
+    <string name="labels_phase_found">Barcode found</string>
+    <string name="labels_phase_looking_up">Looking up the product</string>
+    <string name="labels_phase_reading">Reading the label</string>
+    <string name="labels_code_line">%1$s barcode: %2$s</string>
+    <string name="labels_scan_button">Scan</string>
+    <string name="labels_lookup_button">Look it up</string>
+    <string name="labels_read_button">Read label</string>
+    <string name="labels_expiry_button">Date</string>
+    <string name="labels_allergens_button">Allergens</string>
 </resources>
