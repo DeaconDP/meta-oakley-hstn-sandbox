@@ -139,7 +139,6 @@ class ToolsTest {
     for ((id, phrase) in listOf(
         ToolId.WATCH to null,
         ToolId.LABELS to "scan this",
-        ToolId.LIGHT to "is the light on",
         ToolId.MAIL to "read my mail",
     )) {
       phrase?.let { ToolTestKit.say(glasses, it) }

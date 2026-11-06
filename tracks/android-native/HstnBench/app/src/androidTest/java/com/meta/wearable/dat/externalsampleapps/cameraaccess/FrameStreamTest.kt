@@ -77,8 +77,9 @@ class FrameStreamTest {
   private fun checkFrames(previewCopy: Boolean) {
     val glasses = ToolTestKit.pairHstn()
     ToolTestKit.playFrames(glasses, listOf(scene(left = true), scene(left = false)), holdMs = 1_000L)
-    // The light tool is a stub that only connects: a quiet way to bring the stream up voice-first.
-    scenario = ToolTestKit.launch(ToolRequest(ToolId.LIGHT))
+    // The light tool in colour mode takes one frame and then waits: a quiet way to bring the stream
+    // up voice-first (its light probe would collect frames continuously).
+    scenario = ToolTestKit.launch(ToolRequest(ToolId.LIGHT, mode = ToolRequest.MODE_COLOUR))
     val camera = ToolTestKit.camera(scenario!!)
     camera.previewCopyEnabled = previewCopy
     composeTestRule.waitUntil(timeoutMillis = 30_000L) { camera.isStreaming.value }
@@ -105,7 +106,7 @@ class FrameStreamTest {
   @Test
   fun measuresTheCostOfDecodingFrames() {
     ToolTestKit.pairHstn()
-    scenario = ToolTestKit.launch(ToolRequest(ToolId.LIGHT))
+    scenario = ToolTestKit.launch(ToolRequest(ToolId.LIGHT, mode = ToolRequest.MODE_COLOUR))
     val camera = ToolTestKit.camera(scenario!!)
     composeTestRule.waitUntil(timeoutMillis = 30_000L) { camera.isStreaming.value }
     Thread.sleep(3_000L)
