@@ -37,7 +37,7 @@
 - [ ] Watch for text (continuous OCR, fuzzy words / exact numbers, earcon + left/ahead/right)
 - [ ] Labels and barcodes (on-device barcode, label read-out, Open Food Facts on request, no medicine doses)
 - [ ] Ask about the text (book/mail text only to Claude Haiku 5.5 on request, short spoken answers, "the text doesn't say")
-- [ ] Light and colour (brightness tone, colour naming with hedging)
+- [x] Light and colour (brightness tone, colour naming with hedging) (2026-11-06, notes/light-and-colour.md: log-pitch probe tone with smoothing, relative levels, blink detection, OKLab colour naming with white balance, two-colour split and hedging)
 - [ ] Offline eval harness: Mock Device Kit `setCameraFeed`/`setCapturedImage` + VizWiz/TextVQA subset, replay mode for CI
 - [ ] TalkBack pass + WCAG 2.2 AA check of the companion UI
 - [ ] Accessible onboarding and launch: spoken handoffs around the Meta AI registration and permission flows, speaker and camera check, practice-based tutorial, launch status line, spoken recovery messages, and App Intents / Back Tap / Magic Tap triggers (notes/a11y-onboarding.md)

@@ -108,7 +108,12 @@ class LightToolTest {
     composeTestRule.waitUntil(timeoutMillis = 2_000L) { vm.state.value.toneHz == 0f && vm.state.value.paused }
     Thread.sleep(1_500L)
     assertEquals("tone came back by itself", 0f, vm.state.value.toneHz)
-    assertTrue(ToolTestKit.hub(scenario!!).recentSpeech().contains(ctx.getString(R.string.light_tone_off)))
+    val hub = ToolTestKit.hub(scenario!!)
+    assertTrue(hub.recentSpeech().contains(ctx.getString(R.string.light_tone_off)))
+    // Answer after the "Tone off. Say carry on…" line ends: while it plays, the echo guard rightly
+    // drops "carry on" as our own voice.
+    composeTestRule.waitUntil(timeoutMillis = 10_000L) { !hub.isSpeakingAside }
+    Thread.sleep(500L)
     ToolTestKit.say(glasses, "carry on")
     composeTestRule.waitUntil(timeoutMillis = 5_000L) { vm.state.value.toneHz > 0f }
 
