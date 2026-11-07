@@ -345,6 +345,7 @@ object PageLayout {
       last in HYPHENS && beforeLast.isLetter() -> {
         if (next.first().isLowerCase()) {
           sb.setLength(n - 1) // "exam-" + "ple" -> "example"
+          repairBrokenWordStart(sb)
         } else if (last != '-') {
           sb.setCharAt(n - 1, '-') // soft hyphen before a capital: keep a plain hyphen
         }
@@ -355,6 +356,37 @@ object PageLayout {
       else -> sb.append(' ').append(next)
     }
   }
+
+  /**
+   * Fixes OCR misreads in the start of a word broken across a line end, once it's known to continue
+   * in lower case on the next line. ML Kit has no word context for a two- or three-letter fragment
+   * like "oc-", so it reads glyphs by shape alone: a round "o" becomes "0", and letters that look the
+   * same in both cases (c o s u v w x z) come out as capitals. Seen on a Galaxy A26: "oc-" read as
+   * "0C-", which rejoined to "0Ccasions". Here, inside the trailing fragment of [sb] (letters and
+   * zeros only, at least one letter): a 0 becomes o (O at a sentence start), and if the fragment
+   * starts lower case, a look-alike capital after the first letter becomes lower case. Fragments
+   * that start with a real capital ("McCar-") are left alone.
+   */
+  private fun repairBrokenWordStart(sb: StringBuilder) {
+    var start = sb.length
+    while (start > 0 && sb[start - 1].isLetterOrDigit()) start--
+    val fragment = sb.substring(start)
+    if (fragment.isEmpty() || fragment.none { it.isLetter() }) return
+    if (fragment.any { it.isDigit() && it != '0' }) return
+    val chars = fragment.toCharArray()
+    val before = sb.substring(0, start).trimEnd()
+    val sentenceStart = before.isEmpty() || before.last() in ".!?\"“”"
+    // A misread first glyph tells us nothing about case, so it counts as lower case below.
+    val misreadFirst = chars[0] == '0'
+    if (misreadFirst) chars[0] = if (sentenceStart) 'O' else 'o'
+    for (i in 1 until chars.size) if (chars[i] == '0') chars[i] = 'o'
+    if (chars[0].isLowerCase() || misreadFirst) {
+      for (i in 1 until chars.size) if (chars[i] in CASE_LOOKALIKES) chars[i] = chars[i].lowercaseChar()
+    }
+    for (i in chars.indices) sb.setCharAt(start + i, chars[i])
+  }
+
+  private const val CASE_LOOKALIKES = "COSUVWXZ"
 
   /** True if [text] ends in a letter followed by a line-end hyphen, i.e. a word broken mid-way. */
   fun endsWithBrokenWord(text: String): Boolean {

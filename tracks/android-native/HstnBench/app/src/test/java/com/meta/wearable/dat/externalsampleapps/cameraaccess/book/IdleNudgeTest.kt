@@ -1,5 +1,13 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.book
 
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.BatteryLevel
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.EchoGuard
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlassesSnapshot
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HealthMonitor
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.Heat
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.IdleNudge
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.PhoneSnapshot
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

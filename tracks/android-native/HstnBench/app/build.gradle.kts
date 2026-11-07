@@ -45,6 +45,14 @@ android {
         localProperties.getProperty("mwdat_application_id", "")
     manifestPlaceholders["mwdat_client_token"] =
         localProperties.getProperty("mwdat_client_token", "")
+
+    // Ask about the text: optional Claude path for open questions, off unless local.properties
+    // has anthropic_api_key (tools/ask/AskProvider). Empty = on-device answers only, no network.
+    buildConfigField(
+        "String",
+        "ANTHROPIC_API_KEY",
+        "\"" + localProperties.getProperty("anthropic_api_key", "").replace("\\", "").replace("\"", "") + "\"",
+    )
   }
 
   buildTypes {
@@ -78,6 +86,8 @@ dependencies {
   implementation(libs.mwdat.mockdevice)
   // Book reader: on-device OCR, Latin script, model bundled in the APK (no Play Services download).
   implementation(libs.mlkit.text.recognition)
+  // Label reader: on-device barcode scanning, model bundled in the APK.
+  implementation(libs.mlkit.barcode.scanning)
   testImplementation(libs.junit)
   androidTestImplementation(libs.androidx.ui.test.junit4)
   androidTestImplementation(libs.androidx.test.uiautomator)

@@ -12,18 +12,20 @@
 // A bookmark (pages read + last sentence) is saved after every sentence so a fold, which ends the
 // DAT session, can resume where it stopped.
 //
-// Voice is the primary control, not an extra: a blind reader can't see the buttons. While the reader
-// is open it listens (glasses mic first, phone mic as fallback; VoiceControl), understands on-device
-// (book/VoiceCommands), and answers out loud. Replies interrupt the sentence being read and then
-// read it again, so the user never waits for a long sentence to finish. EchoGuard drops transcripts
-// that are just the book (or our replies) coming back through the mic. Launched straight into the
-// reader (voice-first), it also brings the glasses link up by itself and narrates each step.
+// Voice is the primary control, not an extra: a blind reader can't see the buttons. The voice-first
+// machinery every tool shares lives in tools/ToolHub (the reader is one ToolHost): listening
+// (glasses mic first, phone fallback), the echo guard, connecting and narrating each step on a
+// voice-first launch, spoken pitfalls, silence reminders, switching to another tool by voice, and
+// questions about the text. This class keeps what is specific to reading: the book grammar
+// (book/VoiceCommands, tried before the global one), the page loop, the bookmark, and the reading
+// position. Replies interrupt the sentence being read and then read it again (onAsideDone), so the
+// user never waits for a long sentence to finish. Each page and the sentence being read are
+// published to ToolHub.recentText for "ask about the text".
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader
 
 import android.app.Application
 import android.content.Context
-import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
@@ -32,19 +34,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bench.BenchClock
-import com.meta.wearable.dat.core.Wearables
-import com.meta.wearable.dat.core.types.Permission
-import com.meta.wearable.dat.core.types.PermissionStatus
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.BatteryLevel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.Bookmark
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.EchoGuard
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.GlassesSnapshot
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.HealthAlert
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.HealthMonitor
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.IdleNudge
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.ImageCheck
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.ImageIssue
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.PhoneSnapshot
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ask.AskGrammar
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ask.AskMemory
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.FrameSignal
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.FrameSizeMotion
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.PageOutcome
@@ -55,7 +47,20 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.SpeechChunker
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.TurnEvent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.VoiceCommand
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.VoiceCommands
-import java.util.Locale
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.CameraLink
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.Earcon
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.Microphone
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.OpenReason
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolHost
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolHub
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolTexts
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.BatteryLevel
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlobalCommand
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HealthAlert
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.ImageCheck
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.ImageIssue
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolId
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -63,12 +68,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 
 enum class ReaderPhase {
   /** Not started. */
@@ -117,8 +119,11 @@ data class BookReaderUiState(
 
 class BookReaderViewModel(
     application: Application,
-    private val camera: PageCamera,
-) : AndroidViewModel(application), BookSpeaker.Listener {
+    private val hub: ToolHub,
+) : AndroidViewModel(application), ToolHost {
+
+  override val toolId = ToolId.BOOK
+  private val camera = hub.camera
 
   companion object {
     private const val TAG = "BookReader"
@@ -129,15 +134,8 @@ class BookReaderViewModel(
     private const val KEY_AUTO = "auto_turn"
     private const val MAX_HINTS = 3
     private const val HINT_RETRY_MS = 2500L
-    private const val LINK_WAIT_MS = 20_000L
-    private const val SORRY_GAP_MS = 8_000L
-    private const val SORRY_MAX_WORDS = 6
     private const val TICK_MS = 2_500L
     private const val STILL_WORKING_MS = 10_000L
-    private const val STREAM_LOST_SAY_DELAY_MS = 1_500L
-    private const val ALERT_EXPLAINS_MS = 4_000L
-    private const val RECONNECT_EVERY_MS = 4_000L
-    private const val NUDGE_CHECK_MS = 1_000L
     const val MIN_RATE = 0.5f
     const val MAX_RATE = 3f
   }
@@ -160,11 +158,7 @@ class BookReaderViewModel(
   private val detector = PageTurnDetector()
   private val motion = FrameSizeMotion()
   private val ocr = MlKitOcr()
-  private val earcons = Earcons()
-  private val speaker = BookSpeaker(application, this).apply { setRate(_uiState.value.speechRate) }
-  private val voice = VoiceControl(application, viewModelScope)
-  private val echo = EchoGuard()
-  private val nudge = IdleNudge()
+  private val earcons = hub.earcons
 
   // Main thread only.
   private var current: Page? = null
@@ -174,22 +168,12 @@ class BookReaderViewModel(
   private var retryJob: Job? = null
   private var hintAttempts = 0
   private var pendingResume: Bookmark? = null
-  private var speakingAside = false
   private var lastPage: Page? = null
-  private var voiceJob: Job? = null
-  private var lastSorryMs = 0L
+  private var pageSerial = 0
 
-  // Pitfalls: glasses/phone health, reconnecting.
-  private val watch = ReaderWatch(application)
-  private val health = HealthMonitor()
-  private var glassesNow: GlassesSnapshot? = null
-  private var phoneNow: PhoneSnapshot? = null
-  private var requestPermission: (suspend (Permission) -> PermissionStatus)? = null
-  private var lastAlertMs = 0L
-  private var streamLost = false
-  private var reconnectJob: Job? = null
-  private var phoneAllowed: (suspend () -> Boolean)? = null
-  private var reconnectLoop: Job? = null
+  /** A short note is being spoken; the page waits for it (ToolHub owns the flag). */
+  private val speakingAside: Boolean
+    get() = hub.isSpeakingAside
 
   init {
     // Page-turn detection from the stream. Cheap per frame; events hop to main.
@@ -200,13 +184,8 @@ class BookReaderViewModel(
         if (event != null) withContext(Dispatchers.Main) { onTurnEvent(event) }
       }
     }
-    // A fold or session end stops the stream: stop talking, keep the bookmark.
-    viewModelScope.launch {
-      camera.isStreaming.drop(1).collect { streaming ->
-        if (!streaming && _uiState.value.phase != ReaderPhase.IDLE) onStreamLost()
-        if (streaming && streamLost) onStreamBack()
-      }
-    }
+    // Which mic ToolHub is listening on, for the screen.
+    viewModelScope.launch { hub.microphone.collect { m -> _uiState.update { it.copy(microphone = m) } } }
   }
 
   // MARK: - Controls
@@ -244,7 +223,6 @@ class BookReaderViewModel(
   fun pause() {
     userActed()
     hush()
-    speakingAside = false
     retryJob?.cancel()
     saveBookmark()
     _uiState.update { it.copy(phase = ReaderPhase.PAUSED, status = str(R.string.book_status_paused)) }
@@ -289,20 +267,16 @@ class BookReaderViewModel(
     publishChunk()
     if (_uiState.value.phase == ReaderPhase.READING) {
       hush()
-      speakingAside = false
       speakCurrent()
     }
   }
 
   /** A button press or command: acknowledge it, and start silence reminders over. */
-  private fun userActed() {
-    earcons.play(Earcon.ACK)
-    nudge.userActed(SystemClock.elapsedRealtime())
-  }
+  private fun userActed() = hub.userActed()
 
   fun setSpeechRate(rate: Float) {
     val r = (Math.round(rate * 10f) / 10f).coerceIn(MIN_RATE, MAX_RATE)
-    speaker.setRate(r)
+    hub.setRate(r)
     prefs.edit().putFloat(KEY_RATE, r).apply()
     _uiState.update { it.copy(speechRate = r) }
   }
@@ -322,7 +296,6 @@ class BookReaderViewModel(
   fun stop() {
     if (_uiState.value.phase == ReaderPhase.IDLE) return
     hush()
-    speakingAside = false
     captureJob?.cancel()
     retryJob?.cancel()
     saveBookmark()
@@ -522,6 +495,8 @@ class BookReaderViewModel(
     }
     current = next
     chunkIndex = 0
+    // Pages read this session, for questions about the text.
+    hub.recentText.addPassage(ToolId.BOOK, next.displayText, key = "page-${pageSerial++}")
     pendingResume?.let { bookmark ->
       pendingResume = null
       bookmark.resumeIndex(next.chunks)?.let { idx ->
@@ -548,44 +523,34 @@ class BookReaderViewModel(
       return
     }
     publishChunk()
-    if (!speakingAside) speaker.speak(page.chunks[chunkIndex].text, "chunk")
+    if (!speakingAside) hub.speak(page.chunks[chunkIndex].text, "chunk")
   }
 
   private fun publishChunk() {
     _uiState.update { it.copy(currentChunk = chunkIndex) }
+    hub.recentText.setCurrent(ToolId.BOOK, current?.chunks?.getOrNull(chunkIndex)?.sentenceText)
   }
 
   /** Short spoken note (status, hint). Reading resumes after it. */
-  private fun sayAside(text: String) {
-    speakingAside = true
-    speaker.speak(text, "aside")
-  }
+  private fun sayAside(text: String) = hub.sayAside(text)
 
-  override fun onUtteranceStarted(text: String) {
-    echo.spoke(text, SystemClock.elapsedRealtime())
+  /** A short note ended: carry on reading where it was. */
+  override fun onAsideDone() {
+    if (_uiState.value.phase == ReaderPhase.READING) speakCurrent()
   }
 
   override fun onSpoken(tag: String) {
-    echo.finished(SystemClock.elapsedRealtime())
-    when (tag) {
-      "aside" -> {
-        speakingAside = false
-        if (_uiState.value.phase == ReaderPhase.READING) speakCurrent()
-      }
-      "chunk" -> {
-        if (_uiState.value.phase != ReaderPhase.READING) return
-        val page = current ?: return
-        chunkIndex++
-        saveBookmark(page.chunks.getOrNull(chunkIndex - 1))
-        speakCurrent()
-      }
-    }
+    if (tag != "chunk") return
+    if (_uiState.value.phase != ReaderPhase.READING) return
+    val page = current ?: return
+    chunkIndex++
+    saveBookmark(page.chunks.getOrNull(chunkIndex - 1))
+    speakCurrent()
   }
 
   override fun onEngineState(available: Boolean) {
+    // ToolHub plays the error earcon when there's no voice at all.
     _uiState.update { it.copy(speechAvailable = available) }
-    // No voice at all: the only thing left to signal with is sound.
-    if (!available) earcons.play(Earcon.ERROR)
   }
 
   private fun pageFinished() {
@@ -603,193 +568,162 @@ class BookReaderViewModel(
   private fun pageDonePrompt(): String =
       str(if (_uiState.value.autoTurn) R.string.book_status_turn_page else R.string.book_status_press_next)
 
-  // MARK: - Voice
+  // MARK: - ToolHost: voice, reminders, pitfalls (the machinery is in ToolHub)
 
-  /**
-   * Starts listening while the reader screen is open. [voiceFirst]: the app was launched straight
-   * into the reader, so bring the glasses link up without dialogs and narrate each step.
-   */
-  fun openVoice(
-      voiceFirst: Boolean,
-      requestWearablesPermission: suspend (Permission) -> PermissionStatus,
-      requestRecordAudio: suspend () -> Boolean,
-  ) {
-    if (voiceJob?.isActive == true) return
+  override fun texts(): ToolTexts =
+      ToolTexts(
+          name = str(R.string.book_reader_title),
+          connecting = str(R.string.voice_connecting),
+          ready = str(R.string.voice_welcome_ready),
+          welcome = str(R.string.voice_welcome_short),
+          welcomeAfterSwitch = str(R.string.voice_welcome_after_switch),
+          help = str(R.string.voice_help),
+          streamLost = str(R.string.book_status_stream_lost),
+          pausedByGlasses = str(R.string.book_say_paused_by_glasses),
+          cameraBack = str(R.string.book_say_glasses_back),
+          cameraDenied = str(R.string.voice_camera_denied),
+          goodbye = str(R.string.voice_goodbye),
+      )
+
+  override fun speechRate(): Float = _uiState.value.speechRate
+
+  override fun onAttached(request: ToolRequest) {
     _uiState.update { it.copy(closeRequested = false) }
-    requestPermission = requestWearablesPermission
-    phoneAllowed = requestRecordAudio
-    voiceJob = viewModelScope.launch {
-      // Everything that can go wrong around the reader is spoken when it changes.
-      launch {
-        try {
-          watch.both().collect { (g, p) ->
-            glassesNow = g
-            phoneNow = p
-            onHealth(health.update(g, p))
-          }
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Exception) {
-          Log.w(TAG, "health watch failed", e)
-        }
-      }
-      // A quiet user gets told what the reader is waiting for.
-      launch { remindWhenQuiet() }
-      // Permission trouble, whoever started the connection.
-      launch {
-        camera.link.drop(1).collect { link ->
-          when (link) {
-            CameraLink.NEEDS_PERMISSION -> sayAside(str(R.string.voice_camera_permission))
-            CameraLink.CAMERA_DENIED -> warn(str(R.string.voice_camera_denied))
-            else -> Unit
-          }
-        }
-      }
-      if (voiceFirst && !camera.isStreaming.value) {
-        bringUpLink(requestWearablesPermission)
-      } else {
-        sayAside(str(R.string.voice_welcome_short))
-      }
-      // Glasses speech rides the session, so wait (briefly) for one before choosing a mic.
-      withTimeoutOrNull(LINK_WAIT_MS) { camera.link.first { it >= CameraLink.CONNECTED } }
-      val mic =
-          voice.start(
-              session = camera.deviceSession,
-              glassesAllowed = { glassesMicAllowed(requestWearablesPermission) },
-              phoneAllowed = requestRecordAudio,
-          )
-      Log.i(TAG, "voice microphone=$mic")
-      when (mic) {
-        Microphone.GLASSES -> Unit
-        Microphone.PHONE -> sayAside(str(R.string.voice_using_phone_mic))
-        Microphone.NONE -> sayAside(str(R.string.voice_unavailable))
-      }
-      launch { voice.microphone.collect { m -> _uiState.update { it.copy(microphone = m) } } }
-      voice.utterances.collect { onUtterance(it.text, it.isFinal) }
-    }
   }
 
-  /** Stops listening (screen closed). The bookmark and reading state are kept. */
-  fun closeVoice() {
-    voiceJob?.cancel()
-    voiceJob = null
-    reconnectJob?.cancel()
-    reconnectLoop?.cancel()
-    requestPermission = null
-    phoneAllowed = null
-    voice.stop()
+  /** Switching to another tool by voice: stop reading and keep the bookmark. */
+  override fun onLeaving() = stop()
+
+  override fun onDetached() {
     _uiState.update { it.copy(microphone = Microphone.NONE) }
   }
 
-  /**
-   * Runs while voice is on. When the reader is waiting for the user (not started, or between pages)
-   * and nobody has said anything for a while, say what it's waiting for. IdleNudge spaces the
-   * reminders out and stops after the last one, until the user does something.
-   */
-  private suspend fun remindWhenQuiet() {
-    nudge.userActed(SystemClock.elapsedRealtime())
-    while (true) {
-      delay(NUDGE_CHECK_MS)
-      val now = SystemClock.elapsedRealtime()
-      if (!waitingForUser()) {
-        nudge.busy(now)
-        continue
-      }
-      val reminder = nudge.due(now) ?: continue
-      val ui = _uiState.value
-      val app = getApplication<Application>()
-      val what =
-          when {
-            ui.phase == ReaderPhase.IDLE -> str(R.string.voice_nudge_start)
-            ui.lastResult == CaptureResult.HINT -> str(R.string.book_say_cant_see_page)
-            else -> str(R.string.voice_nudge_waiting) + " " + waitingHint()
-          }
-      val text = if (nudge.isLast(reminder)) what + " " + app.getString(R.string.voice_nudge_last) else what
-      Log.i(TAG, "nudge reminder=$reminder text=$text")
-      sayAside(text)
-    }
+  override fun onHeard(text: String) {
+    _uiState.update { it.copy(heard = text) }
   }
 
-  /** Nothing to read, nothing in progress, glasses there: only the user can move things on. */
-  private fun waitingForUser(): Boolean {
+  override fun onStatus(text: String) {
+    _uiState.update { it.copy(status = text) }
+  }
+
+  /**
+   * Barge-in: stop talking on the partial, don't wait for the recogniser to finish. A question
+   * about the text ("what does recondite mean") pauses too, silently: the answer follows, then
+   * "carry on" reads on from the interrupted sentence.
+   */
+  override fun onPartial(text: String): Boolean {
+    if (_uiState.value.phase == ReaderPhase.READING && VoiceCommands.isBargeIn(text)) {
+      Log.i(TAG, "voice barge-in on partial: \"$text\"")
+      voicePause()
+      return true
+    }
+    if (_uiState.value.phase == ReaderPhase.READING && AskGrammar.isQuestion(text)) {
+      Log.i(TAG, "voice barge-in on question partial: \"$text\"")
+      pause()
+      return true
+    }
+    return false
+  }
+
+  /** The book grammar, tried before the global one. */
+  override fun onCommand(text: String): Boolean {
+    val command = VoiceCommands.parse(text)
+    Log.i(TAG, "voice heard=\"$text\" command=$command")
+    if (command == null) return false
+    handle(command)
+    return true
+  }
+
+  /**
+   * Global commands the book grammar didn't catch. The everyday ones mean the same as the book's
+   * own; opening another tool and questions about the text are left to ToolHub.
+   */
+  override fun onGlobal(command: GlobalCommand): Boolean {
+    when (command) {
+      GlobalCommand.Pause -> handle(VoiceCommand.Pause)
+      GlobalCommand.Resume -> handle(VoiceCommand.Resume)
+      GlobalCommand.Repeat -> handle(VoiceCommand.Repeat)
+      is GlobalCommand.Faster -> handle(VoiceCommand.Faster(command.step))
+      is GlobalCommand.Slower -> handle(VoiceCommand.Slower(command.step))
+      is GlobalCommand.SetRate -> handle(VoiceCommand.SetRate(command.rate))
+      GlobalCommand.Help -> handle(VoiceCommand.Help)
+      GlobalCommand.Battery -> handle(VoiceCommand.Battery)
+      GlobalCommand.Close -> handle(VoiceCommand.Close)
+      is GlobalCommand.Open -> {
+        // "Read a book" in the book reader: same as "read".
+        if (command.request.tool != ToolId.BOOK) return false
+        handle(VoiceCommand.Resume)
+      }
+      is GlobalCommand.Ask -> {
+        // Stay paused after the answer (follow-ups like "more" or "spell it" may come); "carry on"
+        // reads on. ToolHub answers.
+        if (_uiState.value.phase == ReaderPhase.READING) pause()
+        return false
+      }
+    }
+    return true
+  }
+
+  // While a page is being read, unknown speech is most likely the room, not the user.
+  override fun onNotUnderstood(text: String) =
+      hub.sayNotUnderstood(text, busy = _uiState.value.phase == ReaderPhase.READING)
+
+  /** Nothing to read, nothing in progress: only the user can move things on. */
+  override fun isWaitingForUser(): Boolean {
     val ui = _uiState.value
     return (ui.phase == ReaderPhase.IDLE || ui.phase == ReaderPhase.WAITING) &&
         !ui.closeRequested &&
         !ui.isCapturing &&
-        !speakingAside &&
         current == null &&
         queue.isEmpty() &&
         captureJob?.isActive != true &&
-        retryJob?.isActive != true &&
-        reconnectJob?.isActive != true &&
-        !streamLost &&
-        camera.isStreaming.value
+        retryJob?.isActive != true
   }
 
-  private suspend fun bringUpLink(requestPermission: suspend (Permission) -> PermissionStatus) {
-    val narration = viewModelScope.launch {
-      camera.link.collect { link ->
-        if (link == CameraLink.CONNECTING) sayAside(str(R.string.voice_connecting))
-      }
-    }
-    camera.connectAndStream(requestPermission)
-    val up = withTimeoutOrNull(LINK_WAIT_MS) { camera.isStreaming.first { it } }
-    narration.cancel()
-    if (up == true) {
-      earcons.play(Earcon.PAGE_DONE)
-      sayAside(str(R.string.voice_welcome_ready))
-    } else {
-      explainNoGlasses()
-      // Keep waiting quietly; welcome the user when the glasses turn up.
-      viewModelScope.launch {
-        camera.isStreaming.first { it }
-        sayAside(str(R.string.voice_welcome_ready))
-      }
-    }
+  /** What the reader is waiting for, after a silence (ToolHub's IdleNudge spaces these out). */
+  override fun reminder(index: Int, last: Boolean): String {
+    val ui = _uiState.value
+    val what =
+        when {
+          ui.phase == ReaderPhase.IDLE -> str(R.string.voice_nudge_start)
+          ui.lastResult == CaptureResult.HINT -> str(R.string.book_say_cant_see_page)
+          else -> str(R.string.voice_nudge_waiting) + " " + waitingHint()
+        }
+    return if (last) what + " " + str(R.string.voice_nudge_last) else what
   }
 
-  private suspend fun glassesMicAllowed(
-      requestPermission: suspend (Permission) -> PermissionStatus,
-  ): Boolean {
-    val granted =
-        Wearables.checkPermissionStatus(Permission.MICROPHONE).fold(
-            onSuccess = { it == PermissionStatus.Granted },
-            onFailure = { error, _ ->
-              Log.w(TAG, "microphone permission check failed: ${error.description}")
-              false
-            },
-        )
-    if (granted) return true
-    sayAside(str(R.string.voice_mic_permission))
-    return requestPermission(Permission.MICROPHONE) == PermissionStatus.Granted
+  /** Pause for the conditions that stop reading; keep the place when the battery is nearly gone. */
+  override fun onHealthAlert(alert: HealthAlert): String? {
+    when (alert) {
+      HealthAlert.GlassesDisconnected,
+      HealthAlert.GlassesRemoved,
+      HealthAlert.GlassesTooHot -> if (_uiState.value.isRunning) pause()
+      is HealthAlert.GlassesBattery -> if (alert.level == BatteryLevel.CRITICAL) saveBookmark()
+      is HealthAlert.PhoneBattery -> if (alert.level == BatteryLevel.CRITICAL) saveBookmark()
+      else -> Unit
+    }
+    return null
   }
 
-  /** One transcript from the mic. Public so tests can drive it without audio. */
-  fun onUtterance(text: String, isFinal: Boolean) {
-    val now = SystemClock.elapsedRealtime()
-    if (echo.isEcho(text, now)) {
-      if (isFinal) Log.i(TAG, "voice echo ignored: \"$text\"")
-      return
+  /**
+   * A fold or session end: stop talking, keep the bookmark. Paused, not reset: the page already
+   * captured can still be read ("read" carries on). ToolHub reconnects and explains.
+   */
+  override fun onStreamLost(): Boolean {
+    if (_uiState.value.phase == ReaderPhase.IDLE) return false
+    hush()
+    captureJob?.cancel()
+    retryJob?.cancel()
+    saveBookmark()
+    processor.flushCarry()
+    _uiState.update {
+      it.copy(phase = ReaderPhase.PAUSED, isCapturing = false, status = str(R.string.book_status_stream_lost))
     }
-    if (!isFinal) {
-      // Barge-in: stop talking on the partial, don't wait for the recogniser to finish.
-      if (_uiState.value.phase == ReaderPhase.READING && VoiceCommands.isBargeIn(text)) {
-        Log.i(TAG, "voice barge-in on partial: \"$text\"")
-        voicePause()
-      }
-      return
-    }
-    _uiState.update { it.copy(heard = text) }
-    // Even speech that isn't a command means the user is there: no reminder needed yet.
-    nudge.userActed(now)
-    val command = VoiceCommands.parse(text)
-    Log.i(TAG, "voice heard=\"$text\" command=$command")
-    if (command == null) {
-      notUnderstood(text, now)
-      return
-    }
-    handle(command)
+    return true
   }
+
+  /** One transcript, as if from the mic. Public so tests can drive it without audio. */
+  fun onUtterance(text: String, isFinal: Boolean) = hub.onUtterance(text, isFinal)
 
   private fun handle(command: VoiceCommand) {
     val phase = _uiState.value.phase
@@ -821,7 +755,7 @@ class BookReaderViewModel(
       is VoiceCommand.Slower -> changeRate(_uiState.value.speechRate - command.step)
       is VoiceCommand.SetRate -> changeRate(command.rate)
       VoiceCommand.WhereAmI -> reply(whereAmI())
-      VoiceCommand.Battery -> reply(batteryReport())
+      VoiceCommand.Battery -> reply(hub.batteryReport())
       VoiceCommand.Help -> reply(str(R.string.voice_help))
       is VoiceCommand.ReadFurniture -> {
         setReadFurniture(command.enabled)
@@ -846,21 +780,7 @@ class BookReaderViewModel(
   }
 
   /** Answer now: cut the sentence being read, speak, then read that sentence again. */
-  private fun reply(text: String) {
-    earcons.play(Earcon.ACK)
-    hush()
-    speakingAside = false
-    sayAside(text)
-  }
-
-  private fun notUnderstood(text: String, now: Long) {
-    // While a page is being read, unknown speech is most likely the room, not the user.
-    if (_uiState.value.phase == ReaderPhase.READING) return
-    if (text.trim().split(Regex("\\s+")).size > SORRY_MAX_WORDS) return
-    if (now - lastSorryMs < SORRY_GAP_MS) return
-    lastSorryMs = now
-    reply(str(R.string.voice_not_understood))
-  }
+  private fun reply(text: String) = hub.reply(text)
 
   /**
    * Moves the reading position on the current page (or, between pages, the page just finished) to
@@ -883,7 +803,6 @@ class BookReaderViewModel(
     }
     chunkIndex = target(page, at).coerceIn(0, page.chunks.lastIndex)
     hush()
-    speakingAside = false
     retryJob?.cancel()
     _uiState.update {
       it.copy(
@@ -905,13 +824,7 @@ class BookReaderViewModel(
     val before = _uiState.value.speechRate
     setSpeechRate(requested)
     val after = _uiState.value.speechRate
-    val text =
-        when {
-          after == before && requested > before -> str(R.string.voice_rate_fastest)
-          after == before && requested < before -> str(R.string.voice_rate_slowest)
-          else -> getApplication<Application>().getString(R.string.voice_rate, formatRate(after))
-        }
-    reply(text)
+    reply(hub.rateReply(before, requested, after))
   }
 
   private fun whereAmI(): String {
@@ -935,201 +848,19 @@ class BookReaderViewModel(
   private fun waitingHint(): String =
       str(if (_uiState.value.autoTurn) R.string.voice_waiting_auto else R.string.voice_waiting_manual)
 
-  private fun formatRate(rate: Float): String =
-      if (rate % 1f == 0f) rate.toInt().toString()
-      else String.format(Locale.US, "%.2f", rate).trimEnd('0')
+  private fun formatRate(rate: Float): String = hub.formatRate(rate)
 
-  /** Stops speech now and tells the echo guard it ended. */
-  private fun hush() {
-    speaker.stop()
-    echo.finished(SystemClock.elapsedRealtime())
-  }
+  /** Stops speech now (ToolHub also tells the echo guard). */
+  private fun hush() = hub.hush()
 
   // MARK: - Session end and errors
 
-  private fun onStreamLost() {
-    hush()
-    speakingAside = false
-    captureJob?.cancel()
-    retryJob?.cancel()
-    saveBookmark()
-    earcons.play(Earcon.ERROR)
-    streamLost = true
-    processor.flushCarry()
-    // Paused, not reset: the page already captured can still be read ("read" carries on), and the
-    // place is kept for when the glasses come back.
-    _uiState.update {
-      it.copy(phase = ReaderPhase.PAUSED, isCapturing = false, status = str(R.string.book_status_stream_lost))
-    }
-    val pausedByGlasses = camera.link.value == CameraLink.PAUSED
-    if (!pausedByGlasses) keepTryingToReconnect()
-    viewModelScope.launch {
-      // A health alert ("glasses disconnected", "taken off") usually explains it better; give it
-      // a moment to arrive and only speak the generic line if nothing did.
-      delay(STREAM_LOST_SAY_DELAY_MS)
-      if (camera.isStreaming.value) return@launch
-      val now = SystemClock.elapsedRealtime()
-      when {
-        pausedByGlasses -> sayAside(str(R.string.book_say_paused_by_glasses))
-        now - lastAlertMs > ALERT_EXPLAINS_MS -> sayAside(str(R.string.book_status_stream_lost))
-      }
-    }
-  }
-
   /**
-   * Folding (or a session ending) doesn't always show up as a link change, so while the stream
-   * is lost and the reader is open, quietly try to bring it back whenever the glasses look
-   * reachable. Stops once streaming again or the reader closes.
-   */
-  private fun keepTryingToReconnect() {
-    if (reconnectLoop?.isActive == true) return
-    reconnectLoop = viewModelScope.launch {
-      while (streamLost && voiceJob?.isActive == true) {
-        delay(RECONNECT_EVERY_MS)
-        if (camera.isStreaming.value) break
-        val g = glassesNow
-        // Not gated on "worn": after a fold the glasses can keep reporting "off" until used.
-        val reachable = g == null || g.connected
-        val busy = camera.link.value.let {
-          it == CameraLink.CONNECTING || it == CameraLink.STARTING_STREAM ||
-              it == CameraLink.NEEDS_PERMISSION || it == CameraLink.CAMERA_DENIED
-        }
-        if (reachable && !busy) requestPermission?.let { camera.connectAndStream(it) }
-      }
-    }
-  }
-
-  /** The stream came back after a loss: say so, and move voice back onto the glasses. */
-  private fun onStreamBack() {
-    streamLost = false
-    if (voiceJob?.isActive != true) return
-    earcons.play(Earcon.PAGE_DONE)
-    say(str(R.string.book_say_glasses_back))
-    restartVoiceOnGlasses()
-  }
-
-  /**
-   * Not streaming but the user wants to read: bring the link up (narrated), then run [then]. If
-   * it doesn't come up, say why it can't.
+   * Not streaming but the user wants to read: bring the link up (narrated by ToolHub), then run
+   * [then]. Without voice open there's no way to ask for permission, so say it can't.
    */
   private fun reconnectThen(then: () -> Unit) {
-    val rp = requestPermission
-    if (rp == null) {
-      fail(R.string.book_error_not_streaming)
-      return
-    }
-    if (reconnectJob?.isActive == true) return
-    sayAside(str(R.string.voice_connecting))
-    camera.connectAndStream(rp)
-    reconnectJob = viewModelScope.launch {
-      val up = withTimeoutOrNull(LINK_WAIT_MS) { camera.isStreaming.first { it } }
-      if (up == true) then() else explainNoGlasses()
-    }
-  }
-
-  /** The most specific reason the glasses can't be reached, spoken. */
-  private fun explainNoGlasses() {
-    earcons.play(Earcon.ERROR)
-    val g = glassesNow
-    val p = phoneNow
-    sayAside(
-        str(
-            when {
-              p?.bluetoothOn == false -> R.string.health_bluetooth_off
-              g?.paired == false -> R.string.health_no_glasses
-              g?.updateRequired == true -> R.string.health_update_required
-              camera.link.value == CameraLink.CAMERA_DENIED -> R.string.voice_camera_denied
-              g?.connected == true && g.worn == false -> R.string.health_removed
-              else -> R.string.voice_no_glasses
-            },
-        ),
-    )
-  }
-
-  private fun restartVoiceOnGlasses() {
-    val rp = requestPermission ?: return
-    viewModelScope.launch {
-      voice.stop()
-      voice.start(
-          session = camera.deviceSession,
-          glassesAllowed = { glassesMicAllowed(rp) },
-          phoneAllowed = phoneAllowed ?: { false },
-      )
-    }
-  }
-
-  // MARK: - Glasses and phone health
-
-  private fun onHealth(alerts: List<HealthAlert>) {
-    for (alert in alerts) {
-      Log.i(TAG, "health=$alert")
-      lastAlertMs = SystemClock.elapsedRealtime()
-      val app = getApplication<Application>()
-      when (alert) {
-        HealthAlert.BluetoothOff -> warn(str(R.string.health_bluetooth_off))
-        HealthAlert.BluetoothOn -> say(str(R.string.health_bluetooth_on))
-        HealthAlert.NoGlassesPaired -> warn(str(R.string.health_no_glasses))
-        HealthAlert.GlassesDisconnected -> {
-          if (_uiState.value.isRunning) pause()
-          warn(str(R.string.health_disconnected))
-        }
-        HealthAlert.GlassesConnected -> {
-          say(str(R.string.health_connected))
-          // Bring the camera back by itself; onStreamBack says when it's ready.
-          if (!camera.isStreaming.value) requestPermission?.let { camera.connectAndStream(it) }
-        }
-        HealthAlert.GlassesRemoved -> {
-          if (_uiState.value.isRunning) pause()
-          warn(str(R.string.health_removed))
-        }
-        HealthAlert.GlassesWornAgain -> say(str(R.string.health_worn_again))
-        HealthAlert.UpdateRequired -> warn(str(R.string.health_update_required))
-        is HealthAlert.GlassesBattery -> {
-          if (alert.level == BatteryLevel.CRITICAL) saveBookmark()
-          warn(
-              app.getString(
-                  if (alert.level == BatteryLevel.CRITICAL) R.string.health_glasses_battery_critical
-                  else R.string.health_glasses_battery_low,
-                  alert.percent,
-              ),
-          )
-        }
-        is HealthAlert.PhoneBattery -> {
-          if (alert.level == BatteryLevel.CRITICAL) saveBookmark()
-          warn(app.getString(R.string.health_phone_battery_low, alert.percent))
-        }
-        HealthAlert.GlassesHot -> warn(str(R.string.health_hot))
-        HealthAlert.GlassesTooHot -> {
-          if (_uiState.value.isRunning) pause()
-          warn(str(R.string.health_too_hot))
-        }
-        HealthAlert.GlassesCooled -> say(str(R.string.health_cooled))
-      }
-    }
-  }
-
-  /** A problem: error earcon, then interrupt and say it. Reading carries on after if it can. */
-  private fun warn(text: String) {
-    earcons.play(Earcon.ERROR)
-    _uiState.update { it.copy(status = text) }
-    reply(text)
-  }
-
-  private fun say(text: String) {
-    _uiState.update { it.copy(status = text) }
-    sayAside(text)
-  }
-
-  private fun batteryReport(): String {
-    val app = getApplication<Application>()
-    val g = glassesNow?.takeIf { it.connected }?.battery
-    val p = phoneNow?.battery
-    return when {
-      g != null && p != null -> app.getString(R.string.voice_battery_both, g, p)
-      g != null -> app.getString(R.string.voice_battery_glasses, g)
-      p != null -> app.getString(R.string.voice_battery_phone, p)
-      else -> str(R.string.voice_battery_unknown)
-    }
+    if (!hub.reconnectThen(then)) fail(R.string.book_error_not_streaming)
   }
 
   private fun fail(@StringRes message: Int) {
@@ -1143,28 +874,26 @@ class BookReaderViewModel(
     val page = current
     val chunk = spoken ?: page?.chunks?.getOrNull(chunkIndex - 1) ?: return
     val bookmark = Bookmark(_uiState.value.pagesRead, chunk.sentenceText)
-    prefs.edit().putString(KEY_BOOKMARK, bookmark.encode()).apply()
+    // The recent text goes next to the bookmark, for "what happened last time" after a restart.
+    AskMemory.save(prefs.edit().putString(KEY_BOOKMARK, bookmark.encode()), hub.recentText.snapshot(ToolId.BOOK)).apply()
   }
 
   private fun str(@StringRes id: Int): String = getApplication<Application>().getString(id)
 
   override fun onCleared() {
     super.onCleared()
-    voice.stop()
     saveBookmark()
-    speaker.shutdown()
-    earcons.release()
     ocr.close()
   }
 
   class Factory(
       private val application: Application,
-      private val camera: PageCamera,
+      private val hub: ToolHub,
   ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
       if (modelClass.isAssignableFrom(BookReaderViewModel::class.java)) {
         @Suppress("UNCHECKED_CAST")
-        return BookReaderViewModel(application, camera) as T
+        return BookReaderViewModel(application, hub) as T
       }
       throw IllegalArgumentException("Unknown ViewModel class")
     }

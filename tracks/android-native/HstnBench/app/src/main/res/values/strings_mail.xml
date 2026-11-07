@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mail reader (tools/mail/). Only this tool uses these; its feature work edits this file only.
+     The letter summary and answers themselves are built in LetterSpeech.kt (English, JVM-tested). -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="mail_name" description="Spoken and shown name of the tool">Mail reader</string>
+    <string name="mail_launcher_label" description="Launcher name, so the user can say Open Mail Reader">Mail Reader</string>
+    <string name="mail_button" description="Button on the camera screen that opens the tool">Mail</string>
+    <string name="mail_button_description" description="Accessibility description of that button">Open mail reader. Says who a letter is from and what it\'s about, then reads it.</string>
+    <string name="mail_help" description="Spoken list of what can be said in this tool">Hold up a letter or envelope about a foot from your face. You can say: what is this letter, read it all, who\'s it from, who\'s it for, how much, when is it due, is it junk, what\'s the reference number, read the envelope, next page, new letter, stop, carry on, back, skip, start again, or close.</string>
+
+    <!-- Spoken -->
+    <string name="mail_welcome" description="Spoken when the tool opens">Hold up a letter or envelope and say: what is this letter.</string>
+    <string name="mail_looking" description="Spoken when a photo of the letter is being taken">Looking.</string>
+    <string name="mail_looking_page" description="Spoken when photographing another page">Looking at the next page.</string>
+    <string name="mail_still_looking" description="Spoken if the user asks again while still reading the photo">Still looking at the letter.</string>
+    <string name="mail_still_working" description="Spoken if reading the letter takes a while">Still reading the letter.</string>
+    <string name="mail_capture_failed" description="Photo from the glasses failed">I couldn\'t get a photo from your glasses. Say read to try again.</string>
+    <string name="mail_ocr_failed" description="Text recognition failed">Sorry, I couldn\'t read that. Say read to try again.</string>
+    <string name="mail_no_text" description="Nothing readable in the photo">I can\'t see any writing. Hold the letter about a foot from your face, flat and facing you, then say read.</string>
+    <string name="mail_low_confidence" description="Text too blurred">I can\'t read this clearly. Hold the letter still, in good light, then say read.</string>
+    <string name="mail_too_small" description="Text too small">The writing is too small. Bring the letter a little closer, then say read.</string>
+    <string name="mail_hint_covered" description="Lens covered">Something is covering the camera. Check nothing is over the left side of your glasses, then say read.</string>
+    <string name="mail_hint_dark" description="Too dark">It\'s too dark to read. Turn on a light, then say read.</string>
+    <string name="mail_hint_nothing" description="No letter in view">I can\'t see a letter. Hold it up about a foot in front of your face, then say read.</string>
+    <string name="mail_cut_right" description="Letter cut off at the right">The letter looks cut off on the right. Turn your head a little right, or move the letter left, and say read again.</string>
+    <string name="mail_cut_left" description="Letter cut off at the left">The letter looks cut off on the left. Turn your head a little left, and say read again.</string>
+    <string name="mail_cut_top" description="Letter cut off at the top">The top of the letter looks cut off. Tilt your head up a little, and say read again.</string>
+    <string name="mail_cut_bottom" description="Letter cut off at the bottom">The bottom of the letter looks cut off. Tilt your head down a little, and say next page or read again.</string>
+    <string name="mail_too_close" description="Letter too close">The letter doesn\'t fit. Hold it a little further away, and say read again.</string>
+    <string name="mail_same_page" description="Next page photo shows the same page">That looks like the same page. Turn it over, then say next page.</string>
+    <string name="mail_page_added" description="Another page was added; %1$d is the number of pages">Page <xliff:g id="n">%1$d</xliff:g> added.</string>
+    <string name="mail_no_letter" description="Asked something before any letter was read">I haven\'t read a letter yet. Hold one up and say: what is this letter.</string>
+    <string name="mail_end" description="Read it all reached the end">That\'s the end of the letter. Say start again, next page, or hold up another letter and say read.</string>
+    <string name="mail_paused" description="Reading paused by voice">Paused. Say carry on to continue.</string>
+    <string name="mail_nothing_to_resume" description="Carry on with nothing being read">Say read it all to hear the letter, or hold up a letter and say read.</string>
+    <string name="mail_at_start" description="Back at the first sentence">That\'s the start of the letter.</string>
+    <string name="mail_nudge_idle" description="Reminder when nothing has happened">Hold up a letter and say: what is this letter. Or say help.</string>
+    <string name="mail_nudge_ready" description="Reminder after a summary">Say read it all, how much, or who\'s it from. Or hold up another letter and say new letter.</string>
+    <string name="mail_nudge_paused" description="Reminder while paused">Reading is paused. Say carry on to continue.</string>
+    <string name="mail_nudge_last" description="Last reminder">I\'ll stay quiet now. Say help any time.</string>
+    <string name="mail_title" description="Title for the ask-about-the-text seam; %1$s is the sender">Letter from <xliff:g id="sender">%1$s</xliff:g></string>
+
+    <!-- Screen -->
+    <string name="mail_status_looking" description="Status while photographing and reading">Reading the letter…</string>
+    <string name="mail_status_ready" description="Status after a summary">Letter read. Say read it all to hear every word.</string>
+    <string name="mail_status_reading" description="Status while reading every word">Reading every word</string>
+    <string name="mail_status_paused" description="Status while paused">Paused</string>
+    <string name="mail_action_summarise" description="Button: photograph and summarise">What is this letter?</string>
+    <string name="mail_action_read_all" description="Button: read every word">Read it all</string>
+    <string name="mail_action_pause" description="Button: pause reading">Pause</string>
+    <string name="mail_action_resume" description="Button: carry on reading">Carry on</string>
+    <string name="mail_action_back" description="Button: back a sentence">Back a sentence</string>
+    <string name="mail_action_next_page" description="Button: add another page">Next page</string>
+    <string name="mail_action_how_much" description="Button: how much is due">How much?</string>
+    <string name="mail_label_kind" description="Label on screen; %1$s is the kind of letter">Kind: <xliff:g id="v">%1$s</xliff:g></string>
+    <string name="mail_label_from" description="Label on screen; %1$s is the sender">From: <xliff:g id="v">%1$s</xliff:g></string>
+    <string name="mail_label_for" description="Label on screen; %1$s is the recipient">For: <xliff:g id="v">%1$s</xliff:g></string>
+    <string name="mail_label_date" description="Label on screen; %1$s is the date">Date: <xliff:g id="v">%1$s</xliff:g></string>
+    <string name="mail_label_about" description="Label on screen; %1$s is the subject">About: <xliff:g id="v">%1$s</xliff:g></string>
+    <string name="mail_label_amount" description="Label on screen; %1$s is the amount line">Amount: <xliff:g id="v">%1$s</xliff:g></string>
+    <string name="mail_label_due" description="Label on screen; %1$s is the deadline line">Due: <xliff:g id="v">%1$s</xliff:g></string>
+    <string name="mail_label_pages" description="Label on screen; %1$d is the number of pages">Pages: <xliff:g id="n">%1$d</xliff:g></string>
+    <string name="mail_unknown" description="A field that couldn't be read">not found</string>
+    <string name="mail_amount_unsure" description="Screen text for an amount that can't be read for sure">can\'t read for sure</string>
+    <string name="mail_amount_conflict" description="Screen text when two amounts disagree">two different amounts, can\'t tell</string>
+    <string name="mail_sentence_heading" description="Heading above the sentence being read">Now reading</string>
+    <string name="mail_text_heading" description="Heading above the full letter text">Letter text</string>
+</resources>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Watch for text (tools/watch/). Only this tool uses these; its feature work edits this file only.
+     Wording is orientation only: where text is, never whether it is safe to move (ROADMAP: not a mobility aid). -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="watch_name" description="Spoken and shown name of the tool">Watch for text</string>
+    <string name="watch_launcher_label" description="Launcher name, so the user can say Open Watch For Text">Watch For Text</string>
+    <string name="watch_button" description="Button on the camera screen that opens the tool">Watch</string>
+    <string name="watch_button_description" description="Accessibility description of that button">Open watch for text. Tells you when it sees a word or number you ask for.</string>
+    <string name="watch_help" description="Spoken list of what can be said in this tool">I keep reading what your glasses see and tell you when your word or number appears, and which side it\'s on. You can say: watch for, then a word or number. Where is it. What are you watching for. Watch for something else. Stop watching. Carry on watching. Ticks off, ticks on, or tick every 20 seconds. Or close. Keep using your cane or dog as usual.</string>
+
+    <!-- Starting and changing what to watch for -->
+    <string name="watch_ask_target" description="Asked when opened with nothing to watch for">What should I watch for? Say a word or a number, like 42, or exit.</string>
+    <string name="watch_start_first" description="First time watching starts; %1$s is the target">I\'ll tell you when I see <xliff:g id="target">%1$s</xliff:g>. Keep using your cane or dog as usual.</string>
+    <string name="watch_start" description="Watching starts again or with a new target; %1$s is the target">Watching for <xliff:g id="target">%1$s</xliff:g>.</string>
+    <string name="watch_resumed" description="Watching restarted; %1$s is the target">Watching for <xliff:g id="target">%1$s</xliff:g> again.</string>
+    <string name="watch_didnt_get_target" description="The target couldn't be understood">Sorry, I didn\'t get what to watch for. Say a word or a number.</string>
+
+    <!-- Sightings -->
+    <string name="watch_seen" description="Target seen; %1$s is the target, %2$s where (e.g. on your right)"><xliff:g id="target">%1$s</xliff:g>, <xliff:g id="where">%2$s</xliff:g>.</string>
+    <string name="watch_left" description="Position of the text">on your left</string>
+    <string name="watch_right" description="Position of the text">on your right</string>
+    <string name="watch_ahead" description="Position of the text">ahead</string>
+    <string name="watch_where_close" description="Position plus nearness; %1$s is the position">%1$s, close</string>
+    <string name="watch_where_far" description="Position plus nearness; %1$s is the position">%1$s, far off</string>
+    <string name="watch_gone" description="The target has been out of view for a few seconds; %1$s is the target"><xliff:g id="target">%1$s</xliff:g>, gone.</string>
+    <string name="watch_near_miss" description="Something nearly matched; %1$s what was seen, %2$s the target">I see <xliff:g id="seen">%1$s</xliff:g>, not <xliff:g id="target">%2$s</xliff:g>.</string>
+    <string name="watch_where_in_view" description="Where is it, while in view; %1$s target, %2$s position"><xliff:g id="target">%1$s</xliff:g>, <xliff:g id="where">%2$s</xliff:g>.</string>
+    <string name="watch_where_last_seen" description="Where is it, after it went; %1$s target, %2$s position, %3$d seconds ago">I last saw <xliff:g id="target">%1$s</xliff:g> <xliff:g id="where">%2$s</xliff:g>, <xliff:g id="seconds">%3$d</xliff:g> seconds ago.</string>
+    <string name="watch_where_not_seen" description="Where is it, before any sighting; %1$s target">I haven\'t seen <xliff:g id="target">%1$s</xliff:g> yet. I\'m still watching.</string>
+    <string name="watch_where_nothing" description="Where is it, with no target">I\'m not watching for anything. Say watch for, then a word or number.</string>
+
+    <!-- Control -->
+    <string name="watch_what_target" description="What are you watching for; %1$s target">I\'m watching for <xliff:g id="target">%1$s</xliff:g>.</string>
+    <string name="watch_what_target_stopped" description="What are you watching for, while stopped; %1$s target">I was watching for <xliff:g id="target">%1$s</xliff:g>, but I\'ve stopped. Say carry on watching to start again.</string>
+    <string name="watch_stopped" description="Stop watching; %1$s target">Stopped watching for <xliff:g id="target">%1$s</xliff:g>. Say carry on watching, or watch for something else.</string>
+    <string name="watch_paused" description="Pause; %1$s target">Paused. Say carry on to keep watching for <xliff:g id="target">%1$s</xliff:g>.</string>
+    <string name="watch_not_watching" description="Stop or where with nothing being watched">I\'m not watching for anything. Say watch for, then a word or number.</string>
+    <string name="watch_ticks_off" description="Alive tick turned off">Ticks off. I\'ll still tell you if something goes wrong.</string>
+    <string name="watch_ticks_every" description="Alive tick interval; %1$d seconds">I\'ll tick every <xliff:g id="seconds">%1$d</xliff:g> seconds while I watch.</string>
+
+    <!-- Problems: always spoken, never silent -->
+    <string name="watch_covered" description="Image check: lens covered">I can\'t see anything. Is something covering the camera? It\'s at the front left of your glasses.</string>
+    <string name="watch_dark" description="Image check: too dark">It\'s too dark for me to read signs here.</string>
+    <string name="watch_view_back" description="The view problem cleared; %1$s target">I can see again. Still watching for <xliff:g id="target">%1$s</xliff:g>.</string>
+    <string name="watch_slow" description="OCR can't keep up; %1$d seconds between looks">Reading is slow on this phone. I can only look about every <xliff:g id="seconds">%1$d</xliff:g> seconds.</string>
+    <string name="watch_no_frames" description="Streaming but no pictures arrive">I\'m not getting pictures from your glasses camera. I\'ll keep trying.</string>
+    <string name="watch_ocr_failed" description="Text recognition keeps failing">Text recognition isn\'t working right now. I\'ll keep trying.</string>
+
+    <!-- Reminders while waiting for the user -->
+    <string name="watch_reminder_ask" description="Silence reminder while asking for a target">Still here. What should I watch for? Say a word or a number, or say close.</string>
+    <string name="watch_reminder_stopped" description="Silence reminder while stopped; %1$s target">I\'m not watching right now. Say carry on watching for <xliff:g id="target">%1$s</xliff:g>, watch for something else, or close.</string>
+
+    <!-- Screen -->
+    <string name="watch_screen_target" description="Screen: what is being watched for; %1$s target">Watching for: <xliff:g id="target">%1$s</xliff:g></string>
+    <string name="watch_screen_stopped" description="Screen: stopped; %1$s target">Stopped. Was watching for: <xliff:g id="target">%1$s</xliff:g></string>
+    <string name="watch_screen_no_target" description="Screen: no target yet">Not watching yet. Say what to watch for.</string>
+    <string name="watch_screen_last" description="Screen: last sighting; %1$s">Last: <xliff:g id="last">%1$s</xliff:g></string>
+    <string name="watch_screen_pace" description="Screen: OCR time per frame and frames per second; %1$d ms, %2$s fps">Reading takes <xliff:g id="ms">%1$d</xliff:g> ms a look, <xliff:g id="fps">%2$s</xliff:g> looks a second</string>
+    <string name="watch_screen_read" description="Screen: what OCR read in the last frame; %1$s">I can read: <xliff:g id="text">%1$s</xliff:g></string>
+    <string name="watch_screen_read_nothing" description="Screen: OCR read nothing">no text</string>
+    <string name="watch_button_where" description="Button: say where the target is">Where is it?</string>
+    <string name="watch_button_stop" description="Button: stop watching">Stop watching</string>
+    <string name="watch_button_resume" description="Button: start watching again">Carry on watching</string>
+    <string name="watch_button_change" description="Button: watch for something else (asks by voice)">Watch for something else</string>
+    <string name="watch_button_ticks" description="Button: change the alive tick; %1$s current setting">Tick: <xliff:g id="setting">%1$s</xliff:g></string>
+    <string name="watch_ticks_off_short" description="Tick setting shown on the button">off</string>
+    <string name="watch_ticks_every_short" description="Tick setting shown on the button; %1$d seconds">every <xliff:g id="seconds">%1$d</xliff:g> s</string>
+</resources>
