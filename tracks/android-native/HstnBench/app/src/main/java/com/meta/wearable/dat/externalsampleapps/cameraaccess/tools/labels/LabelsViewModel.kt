@@ -425,7 +425,7 @@ class LabelsViewModel(application: Application, hub: ToolHub) :
   }
 
   private fun addView(page: OcrPage) {
-    val lines = PageLayout.readingOrder(page.lines).map { LabelLine(it.text.trim(), it.box.height) }.filter { it.text.isNotEmpty() }
+    val lines = PageLayout.readingOrder(page.lines).map { LabelLine(it.text.trim(), it.box.height, it.confidence) }.filter { it.text.isNotEmpty() }
     val paragraphs =
         page.blocks
             .filter { it.lines.isNotEmpty() }
@@ -501,8 +501,17 @@ class LabelsViewModel(application: Application, hub: ToolHub) :
   }
 
   private fun expiryAnswer(): String {
-    val text = views.asReversed().joinToString("\n") { it.text }
-    return LabelDates.answer(LabelDates.find(text, LocalDate.now()), LocalDate.now()) ?: str(R.string.labels_no_expiry)
+    val today = LocalDate.now()
+    val lines = views.asReversed().flatMap { it.lines }
+    val plain = LabelDates.answer(LabelDates.find(lines.joinToString("\n") { it.text }, today), today)
+    if (!medicine) return plain ?: str(R.string.labels_no_expiry)
+    // Medicine: only a clearly read date, always with the reminder. The lines the date is on: any
+    // line with a date or a date keyword, and the line after a keyword (the date often sits below).
+    val dateLines = lines.indices.filter { i ->
+      val f = LabelDates.find(lines[i].text, today)
+      f.dates.isNotEmpty() || (i > 0 && LabelDates.find(lines[i - 1].text, today).keywordWithoutDate != null)
+    }
+    return MedicineCheck.expiry(plain, dateLines.map { lines[it].confidence }) ?: str(R.string.labels_no_expiry)
   }
 
   private fun nameAnswer(): String =

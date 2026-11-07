@@ -76,7 +76,7 @@ From the ROADMAP: medicine gives the name only, never doses.
   - It is checked after every OCR and after a lookup.
 - **What is said for medicine:**
   - The name, with every number and unit stripped, e.g. "Paracetamol 500 mg Tablets" → "Paracetamol Tablets": "This looks like medicine: PARACETAMOL."
-  - The expiry date is still given. It is not a dose, and it matters for safety. **This is my reading of the rule.** If the rule is meant to cover dates too, remove the date from `labels_medicine_only_name` and from the `Expiry` branch.
+  - The expiry date is still given, **only if it was read clearly**, and always with a reminder (decided 2026-11-07): "Expiry date the end of June 2028. Please have a pharmacist or a trusted person check the date before you take it." If the OCR confidence of any line the date came from is below 0.8, or the engine gave none, no date is said: "I can see a date on this medicine, but I can't read it for sure. Please ask a pharmacist or a trusted person to check it." (`MedicineCheck.expiry`, `MedicineExpiryTest`). Food dates are unchanged.
   - "Read it all", ingredients, cooking and allergens all get the name, then "For medicine I only tell you the name and the date. I won't read medicine doses. Please check with a pharmacist or a trusted person."
   - Any dose question ("how many should I take", "what's the dose", "how often", "directions for use", "can I take another") gets "I won't read medicine doses. Please check with a pharmacist or a trusted person." This happens on any label, food or not.
 - **Nothing from a medicine label leaves the speech path.**
@@ -123,7 +123,7 @@ Galaxy A26, Android 16, mock HSTN, run with the phone lock. `am instrument -e cl
   - The paracetamol label reads "500 mg Tablets / Dosage: adults take 2 tablets every 4 hours. Do not exceed 8 tablets in 24 hours. / EXP 2028-06".
   - "read the label" → "This looks like medicine: PARACETAMOL. For medicine I only tell you the name and the date. I won't read medicine doses…"
   - "how many should I take" and "read it all" are declined.
-  - "when does it expire" → "Expiry date the end of June 2028."
+  - "when does it expire" → "Expiry date the end of June 2028. Please have a pharmacist or a trusted person check the date before you take it."
   - None of these were ever sent to speech: "500", "2 tablets", "4 hours", "every", "Do not exceed", "24 hours", "Dosage".
   - There is no label text on screen and no "tablets" in RecentText.
 

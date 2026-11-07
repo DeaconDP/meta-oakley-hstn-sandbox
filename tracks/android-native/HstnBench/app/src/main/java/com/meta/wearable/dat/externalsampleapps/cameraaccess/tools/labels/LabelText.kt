@@ -12,7 +12,7 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.labels
 
 /** One OCR line in reading order. [height] is its box height in pixels (bigger print, bigger). */
-data class LabelLine(val text: String, val height: Float = 0f)
+data class LabelLine(val text: String, val height: Float = 0f, val confidence: Float? = null)
 
 enum class LabelSection { INGREDIENTS, COOKING, ALLERGENS }
 

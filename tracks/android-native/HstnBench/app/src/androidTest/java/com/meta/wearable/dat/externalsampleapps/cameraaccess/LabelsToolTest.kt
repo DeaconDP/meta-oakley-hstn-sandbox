@@ -18,6 +18,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolHub
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolId
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.labels.MedicineCheck
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolRequest
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.labels.LabelsLookup
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.labels.LookupResult
@@ -134,9 +135,12 @@ class LabelsToolTest {
     ToolTestKit.say(glasses, "read it all")
     compose.waitUntil(timeoutMillis = TIMEOUT) { hub.recentSpeech().count { it.contains(refusal) } >= 3 }
 
-    // The date isn't a dose: it's still given.
+    // The date isn't a dose: it's given when read clearly, with the reminder to have it checked.
     ToolTestKit.say(glasses, "when does it expire")
-    waitForSpeech(hub, READ_TIMEOUT) { it.startsWith("Expiry date the end of June 2028.") }
+    waitForSpeech(hub, READ_TIMEOUT) {
+      it == "Expiry date the end of June 2028. ${MedicineCheck.EXPIRY_CHECK}" || it == MedicineCheck.EXPIRY_UNSURE
+    }
+    assertTrue(hub.recentSpeech().joinToString("\n"), hub.recentSpeech().any { it.startsWith("Expiry date the end of June 2028.") })
 
     // Nothing that is a dose, strength or count reached speech, the screen or RecentText.
     val spoken = hub.recentSpeech().joinToString("\n")

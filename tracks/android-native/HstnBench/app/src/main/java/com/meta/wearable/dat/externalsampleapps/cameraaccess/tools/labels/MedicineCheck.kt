@@ -7,6 +7,10 @@
 // (a strength in mg or mcg, "take 2", "every 4 hours", "daily"). Food nutrition panels give at most
 // one weak sign ("sodium 400mg"; "% daily value" doesn't count). [nameOnly] strips strengths and
 // counts from a medicine's name, so "Paracetamol 500 mg Tablets" is said as "Paracetamol Tablets".
+//
+// The expiry date of a medicine is given (an out-of-date medicine matters), but only when it was read
+// clearly, and always with a reminder to have it checked: [expiry]. A date on a line OCR wasn't sure
+// of is not said at all; a wrong date on a medicine is as bad as no date.
 // Pure Kotlin, JVM-tested.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.labels
@@ -70,5 +74,25 @@ object MedicineCheck {
       out += w
     }
     return out.joinToString(" ").trim(' ', ',', '-', '/').ifEmpty { "a medicine" }
+  }
+
+  /** OCR line confidence below this, on a line with the date, means the date isn't read out. */
+  const val MIN_DATE_CONFIDENCE = 0.8f
+
+  const val EXPIRY_CHECK = "Please have a pharmacist or a trusted person check the date before you take it."
+  const val EXPIRY_UNSURE =
+      "I can see a date on this medicine, but I can't read it for sure. Please ask a pharmacist or a trusted person to check it."
+
+  /**
+   * What to say for "when does it expire" on medicine. [dateAnswer] is the plain answer
+   * (LabelDates.answer), null if no date was found. [dateLineConfidences] are the OCR confidences of
+   * the lines the date came from (null = the engine gave none). Unsure: no figure. Sure: the date and
+   * [EXPIRY_CHECK]. Nothing found: null, so the caller says "turn it".
+   */
+  fun expiry(dateAnswer: String?, dateLineConfidences: List<Float?>): String? {
+    if (dateAnswer == null) return null
+    if (dateLineConfidences.any { it == null || it < MIN_DATE_CONFIDENCE }) return EXPIRY_UNSURE
+    // "I can see expiry date, but I can't make out the date": already no figure; still remind.
+    return "$dateAnswer $EXPIRY_CHECK"
   }
 }
