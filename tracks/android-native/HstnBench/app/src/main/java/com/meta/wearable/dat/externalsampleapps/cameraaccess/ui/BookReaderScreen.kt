@@ -1,7 +1,7 @@
 // BookReaderScreen - phone controls for the book reader
 //
-// The glasses do the reading and voice is the main control: opening this screen starts listening
-// (BookReaderViewModel.openVoice) and closing it stops. The buttons are a mirror for sighted helpers,
+// The glasses do the reading and voice is the main control: while any tool screen is open ToolHub
+// listens (the router starts it), and this screen's ViewModel is attached to it (BookTool). The buttons are a mirror for sighted helpers,
 // low-vision users and TalkBack users, never the only way to do something. Built for TalkBack and low vision:
 // big targets, every control labelled, each toggle one merged switch node, white or yellow on
 // black, and the recognised text in large type with the sentence being spoken highlighted.
@@ -39,7 +39,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -64,10 +63,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.BookReaderUiState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.BookReaderViewModel
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.Microphone
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.Microphone
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.ReaderPhase
-import com.meta.wearable.dat.core.types.Permission
-import com.meta.wearable.dat.core.types.PermissionStatus
 import java.util.Locale
 
 private val ReaderBackground = Color.Black
@@ -77,24 +74,11 @@ private val ReaderAccent = AppColor.Yellow
 fun BookReaderScreen(
     viewModel: BookReaderViewModel,
     onClose: () -> Unit,
-    onRequestWearablesPermission: suspend (Permission) -> PermissionStatus,
-    onRequestRecordAudioPermission: suspend () -> Boolean,
     modifier: Modifier = Modifier,
-    voiceFirst: Boolean = false,
 ) {
   val ui by viewModel.uiState.collectAsStateWithLifecycle()
   BackHandler(onBack = onClose)
 
-  val requestWearables by rememberUpdatedState(onRequestWearablesPermission)
-  val requestRecordAudio by rememberUpdatedState(onRequestRecordAudioPermission)
-  LaunchedEffect(Unit) {
-    viewModel.openVoice(
-        voiceFirst = voiceFirst,
-        requestWearablesPermission = { requestWearables(it) },
-        requestRecordAudio = { requestRecordAudio() },
-    )
-  }
-  DisposableEffect(Unit) { onDispose { viewModel.closeVoice() } }
   val close by rememberUpdatedState(onClose)
   LaunchedEffect(ui.closeRequested) { if (ui.closeRequested) close() }
 

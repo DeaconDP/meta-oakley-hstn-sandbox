@@ -34,6 +34,8 @@ import androidx.core.content.ContextCompat
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.LaunchIntent
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolLaunch
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.CameraAccessScaffold
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 import com.meta.wearable.dat.mockdevice.MockDeviceKit
@@ -55,10 +57,14 @@ class MainActivity : ComponentActivity() {
     // plugin's mcp/target_resolver.py.
     private const val MOCK_TEST_SERVER_PORT = 8237
 
-    // Launcher alias for the voice-first book reader ("Hey Google, open Book Reader").
-    private const val BOOK_READER_ALIAS = ".BookReaderLauncher"
-    // Same thing from adb/tests or a deep link: `--ez book_reader true`, or hstnbench://book.
-    const val EXTRA_BOOK_READER = "book_reader"
+    // Voice-first tools ("Hey Google, open Book Reader" / "Mail Reader" / ...): each has a launcher
+    // alias, a deep link hstnbench://<id> (?mode=..&arg=..) and an intent extra `--es tool <id>`
+    // (plus `--es tool_mode`, `--es tool_arg`). The book reader also keeps `--ez book_reader true`.
+    // Parsed by ToolLaunch (tools/core/ToolId.kt).
+    const val EXTRA_BOOK_READER = ToolLaunch.EXTRA_BOOK_READER
+    const val EXTRA_TOOL = ToolLaunch.EXTRA_TOOL
+    const val EXTRA_TOOL_MODE = ToolLaunch.EXTRA_MODE
+    const val EXTRA_TOOL_ARG = ToolLaunch.EXTRA_ARG
 
     // Required Android permissions for the DAT SDK to function properly
     val PERMISSIONS: Array<String> = arrayOf(BLUETOOTH, BLUETOOTH_CONNECT, INTERNET)
@@ -126,16 +132,27 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     maybeStartMockDeviceTestServer()
     enableEdgeToEdge()
-    val voiceFirst =
-        intent.component?.className?.endsWith(BOOK_READER_ALIAS) == true ||
-            intent.getBooleanExtra(EXTRA_BOOK_READER, false) ||
-            (intent.data?.scheme == "hstnbench" && intent.data?.host == "book")
+    val launchTool =
+        ToolLaunch.parse(
+            LaunchIntent(
+                componentClass = intent.component?.className,
+                toolExtra = intent.getStringExtra(EXTRA_TOOL),
+                modeExtra = intent.getStringExtra(EXTRA_TOOL_MODE),
+                argExtra = intent.getStringExtra(EXTRA_TOOL_ARG),
+                bookReaderExtra = intent.getBooleanExtra(EXTRA_BOOK_READER, false),
+                scheme = intent.data?.scheme,
+                host = intent.data?.host,
+                queryMode = intent.data?.getQueryParameter(ToolLaunch.QUERY_MODE),
+                queryArg = intent.data?.getQueryParameter(ToolLaunch.QUERY_ARG),
+            ),
+        )
+    Log.i(TAG, "launch tool=$launchTool")
     setContent {
       CameraAccessScaffold(
           viewModel = viewModel,
           onRequestWearablesPermission = ::requestWearablesPermission,
           onRequestRecordAudioPermission = ::requestRecordAudioPermission,
-          voiceFirst = voiceFirst,
+          launchTool = launchTool,
       )
     }
   }

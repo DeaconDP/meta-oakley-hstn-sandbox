@@ -10,10 +10,14 @@
 // ("stop detecting page turns" before "stop", "read that again" before "read"). Fillers ("please",
 // "um", "can you") and an optional address ("reader, ...") are dropped first.
 //
-// EchoGuard handles the other half of hands-free listening: the glasses' (or phone's) mic also hears
-// the book being read aloud. A transcript that is just something we said recently is ignored.
+// Normalising text and reading numbers is shared with every tool (tools/core/Phrases.kt), and the
+// echo guard that ignores the book coming back through the mic is tools/core/EchoGuard.kt.
+// Commands every tool understands (switching tools, "what does X mean") are in
+// tools/core/GlobalGrammar.kt; the book reader tries its own grammar first, then that one.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.book
+
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.Phrases
 
 sealed interface VoiceCommand {
   /** Stop talking now, keep the place. */
@@ -72,27 +76,9 @@ sealed interface VoiceCommand {
 
 object VoiceCommands {
 
-  private val FILLERS =
-      listOf(
-          "please", "um", "umm", "uh", "er", "erm", "okay", "ok", "alright", "right", "so",
-          "can you", "could you", "would you", "will you", "i want you to", "i'd like you to",
-          "just", "now", "thanks", "thank you",
-      )
-
   private val ADDRESS = Regex("^(hey |ok |okay )?(book )?reader\\b ?")
 
-  private val NUMBER_WORDS =
-      mapOf(
-          "zero" to 0f, "half" to 0.5f, "one" to 1f, "two" to 2f, "three" to 3f, "four" to 4f,
-          "five" to 5f, "six" to 6f, "seven" to 7f, "eight" to 8f, "nine" to 9f, "ten" to 10f,
-          "a" to 1f, "an" to 1f, "single" to 1f, "double" to 2f, "triple" to 3f, "couple" to 2f,
-          "few" to 3f,
-      )
-
-  private const val NUM =
-      "(\\d+(?:\\.\\d+)?|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|half|a|an|" +
-          "double|triple|couple|few)(?: (?:point|and a half|and) ?(?:\\d|zero|one|two|three|" +
-          "four|five|six|seven|eight|nine|half)?)?)"
+  private const val NUM = Phrases.NUM
 
   private class Rule(pattern: String, val build: (MatchResult) -> VoiceCommand?) {
     val regex = Regex("^(?:$pattern)$")
@@ -190,112 +176,12 @@ object VoiceCommands {
   }
 
   /** Lowercase, punctuation out (apostrophes kept), address and fillers dropped, spaces collapsed. */
-  fun normalize(transcript: String): String {
-    var t = transcript.lowercase()
-        .replace('’', '\'')
-        .replace(Regex("[^a-z0-9.' ]"), " ")
-        .replace(Regex("(?<![0-9])\\.|\\.(?![0-9])"), " ")
-        .replace(Regex("\\s+"), " ")
-        .trim()
-    t = t.replace(ADDRESS, "").trim()
-    for (f in FILLERS) t = t.replace(Regex("(^| )${Regex.escape(f)}(?= |$)"), " ")
-    return t.replace(Regex("\\s+"), " ").trim()
-  }
+  fun normalize(transcript: String): String = Phrases.normalize(transcript, ADDRESS)
 
   /** "1.5", "one point five", "one and a half", "two", "double", "half". Null if not a number. */
-  fun parseNumber(raw: String): Float? {
-    val s = raw.trim()
-    s.toFloatOrNull()?.let { return it }
-    val parts = s.split(' ')
-    val head = NUMBER_WORDS[parts[0]] ?: return null
-    if (parts.size == 1) return head
-    val rest = parts.drop(1).joinToString(" ")
-    return when {
-      rest == "and a half" -> head + 0.5f
-      rest.startsWith("point ") -> {
-        val tail = rest.removePrefix("point ").trim()
-        val digit = tail.toIntOrNull() ?: NUMBER_WORDS[tail]?.toInt() ?: return null
-        if (digit !in 0..9) return null
-        head + digit / 10f
-      }
-      rest.startsWith("and ") -> {
-        val tail = rest.removePrefix("and ").trim()
-        if (tail == "half") head + 0.5f else null
-      }
-      else -> null
-    }
-  }
+  fun parseNumber(raw: String): Float? = Phrases.parseNumber(raw)
 
   /** True if [transcript] is only a stop-talking command, so it can act on a partial result. */
   fun isBargeIn(transcript: String): Boolean = parse(transcript) == VoiceCommand.Pause
 }
 
-/**
- * Remembers what the reader is saying, or said a moment ago, so the mic hearing the book (or our own
- * replies) isn't taken as the user talking.
- *
- * A transcript is an echo when its words appear as a run inside something that is being spoken
- * right now. That catches a command word read out from the book ("Stop!" cried Holmes), including
- * as a partial result. In the [tailMs] after speech ends (recogniser latency), only fragments of
- * [MIN_TAIL_WORDS]+ words count: echoes arrive as phrases, while a user answering a prompt ("Say
- * read to start" → "read") says one or two words and must be heard. After that nothing is filtered.
- */
-class EchoGuard(private val tailMs: Long = 2_000L, private val maxEntries: Int = 4) {
-
-  private companion object {
-    const val MIN_TAIL_WORDS = 3
-  }
-
-  private class Spoken(val words: List<String>, var endMs: Long = Long.MAX_VALUE)
-
-  private val recent = ArrayDeque<Spoken>()
-
-  /** Call when speech of [text] starts. */
-  @Synchronized
-  fun spoke(text: String, nowMs: Long) {
-    val words = words(text)
-    if (words.isEmpty()) return
-    // Speech is sequential: whatever was playing before has ended.
-    recent.lastOrNull()?.let { if (it.endMs == Long.MAX_VALUE) it.endMs = nowMs }
-    recent.addLast(Spoken(words))
-    while (recent.size > maxEntries) recent.removeFirst()
-  }
-
-  /** Call when speech finishes or is cut off. */
-  @Synchronized
-  fun finished(nowMs: Long) {
-    recent.lastOrNull()?.let { if (it.endMs == Long.MAX_VALUE) it.endMs = nowMs }
-  }
-
-  @Synchronized
-  fun clear() = recent.clear()
-
-  @Synchronized
-  fun isEcho(transcript: String, nowMs: Long): Boolean {
-    val heard = words(transcript)
-    if (heard.isEmpty()) return false
-    return recent.any { s ->
-      val speaking = s.endMs == Long.MAX_VALUE
-      val inTail = !speaking && nowMs - s.endMs <= tailMs && heard.size >= MIN_TAIL_WORDS
-      (speaking || inTail) && containsRun(s.words, heard)
-    }
-  }
-
-  /** [heard] appears as a contiguous run in [spoken], allowing one misheard word in four. */
-  private fun containsRun(spoken: List<String>, heard: List<String>): Boolean {
-    val allowedMisses = heard.size / 4
-    for (start in spoken.indices) {
-      if (spoken[start] != heard[0] && allowedMisses == 0) continue
-      var misses = 0
-      for ((k, w) in heard.withIndex()) {
-        if (spoken.getOrNull(start + k) != w) misses++
-        if (misses > allowedMisses) break
-      }
-      if (misses <= allowedMisses) return true
-    }
-    return false
-  }
-
-  private fun words(text: String): List<String> =
-      text.lowercase().replace('’', '\'').split(Regex("[^a-z0-9']+")).filter { it.isNotEmpty() }
-}

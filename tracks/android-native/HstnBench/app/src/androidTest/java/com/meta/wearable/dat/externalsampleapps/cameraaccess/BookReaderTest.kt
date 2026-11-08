@@ -102,8 +102,12 @@ class BookReaderTest {
     assertTrue("CER $cer too high. Read:\n$text", cer <= MAX_CER)
     assertFalse("running header was read", text.contains("BASKERVILLES"))
     assertFalse("page number was read", text.trimEnd().endsWith("3"))
-    assertTrue("line-end hyphen not rejoined", text.contains("occasions"))
-    assertTrue("line-end hyphen not rejoined", text.contains("behind"))
+    // "oc-"/"casions" and "be-"/"hind": a leftover hyphen means the join failed; anything else
+    // means the fragment was misread (ML Kit read "oc-" as "0C-" on a Galaxy A26).
+    for ((word, broken) in listOf("occasions" to "oc-", "behind" to "be-")) {
+      assertFalse("line-end hyphen not rejoined: $broken in\n$text", text.contains(broken))
+      assertTrue("hyphenated word misread, expected $word in\n$text", text.contains(word))
+    }
     assertTrue("real hyphen lost", text.contains("hearth-rug"))
     assertEquals("paragraphs", 3, text.split("\n\n").size)
   }
@@ -268,7 +272,12 @@ class BookReaderTest {
 class BookOcrPipelineTest {
 
   private fun readBack(bitmap: android.graphics.Bitmap): String =
-      MlKitOcr().use { ocr -> PageLayout.layout(runBlocking { ocr.recognize(bitmap) }).bodyText() }
+      MlKitOcr().use { ocr ->
+        val page = runBlocking { ocr.recognize(bitmap) }
+        // Raw ML Kit lines, so a misread can be told apart from a layout bug.
+        page.lines.forEach { Log.i("BookOcrPipelineTest", "raw: ${it.text}") }
+        PageLayout.layout(page).bodyText()
+      }
 
   @Test
   fun singlePage() {

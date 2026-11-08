@@ -147,6 +147,7 @@
     <string name="book_error_ocr_failed" description="Spoken when text recognition fails">Couldn\'t read this page. Try again.</string>
     <!-- Book reader voice control: everything in this block is spoken -->
     <string name="voice_welcome_short" description="Spoken when the book reader opens with the stream already running">Book reader. Say read to start, or help at any time.</string>
+    <string name="voice_welcome_after_switch" description="Spoken after switching to the book reader by voice from another tool (its name was just said)">Say read to start, or help at any time.</string>
     <string name="voice_welcome_ready" description="Spoken when the glasses are connected in voice-first launch">Your glasses are ready. Hold the book open in front of you and say read. Say help at any time.</string>
     <string name="voice_connecting" description="Spoken while connecting to the glasses">Book reader. Connecting to your glasses.</string>
     <string name="voice_camera_permission" description="Spoken before opening Meta AI for camera permission">The glasses need permission to use the camera. Opening the Meta AI app. Allow it there, then come back.</string>

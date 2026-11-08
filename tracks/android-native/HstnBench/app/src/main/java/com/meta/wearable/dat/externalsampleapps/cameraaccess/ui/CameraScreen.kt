@@ -11,6 +11,10 @@
 // A full-bleed camera preview with controls overlaid on a scrim. Walks the SDK's camera lifecycle
 // as explicit steps (Start Session -> Start Preview -> Capture / Record -> Stop Preview -> End
 // Session) and shows the live DeviceSessionState / StreamState so the state machine is legible.
+//
+// It is also the router for the everyday tools: ToolHub.activeTool picks which tool screen covers
+// the live preview (which keeps streaming underneath), the bottom bar has a button per registered
+// tool, and while any tool is open ToolHub listens (so switching tools by voice keeps the mic).
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
@@ -41,7 +45,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LinkOff
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
@@ -84,7 +87,16 @@ import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.BookReaderViewModel
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolHub
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolRegistry
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolScreenContext
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolId
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolRequest
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.semantics.heading
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.camera.CameraUiState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.camera.CameraViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
@@ -103,7 +115,7 @@ fun CameraScreen(
     onRequestWearablesPermission: suspend (Permission) -> PermissionStatus,
     onRequestRecordAudioPermission: suspend () -> Boolean,
     modifier: Modifier = Modifier,
-    voiceFirst: Boolean = false,
+    launchTool: ToolRequest? = null,
     cameraViewModel: CameraViewModel = viewModel(
         factory =
             CameraViewModel.Factory(
@@ -116,8 +128,13 @@ fun CameraScreen(
   val wearablesUi by wearablesViewModel.uiState.collectAsStateWithLifecycle()
   val activity = LocalActivity.current
   var showSettingsMenu by remember { mutableStateOf(false) }
-  // Voice-first launch ("Open Book Reader"): straight into the reader, no taps needed.
-  var showBookReader by remember { mutableStateOf(voiceFirst) }
+  val application = (LocalActivity.current as ComponentActivity).application
+  val hub: ToolHub = viewModel(factory = ToolHub.Factory(application, cameraViewModel))
+  val activeTool by hub.activeTool.collectAsStateWithLifecycle()
+  // Voice-first launch ("Open Book Reader", hstnbench://mail, --es tool watch): straight into the
+  // tool, no taps needed. Leaving a tool opened that way ends the session and steps aside.
+  var launchedVoiceFirst by remember { mutableStateOf(launchTool != null) }
+  LaunchedEffect(launchTool) { launchTool?.let { hub.open(it, voiceFirst = true) } }
 
   val isUpdateRequired = wearablesUi.isFirmwareUpdateRequired
 
@@ -167,7 +184,7 @@ fun CameraScreen(
           onCapturePhoto = cameraViewModel::capturePhoto,
           onToggleRecording = { cameraViewModel.toggleRecording(onRequestRecordAudioPermission) },
           onToggleMic = cameraViewModel::toggleMic,
-          onOpenBookReader = { showBookReader = true },
+          onOpenTool = { hub.open(ToolRequest(it)) },
           onUpdateFirmware = { activity?.let { wearablesViewModel.openFirmwareUpdate(it) } },
       )
     }
@@ -179,33 +196,43 @@ fun CameraScreen(
       )
     }
 
-    // Book reader: full-screen over the live preview, which keeps streaming underneath so the reader
-    // can capture pages and watch for page turns.
-    if (showBookReader) {
-      val bookReaderViewModel: BookReaderViewModel =
-          viewModel(
-              factory =
-                  BookReaderViewModel.Factory(
-                      application = (LocalActivity.current as ComponentActivity).application,
-                      camera = cameraViewModel,
-                  ),
-          )
-      BookReaderScreen(
-          viewModel = bookReaderViewModel,
-          voiceFirst = voiceFirst,
-          onRequestWearablesPermission = onRequestWearablesPermission,
-          onRequestRecordAudioPermission = onRequestRecordAudioPermission,
-          onClose = {
-            bookReaderViewModel.stop()
-            showBookReader = false
-            if (voiceFirst) {
-              // Launched just to read: end the session and step aside (the goodbye still plays)
-              // rather than leaving a blind user on a camera screen with the stream running.
-              cameraViewModel.endSession()
-              activity?.moveTaskToBack(true)
-            }
-          },
-      )
+    // A tool: full-screen over the live preview, which keeps streaming underneath so the tool can
+    // capture photos, read frames and watch for page turns.
+    activeTool?.let { request ->
+      val requestWearables by rememberUpdatedState(onRequestWearablesPermission)
+      val requestRecordAudio by rememberUpdatedState(onRequestRecordAudioPermission)
+      // Listening runs while any tool is open, not per tool, so a switch keeps the mic.
+      LaunchedEffect(Unit) {
+        hub.openVoice(
+            voiceFirst = launchedVoiceFirst,
+            requestWearablesPermission = { requestWearables(it) },
+            requestRecordAudio = { requestRecordAudio() },
+        )
+      }
+      DisposableEffect(Unit) {
+        onDispose {
+          hub.closeVoice()
+          if (launchedVoiceFirst) {
+            // Launched just for this tool: end the session and step aside (the goodbye still
+            // plays) rather than leaving a blind user on a camera screen with the stream running.
+            launchedVoiceFirst = false
+            cameraViewModel.endSession()
+            activity?.moveTaskToBack(true)
+          }
+        }
+      }
+      key(request.tool) {
+        ToolRegistry.spec(request.tool)
+            .content(
+                ToolScreenContext(
+                    hub = hub,
+                    request = request,
+                    onClose = { hub.closeTool() },
+                    onRequestWearablesPermission = onRequestWearablesPermission,
+                    onRequestRecordAudioPermission = onRequestRecordAudioPermission,
+                ),
+            )
+      }
     }
 
     if (ui.showCameraPermissionRedirectConfirm) {
@@ -463,7 +490,7 @@ private fun BottomBar(
     onCapturePhoto: () -> Unit,
     onToggleRecording: () -> Unit,
     onToggleMic: () -> Unit,
-    onOpenBookReader: () -> Unit,
+    onOpenTool: (ToolId) -> Unit,
     onUpdateFirmware: () -> Unit,
 ) {
   Column(
@@ -481,18 +508,9 @@ private fun BottomBar(
           onClick = onUpdateFirmware,
       )
     } else {
-      // Book reader needs a live stream (it captures pages with the in-stream photo).
-      CapturePill(
-          modifier =
-              Modifier.fillMaxWidth()
-                  .alpha(if (ui.hasSession) 1f else 0f)
-                  .testTag("book_reader_button"),
-          icon = Icons.AutoMirrored.Filled.MenuBook,
-          label = stringResource(R.string.book_reader_open),
-          contentDescription = stringResource(R.string.book_reader_open_description),
-          enabled = ui.isStreaming,
-          onClick = onOpenBookReader,
-      )
+      // Tools need a live stream (they capture photos or read frames). The book reader keeps its
+      // full-width button; the others share rows of two.
+      ToolButtons(ui = ui, onOpenTool = onOpenTool)
       CaptureRow(
           ui = ui,
           onStartPreview = onStartPreview,
@@ -507,6 +525,45 @@ private fun BottomBar(
           onStartSession = onStartSession,
           onEndSession = onEndSession,
       )
+    }
+  }
+}
+
+@Composable
+private fun ToolButtons(ui: CameraUiState, onOpenTool: (ToolId) -> Unit) {
+  val visible = Modifier.alpha(if (ui.hasSession) 1f else 0f)
+  val (book, others) = ToolRegistry.all.partition { it.id == ToolId.BOOK }
+  Column(modifier = visible, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Text(
+        text = stringResource(R.string.tools_heading),
+        color = Color.White,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.semantics { heading() },
+    )
+    for (spec in book) {
+      CapturePill(
+          modifier = Modifier.fillMaxWidth().testTag(spec.buttonTag),
+          icon = spec.icon,
+          label = stringResource(spec.buttonRes),
+          contentDescription = stringResource(spec.buttonDescriptionRes),
+          enabled = ui.isStreaming,
+          onClick = { onOpenTool(spec.id) },
+      )
+    }
+    for (row in others.chunked(2)) {
+      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        for (spec in row) {
+          CapturePill(
+              modifier = Modifier.weight(1f).testTag(spec.buttonTag),
+              icon = spec.icon,
+              label = stringResource(spec.buttonRes),
+              contentDescription = stringResource(spec.buttonDescriptionRes),
+              enabled = ui.isStreaming,
+              onClick = { onOpenTool(spec.id) },
+          )
+        }
+      }
     }
   }
 }

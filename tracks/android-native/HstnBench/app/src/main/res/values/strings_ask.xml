@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ask about the text (tools/ask). Spoken answers are built in tools/ask/AskWording.kt. -->
+<resources>
+    <string name="ask_dictionary_credit">Definitions from WordNet 3.0, Copyright 2006 by Princeton University. All rights reserved. Used under the WordNet licence.</string>
+    <string name="ask_privacy_on_device">Questions about the text are answered on this phone.</string>
+    <string name="ask_privacy_online">Open questions are sent to Claude with the recent text, only when you ask one.</string>
+</resources>

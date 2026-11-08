@@ -26,7 +26,23 @@ import android.view.Surface
 import java.nio.ByteBuffer
 import java.util.concurrent.LinkedBlockingQueue
 
-class HevcDecoder {
+/**
+ * With a Surface, frames are rendered to it (the preview). Without one ([start] with null), each
+ * decoded frame is handed to [onImage] as a YUV Image (valid only during the call), which is how
+ * FrameGrabber reads pixels. [preferHardware]: use a hardware decoder (not on the block list) if there is one. The preview keeps
+ * the software decoder, as the SDK does; FrameGrabber, which only needs pixels a few times a
+ * second, asks for hardware to save CPU (notes/tools-layer.md > Frames).
+ */
+class HevcDecoder(
+    private val preferHardware: Boolean = false,
+    private val onImage: ((android.media.Image) -> Unit)? = null,
+) {
+
+  /** Size of the decoded picture (crop applied), once the codec has said; 0 until then. */
+  @Volatile var outputWidth = 0
+    private set
+  @Volatile var outputHeight = 0
+    private set
 
   companion object {
     private const val TAG = "HevcDecoder"
@@ -73,7 +89,7 @@ class HevcDecoder {
   @Volatile private var receivedKeyframe = false
   @Volatile private var outputSurface: Surface? = null
 
-  fun start(width: Int, height: Int, surface: Surface) {
+  fun start(width: Int, height: Int, surface: Surface?) {
     outputSurface = surface
     mediaFormat =
         MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, width, height).also { format
@@ -81,6 +97,12 @@ class HevcDecoder {
           format.setInteger(MediaFormat.KEY_FRAME_RATE, 30)
           format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
           format.setInteger(MediaFormat.KEY_BIT_RATE, 750000)
+          if (surface == null) {
+            format.setInteger(
+                MediaFormat.KEY_COLOR_FORMAT,
+                android.media.MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible,
+            )
+          }
         }
     try {
       ensureCodecsCreated()
@@ -214,9 +236,25 @@ class HevcDecoder {
     }
   }
 
-  // Prefer a software HEVC decoder
+  // Prefer a software HEVC decoder (or a hardware one, if asked and available)
   private fun createHevcDecoder(): MediaCodec {
     val mime = MediaFormat.MIMETYPE_VIDEO_HEVC
+    if (preferHardware) {
+      MediaCodecList(MediaCodecList.REGULAR_CODECS)
+          .codecInfos
+          .firstOrNull { info ->
+            !info.isEncoder &&
+                info.isHardwareAccelerated &&
+                info.name !in BLOCKED_DECODERS &&
+                !info.name.endsWith(".secure") &&
+                info.supportedTypes.any { it.equals(mime, ignoreCase = true) }
+          }
+          ?.name
+          ?.let {
+            Log.d(TAG, "Using hardware HEVC decoder: $it")
+            return MediaCodec.createByCodecName(it)
+          }
+    }
     val softwareName =
         MediaCodecList(MediaCodecList.ALL_CODECS)
             .codecInfos
@@ -269,7 +307,14 @@ class HevcDecoder {
                 Log.e(TAG, "Codec error: ${e.message}")
               }
 
-              override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {}
+              override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
+                val w = format.getInteger(MediaFormat.KEY_WIDTH)
+                val h = format.getInteger(MediaFormat.KEY_HEIGHT)
+                val hasCrop = format.containsKey("crop-right") && format.containsKey("crop-left")
+                outputWidth = if (hasCrop) format.getInteger("crop-right") - format.getInteger("crop-left") + 1 else w
+                outputHeight =
+                    if (hasCrop) format.getInteger("crop-bottom") - format.getInteger("crop-top") + 1 else h
+              }
             },
             // Deliver MediaCodec callbacks on our own decoder thread.
             handler,
@@ -345,6 +390,12 @@ class HevcDecoder {
   private fun onOutputBuffer(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
     try {
       if (!active || info.size == 0) {
+        codec.releaseOutputBuffer(index, false)
+        return
+      }
+      if (outputSurface == null) {
+        // No Surface: hand the frame over as an Image, then give the buffer back.
+        onImage?.let { listener -> codec.getOutputImage(index)?.use { listener(it) } }
         codec.releaseOutputBuffer(index, false)
         return
       }

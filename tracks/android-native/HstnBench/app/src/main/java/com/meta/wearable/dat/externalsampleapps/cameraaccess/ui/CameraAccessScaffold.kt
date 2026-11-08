@@ -64,6 +64,9 @@ import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.BuildConfig
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolRegistry
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolId
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolRequest
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,7 +76,7 @@ fun CameraAccessScaffold(
     onRequestWearablesPermission: suspend (Permission) -> PermissionStatus,
     onRequestRecordAudioPermission: suspend () -> Boolean,
     modifier: Modifier = Modifier,
-    voiceFirst: Boolean = false,
+    launchTool: ToolRequest? = null,
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
@@ -94,7 +97,7 @@ fun CameraAccessScaffold(
             wearablesViewModel = viewModel,
             onRequestWearablesPermission = onRequestWearablesPermission,
             onRequestRecordAudioPermission = onRequestRecordAudioPermission,
-            voiceFirst = voiceFirst,
+            launchTool = launchTool,
         )
       } else {
         HomeScreen(
@@ -102,7 +105,12 @@ fun CameraAccessScaffold(
         )
         // Voice-first launch but the app was never connected to Meta AI: say so rather than sit
         // silently on a screen a blind user can't see. Registration happens once, in Meta AI's UI.
-        if (voiceFirst) SpeakOnce(stringResource(R.string.voice_needs_setup), delayMs = 3_000L)
+        launchTool?.let { request ->
+          val text =
+              if (request.tool == ToolId.BOOK) stringResource(R.string.voice_needs_setup)
+              else stringResource(R.string.tool_needs_setup, stringResource(ToolRegistry.spec(request.tool).nameRes))
+          SpeakOnce(text, delayMs = 3_000L)
+        }
       }
 
       SnackbarHost(
