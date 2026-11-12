@@ -21,8 +21,11 @@ import android.Manifest.permission.BLUETOOTH
 import android.Manifest.permission.BLUETOOTH_CONNECT
 import android.Manifest.permission.INTERNET
 import android.Manifest.permission.RECORD_AUDIO
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -34,6 +37,9 @@ import androidx.core.content.ContextCompat
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.PermState
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.SetupVoice
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolRegistry
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.LaunchIntent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolLaunch
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.CameraAccessScaffold
@@ -46,7 +52,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), SetupVoice.Host {
   companion object {
     private const val TAG = "CameraAccessMain"
     // Intent boolean extra that activates the MockDevice test server for out-of-process MCP
@@ -68,17 +74,23 @@ class MainActivity : ComponentActivity() {
 
     // Required Android permissions for the DAT SDK to function properly
     val PERMISSIONS: Array<String> = arrayOf(BLUETOOTH, BLUETOOTH_CONNECT, INTERNET)
+    // Asked for at launch with the above, so the setup screen can listen (voice setup). Refusing it
+    // doesn't block the DAT SDK: the screen says how to fix it and the button still works.
+    private val LAUNCH_PERMISSIONS: List<String> = PERMISSIONS.toList() + RECORD_AUDIO
+    private const val SETUP_PREFS = "setup_voice"
   }
 
   val viewModel: WearablesViewModel by viewModels()
+  val setupVoice: SetupVoice by viewModels()
+
+  // Permissions refused in this run: not asked again on every onStart (each return from Meta AI or
+  // Settings is an onStart). Saying "connect" asks again; Android itself stops asking after two.
+  private val refusedThisRun = mutableSetOf<String>()
 
   private val permissionCheckLauncher =
       registerForActivityResult(RequestMultiplePermissions()) { permissionsResult ->
-        viewModel.onPermissionsResult(permissionsResult) {
-          // Initialize the DAT SDK once the permissions are granted
-          // This is REQUIRED before using any Wearables APIs
-          Wearables.initialize(this)
-        }
+        permissionsResult.forEach { (permission, granted) -> if (!granted) refusedThisRun += permission }
+        deliverPermissions()
       }
 
   private var permissionContinuation: CancellableContinuation<PermissionStatus>? = null
@@ -147,6 +159,7 @@ class MainActivity : ComponentActivity() {
             ),
         )
     Log.i(TAG, "launch tool=$launchTool")
+    setupVoice.setLaunchedTool(launchTool?.let { getString(ToolRegistry.spec(it.tool).nameRes) })
     setContent {
       CameraAccessScaffold(
           viewModel = viewModel,
@@ -160,8 +173,86 @@ class MainActivity : ComponentActivity() {
   override fun onStart() {
     super.onStart()
     // First, ensure the app has necessary Android permissions
-    permissionCheckLauncher.launch(PERMISSIONS)
+    checkPermissions(fromVoice = false)
   }
+
+  /**
+   * Asks for the launch permissions that are missing and can still be asked for, after saying out
+   * loud what Android's dialog is about (unless the user just asked by voice and heard it already).
+   * Permanently refused ones aren't asked: the setup screen says how to fix them in Settings.
+   */
+  private fun checkPermissions(fromVoice: Boolean) {
+    val askable =
+        LAUNCH_PERMISSIONS.filter {
+          !isGranted(it) && !isBlocked(it) && (fromVoice || it !in refusedThisRun)
+        }
+    // Normal (install-time) permissions are always granted; only the runtime ones need a dialog.
+    if (askable.isEmpty()) {
+      deliverPermissions()
+      return
+    }
+    val prefs = getSharedPreferences(SETUP_PREFS, MODE_PRIVATE).edit()
+    askable.forEach { prefs.putBoolean("asked_$it", true) }
+    prefs.apply()
+    val launch = { permissionCheckLauncher.launch(askable.toTypedArray()) }
+    if (fromVoice) {
+      launch()
+      return
+    }
+    val needsBluetooth = BLUETOOTH_CONNECT in askable
+    val needsMic = RECORD_AUDIO in askable
+    val line =
+        when {
+          needsBluetooth && needsMic -> R.string.setup_ask_both
+          needsBluetooth -> R.string.setup_ask_bluetooth
+          else -> R.string.setup_ask_mic
+        }
+    setupVoice.speakThen(getString(line), launch)
+  }
+
+  private fun deliverPermissions() {
+    viewModel.onPermissionsResult(PERMISSIONS.associateWith { isGranted(it) }) {
+      // Initialize the DAT SDK once the permissions are granted
+      // This is REQUIRED before using any Wearables APIs
+      Wearables.initialize(this)
+    }
+    setupVoice.onPermissions(
+        bluetooth = permState(BLUETOOTH_CONNECT),
+        mic = permState(RECORD_AUDIO),
+    )
+  }
+
+  private fun isGranted(permission: String): Boolean =
+      ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+
+  // Asked before, refused, and Android no longer shows a rationale: it won't show the dialog again.
+  private fun isBlocked(permission: String): Boolean =
+      !isGranted(permission) &&
+          getSharedPreferences(SETUP_PREFS, MODE_PRIVATE).getBoolean("asked_$permission", false) &&
+          !shouldShowRequestPermissionRationale(permission)
+
+  private fun permState(permission: String): PermState =
+      when {
+        isGranted(permission) -> PermState.GRANTED
+        isBlocked(permission) -> PermState.BLOCKED
+        else -> PermState.ASKABLE
+      }
+
+  // SetupVoice.Host: what the spoken setup screen can do.
+
+  override fun startRegistration() = viewModel.startRegistration(this)
+
+  override fun quitApp() {
+    moveTaskToBack(true)
+  }
+
+  override fun openAppSettings() {
+    startActivity(
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)),
+    )
+  }
+
+  override fun askAppPermissions() = checkPermissions(fromVoice = true)
 
   // Debug-only: when launched with `--ez mwdat_ui_testing true`, enable MockDeviceKit and start its
   // local HTTP test server so an out-of-process MCP client can drive the app without real glasses.

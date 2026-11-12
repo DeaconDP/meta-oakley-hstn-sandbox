@@ -27,27 +27,38 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.SetupVoice
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 
 @Composable
 fun HomeScreen(
     viewModel: WearablesViewModel,
+    setupVoice: SetupVoice,
     modifier: Modifier = Modifier,
 ) {
   val scrollState = rememberScrollState()
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val voiceUi by setupVoice.ui.collectAsStateWithLifecycle()
+  SetupVoiceEffect(setupVoice)
   val activity = LocalActivity.current
   val context = LocalContext.current
   val errorActivityUnavailable = stringResource(R.string.error_activity_unavailable)
@@ -106,14 +117,69 @@ fun HomeScreen(
           textAlign = TextAlign.Center,
           modifier = Modifier.padding(horizontal = 24.dp),
       )
+      // Voice status: what the setup screen is doing, and the last thing it heard. Not a live
+      // region: SetupVoice already speaks everything, so TalkBack shouldn't read it a second time.
+      Text(
+          text =
+              stringResource(
+                  when {
+                    voiceUi.speaking -> R.string.setup_status_speaking
+                    !voiceUi.micGranted -> R.string.setup_status_no_mic
+                    voiceUi.listening -> R.string.setup_status_listening
+                    else -> R.string.setup_status_off
+                  },
+              ),
+          textAlign = TextAlign.Center,
+          modifier = Modifier.fillMaxWidth().testTag("setup_voice_status"),
+      )
+      voiceUi.heard?.let { heard ->
+        Text(
+            text = stringResource(R.string.setup_heard_label) + ": " + heard,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().testTag("setup_voice_heard"),
+        )
+      }
+      val connectDescription = stringResource(R.string.setup_connect_description)
       SwitchButton(
           label = stringResource(R.string.register_button_title),
           enabled = uiState.canStartRegistration,
+          modifier =
+              Modifier.testTag("setup_connect_button").semantics {
+                contentDescription = connectDescription
+              },
           onClick = {
-            activity?.let { viewModel.startRegistration(it) }
-                ?: Toast.makeText(context, errorActivityUnavailable, Toast.LENGTH_SHORT).show()
+            activity?.let {
+              setupVoice.connectTapped()
+              viewModel.startRegistration(it)
+            } ?: Toast.makeText(context, errorActivityUnavailable, Toast.LENGTH_SHORT).show()
           },
       )
+    }
+  }
+}
+
+/**
+ * Runs the spoken setup while this screen shows: attaches SetupVoice with the activity as its Host,
+ * and tells it when the app goes to the background (Meta AI, Settings) and comes back. Leaving the
+ * composition (registered) detaches it, which releases the mic and TTS.
+ */
+@Composable
+private fun SetupVoiceEffect(setupVoice: SetupVoice) {
+  val activity = LocalActivity.current
+  val lifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(setupVoice, activity, lifecycleOwner) {
+    (activity as? SetupVoice.Host)?.let { setupVoice.attach(it) }
+    val observer = LifecycleEventObserver { _, event ->
+      when (event) {
+        Lifecycle.Event.ON_START -> setupVoice.setForeground(true)
+        Lifecycle.Event.ON_STOP -> setupVoice.setForeground(false)
+        else -> Unit
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose {
+      lifecycleOwner.lifecycle.removeObserver(observer)
+      setupVoice.detach()
     }
   }
 }
