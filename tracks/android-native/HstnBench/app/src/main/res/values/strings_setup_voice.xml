@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Voice setup: what the setup screen (app not yet connected to Meta AI) says, and the permission
+     sentences spoken before Android's dialogs. See setup/SetupFlow.kt and notes/a11y-onboarding.md. -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="setup_welcome" description="Spoken when the setup screen first shows">Welcome. To use your glasses, this app needs to connect to the Meta AI app once. Say connect to start, or say help.</string>
+    <string name="setup_welcome_no_mic" description="Spoken when the setup screen shows and the microphone permission is off">Welcome. To use your glasses, this app needs to connect to the Meta AI app once. The microphone is off for this app, so I can\'t hear you. To talk to the app, open Android Settings, then Apps, HSTN Bench, Permissions, Microphone, and choose Allow. Or use the Connect my glasses button at the bottom of the screen.</string>
+    <string name="setup_welcome_no_bluetooth" description="Spoken when the setup screen shows and the nearby devices permission is off">Welcome. This app can\'t reach your glasses yet, because the Nearby devices permission is off. Say connect to fix it, or say help.</string>
+    <string name="setup_tool_first" description="Said before the welcome when a tool was opened by voice before setup; %1$s is the tool name"><xliff:g id="tool">%1$s</xliff:g> needs a one-time setup first.</string>
+    <string name="setup_resumed" description="Spoken when the user comes back to the setup screen">Glasses setup. Say connect to start, or say help.</string>
+    <string name="setup_help" description="Spoken help on the setup screen">This is the setup screen. Before it can use your glasses, this app needs a one-time connection with the Meta AI app. You can say: connect, to open Meta AI and approve it. Repeat, to hear the last thing again. Open settings, for this app\'s permissions. Or close the app. The Connect my glasses button at the bottom of the screen does the same as saying connect.</string>
+    <string name="setup_handoff" description="Spoken just before opening Meta AI for registration">Opening Meta AI. Approve the connection there, then come back.</string>
+    <string name="setup_not_connected_yet" description="Spoken on return from Meta AI when the app still isn't registered">You\'re back, but the app isn\'t connected to your glasses yet. Say connect to try again, or say help.</string>
+    <string name="setup_didnt_open" description="Spoken when Meta AI did not open after asking to connect">Meta AI didn\'t open, or the connection didn\'t finish. Check the Meta AI app is installed and your glasses are paired in it. Say connect to try again, or say help.</string>
+    <string name="setup_declined" description="Spoken when the user says no or not now">Okay. Say connect when you\'re ready, or say close the app.</string>
+    <string name="setup_not_understood" description="Spoken when a short phrase wasn't understood">Sorry, I didn\'t get that. Say connect, or say help.</string>
+    <string name="setup_reminder" description="Reminder after a quiet stretch">I\'m still here. Say connect to set up your glasses, or say help.</string>
+    <string name="setup_last_reminder" description="Final reminder; the app then stays quiet">I\'ll stop reminding you now. Say connect whenever you\'re ready, or use the Connect my glasses button.</string>
+    <string name="setup_goodbye" description="Spoken before the app moves to the background">Closing. Open the app again whenever you\'re ready.</string>
+    <string name="setup_opening_settings" description="Spoken before opening this app's Android settings">Opening this app\'s settings. Choose Permissions to change the microphone or Nearby devices.</string>
+    <string name="setup_needs_bluetooth_ask" description="Spoken before asking for nearby devices permission again">First the app needs the Nearby devices permission, to reach your glasses. Android will ask now. Choose Allow.</string>
+    <string name="setup_needs_bluetooth_settings" description="Spoken when nearby devices permission is permanently denied">The Nearby devices permission is off, and Android won\'t ask again. Say open settings, then choose Permissions, Nearby devices, and Allow.</string>
+    <string name="setup_already_connecting" description="Spoken when connect is said while registration is under way">Already connecting. Approve the connection in Meta AI, then come back.</string>
+
+    <!-- Spoken before Android's permission dialogs at launch. -->
+    <string name="setup_ask_mic" description="Spoken before the microphone permission dialog">Android will ask to use the microphone so you can talk to the app. Choose Allow.</string>
+    <string name="setup_ask_bluetooth" description="Spoken before the nearby devices permission dialog">Android will ask to find and connect to nearby devices, so the app can reach your glasses. Choose Allow.</string>
+    <string name="setup_ask_both" description="Spoken before the nearby devices and microphone permission dialogs">Android will ask two things. First, to connect to nearby devices, so the app can reach your glasses. Then, to use the microphone, so you can talk to the app. Choose Allow both times.</string>
+    <string name="setup_bluetooth_denied" description="Error when the nearby devices permission is denied">The Nearby devices permission is off, so the app can\'t reach your glasses. Say connect to be asked again, or open Android Settings, Apps, HSTN Bench, Permissions, Nearby devices, and choose Allow.</string>
+
+    <!-- On screen. -->
+    <string name="setup_connect_description" description="TalkBack description of the connect button">Connect my glasses. Opens the Meta AI app to approve the connection, then come back here.</string>
+    <string name="setup_status_listening" description="On-screen voice status while listening">Listening. Say connect, or say help.</string>
+    <string name="setup_status_speaking" description="On-screen voice status while speaking">Speaking…</string>
+    <string name="setup_status_no_mic" description="On-screen voice status when the microphone is off">Microphone off. Use the button, or allow the microphone in Settings.</string>
+    <string name="setup_status_off" description="On-screen voice status when not listening">Voice is off.</string>
+    <string name="setup_heard_label" description="Label before the last phrase the setup screen heard">Heard</string>
+</resources>

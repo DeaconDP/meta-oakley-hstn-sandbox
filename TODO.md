@@ -41,5 +41,7 @@
 - [ ] Offline eval harness: Mock Device Kit `setCameraFeed`/`setCapturedImage` + VizWiz/TextVQA subset, replay mode for CI
 - [ ] TalkBack pass + WCAG 2.2 AA check of the companion UI
 - [ ] Accessible onboarding and launch: spoken handoffs around the Meta AI registration and permission flows, speaker and camera check, practice-based tutorial, launch status line, spoken recovery messages, and App Intents / Back Tap / Magic Tap triggers (notes/a11y-onboarding.md)
+  - [x] Android: voice setup before registration (spoken welcome on every launch, connect/help/repeat/open settings/quit by voice, spoken handoff to Meta AI and "not connected yet" on return, gentle reminders), mic + Nearby devices asked at launch with a spoken sentence first, permanent refusals explained instead of re-asked, snackbar errors spoken unless TalkBack is on (2026-11-12, notes/a11y-onboarding.md > Voice setup; JVM 297/0; SetupVoiceTest written, not yet run on a phone)
+  - [ ] Run SetupVoiceTest and RegistrationButtonTest on the A26; try voice setup with the real Meta AI app (registration screens under TalkBack, return focus)
 - [ ] Real HSTN: check Meta AI registration and permission screens under VoiceOver, plus the open questions in notes/a11y-onboarding.md
 - [ ] Mention the accessibility focus in README once the first demo runs
