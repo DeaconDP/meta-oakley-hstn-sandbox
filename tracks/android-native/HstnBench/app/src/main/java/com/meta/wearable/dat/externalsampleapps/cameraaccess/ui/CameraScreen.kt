@@ -87,6 +87,11 @@ import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.Microphone
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolAccent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolHub
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolRegistry
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolScreenContext
@@ -131,10 +136,51 @@ fun CameraScreen(
   val application = (LocalActivity.current as ComponentActivity).application
   val hub: ToolHub = viewModel(factory = ToolHub.Factory(application, cameraViewModel))
   val activeTool by hub.activeTool.collectAsStateWithLifecycle()
+  // The home voice menu: voice runs for this whole screen, not only while a tool is open, so a
+  // blind user never needs the buttons (notes/tools-layer.md > Home voice menu). Off for the
+  // touch-driven bench tests and with `--ez home_voice false`.
+  val homeVoice = remember {
+    ToolHub.homeMenuEnabled && activity?.intent?.getBooleanExtra(ToolHub.EXTRA_HOME_VOICE, true) != false
+  }
+  val requestWearablesForVoice by rememberUpdatedState(onRequestWearablesPermission)
+  val requestRecordAudioForVoice by rememberUpdatedState(onRequestRecordAudioPermission)
   // Voice-first launch ("Open Book Reader", hstnbench://mail, --es tool watch): straight into the
   // tool, no taps needed. Leaving a tool opened that way ends the session and steps aside.
   var launchedVoiceFirst by remember { mutableStateOf(launchTool != null) }
-  LaunchedEffect(launchTool) { launchTool?.let { hub.open(it, voiceFirst = true) } }
+  if (homeVoice) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(launchTool) {
+      launchTool?.let { hub.open(it, voiceFirst = true) }
+      // Each time the app comes to the front: listen (a no-op if already listening). After
+      // "close the app" voice is off, so coming back starts the menu again.
+      lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+        hub.openVoice(
+            voiceFirst = true,
+            requestWearablesPermission = { requestWearablesForVoice(it) },
+            requestRecordAudio = { requestRecordAudioForVoice() },
+            home = true,
+        )
+      }
+    }
+    DisposableEffect(hub) {
+      hub.onExitApp = {
+        cameraViewModel.endSession()
+        activity?.moveTaskToBack(true)
+      }
+      onDispose {
+        hub.onExitApp = null
+        hub.closeVoice()
+      }
+    }
+    // The voice path replaces the camera-permission prompt: ToolHub says why, then Meta AI opens.
+    LaunchedEffect(ui.showCameraPermissionRedirectConfirm) {
+      if (ui.showCameraPermissionRedirectConfirm) {
+        cameraViewModel.confirmCameraPermissionRedirect(onRequestWearablesPermission)
+      }
+    }
+  } else {
+    LaunchedEffect(launchTool) { launchTool?.let { hub.open(it, voiceFirst = true) } }
+  }
 
   val isUpdateRequired = wearablesUi.isFirmwareUpdateRequired
 
@@ -171,6 +217,8 @@ fun CameraScreen(
           },
       )
 
+      if (homeVoice && activeTool == null) HomeVoicePanel(hub)
+
       Spacer(modifier = Modifier.weight(1f))
 
       BottomBar(
@@ -199,25 +247,26 @@ fun CameraScreen(
     // A tool: full-screen over the live preview, which keeps streaming underneath so the tool can
     // capture photos, read frames and watch for page turns.
     activeTool?.let { request ->
-      val requestWearables by rememberUpdatedState(onRequestWearablesPermission)
-      val requestRecordAudio by rememberUpdatedState(onRequestRecordAudioPermission)
-      // Listening runs while any tool is open, not per tool, so a switch keeps the mic.
-      LaunchedEffect(Unit) {
-        hub.openVoice(
-            voiceFirst = launchedVoiceFirst,
-            requestWearablesPermission = { requestWearables(it) },
-            requestRecordAudio = { requestRecordAudio() },
-        )
-      }
-      DisposableEffect(Unit) {
-        onDispose {
-          hub.closeVoice()
-          if (launchedVoiceFirst) {
-            // Launched just for this tool: end the session and step aside (the goodbye still
-            // plays) rather than leaving a blind user on a camera screen with the stream running.
-            launchedVoiceFirst = false
-            cameraViewModel.endSession()
-            activity?.moveTaskToBack(true)
+      if (!homeVoice) {
+        // Without the home menu, listening runs while any tool is open, not per tool, so a switch
+        // keeps the mic.
+        LaunchedEffect(Unit) {
+          hub.openVoice(
+              voiceFirst = launchedVoiceFirst,
+              requestWearablesPermission = { requestWearablesForVoice(it) },
+              requestRecordAudio = { requestRecordAudioForVoice() },
+          )
+        }
+        DisposableEffect(Unit) {
+          onDispose {
+            hub.closeVoice()
+            if (launchedVoiceFirst) {
+              // Launched just for this tool: end the session and step aside (the goodbye still
+              // plays) rather than leaving a blind user on a camera screen with the stream running.
+              launchedVoiceFirst = false
+              cameraViewModel.endSession()
+              activity?.moveTaskToBack(true)
+            }
           }
         }
       }
@@ -235,7 +284,8 @@ fun CameraScreen(
       }
     }
 
-    if (ui.showCameraPermissionRedirectConfirm) {
+    // Touch-only mode keeps the bench's prompt; with the home menu the voice path replaces it.
+    if (ui.showCameraPermissionRedirectConfirm && !homeVoice) {
       AlertDialog(
           onDismissRequest = { cameraViewModel.cancelCameraPermissionRedirect() },
           title = { Text(stringResource(R.string.camera_permission_redirect_title)) },
@@ -254,6 +304,66 @@ fun CameraScreen(
               Text(stringResource(R.string.camera_permission_cancel))
             }
           },
+      )
+    }
+  }
+}
+
+// MARK: - Home voice menu
+
+/**
+ * What the home voice menu is doing, for sighted helpers and TalkBack: which mic is listening, the
+ * last thing said and the last thing heard. Tags: "home_voice_mic", "home_status", "home_voice_heard".
+ */
+@Composable
+private fun HomeVoicePanel(hub: ToolHub) {
+  val mic by hub.microphone.collectAsStateWithLifecycle()
+  val status by hub.homeStatus.collectAsStateWithLifecycle()
+  val heard by hub.homeHeard.collectAsStateWithLifecycle()
+  Column(
+      modifier =
+          Modifier.fillMaxWidth()
+              .padding(horizontal = 20.dp)
+              .clip(RoundedCornerShape(16.dp))
+              .background(Color.Black.copy(alpha = 0.7f))
+              .padding(16.dp)
+              .testTag("home_voice_panel"),
+      verticalArrangement = Arrangement.spacedBy(6.dp),
+  ) {
+    Text(
+        text = stringResource(R.string.home_heading),
+        color = Color.White,
+        fontSize = 18.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.semantics { heading() },
+    )
+    Text(
+        text =
+            stringResource(
+                when (mic) {
+                  Microphone.GLASSES -> R.string.voice_mic_glasses
+                  Microphone.PHONE -> R.string.voice_mic_phone
+                  Microphone.NONE -> R.string.voice_mic_none
+                },
+            ),
+        color = Color.White,
+        fontSize = 16.sp,
+        modifier = Modifier.testTag("home_voice_mic"),
+    )
+    if (status.isNotEmpty()) {
+      Text(
+          text = status,
+          color = ToolAccent,
+          fontSize = 18.sp,
+          modifier = Modifier.testTag("home_status"),
+      )
+    }
+    if (heard.isNotEmpty()) {
+      Text(
+          text = stringResource(R.string.voice_heard, heard),
+          color = Color.White,
+          fontSize = 16.sp,
+          modifier = Modifier.testTag("home_voice_heard"),
       )
     }
   }

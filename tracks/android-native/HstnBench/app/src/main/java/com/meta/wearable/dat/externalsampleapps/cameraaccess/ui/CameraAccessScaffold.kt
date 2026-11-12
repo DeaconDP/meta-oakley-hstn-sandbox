@@ -44,12 +44,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
-import android.media.AudioAttributes
-import android.os.Handler
-import android.os.Looper
-import android.speech.tts.TextToSpeech
+import android.content.Context
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,14 +55,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.BuildConfig
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolRegistry
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolId
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.SetupVoice
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolRequest
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 
@@ -82,9 +82,14 @@ fun CameraAccessScaffold(
   val snackbarHostState = remember { SnackbarHostState() }
   val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-  // Observe recent errors and show snackbar
+  val context = LocalContext.current
+  val setupVoice: SetupVoice = viewModel()
+
+  // Observe recent errors and show snackbar. Errors are also spoken: with TalkBack on, TalkBack
+  // reads the snackbar (a polite live region), so we don't speak it a second time.
   LaunchedEffect(uiState.recentError?.id) {
     uiState.recentError?.let { error ->
+      if (!isTouchExplorationOn(context)) setupVoice.announce(error.message)
       snackbarHostState.showSnackbar(error.message)
       viewModel.clearRecentError(error.id)
     }
@@ -100,17 +105,12 @@ fun CameraAccessScaffold(
             launchTool = launchTool,
         )
       } else {
+        // Not connected to Meta AI yet: the setup screen talks and listens (setup/SetupVoice), on
+        // every launch. A voice-first launch into a tool names the tool in the welcome.
         HomeScreen(
             viewModel = viewModel,
+            setupVoice = setupVoice,
         )
-        // Voice-first launch but the app was never connected to Meta AI: say so rather than sit
-        // silently on a screen a blind user can't see. Registration happens once, in Meta AI's UI.
-        launchTool?.let { request ->
-          val text =
-              if (request.tool == ToolId.BOOK) stringResource(R.string.voice_needs_setup)
-              else stringResource(R.string.tool_needs_setup, stringResource(ToolRegistry.spec(request.tool).nameRes))
-          SpeakOnce(text, delayMs = 3_000L)
-        }
       }
 
       SnackbarHost(
@@ -121,6 +121,7 @@ fun CameraAccessScaffold(
                   .padding(horizontal = 16.dp, vertical = 32.dp),
           snackbar = { data ->
             Snackbar(
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 shape = RoundedCornerShape(24.dp),
                 containerColor = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -165,31 +166,7 @@ fun CameraAccessScaffold(
   }
 }
 
-/** Speaks [text] once after [delayMs] if this composable is still showing. Accessibility audio. */
-@Composable
-private fun SpeakOnce(text: String, delayMs: Long) {
-  val context = LocalContext.current
-  DisposableEffect(text) {
-    var tts: TextToSpeech? = null
-    val handler = Handler(Looper.getMainLooper())
-    val speak = Runnable {
-      tts =
-          TextToSpeech(context.applicationContext) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-              tts?.setAudioAttributes(
-                  AudioAttributes.Builder()
-                      .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
-                      .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                      .build(),
-              )
-              tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "setup")
-            }
-          }
-    }
-    handler.postDelayed(speak, delayMs)
-    onDispose {
-      handler.removeCallbacks(speak)
-      tts?.shutdown()
-    }
-  }
-}
+/** TalkBack (or another touch-exploration screen reader) is on: it reads live regions itself. */
+private fun isTouchExplorationOn(context: Context): Boolean =
+    (context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager)
+        ?.isTouchExplorationEnabled == true

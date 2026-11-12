@@ -157,6 +157,7 @@
     <string name="voice_unavailable" description="Spoken when no microphone can be used">Voice control is off because I can\'t use a microphone. The buttons on the phone screen still work.</string>
     <string name="voice_paused" description="Spoken after pausing by voice">Paused.</string>
     <string name="voice_goodbye" description="Spoken when leaving by voice">Bookmark saved. Goodbye.</string>
+    <string name="voice_bookmark_saved" description="Spoken when closing the reader back to the main menu">Bookmark saved.</string>
     <string name="voice_help" description="Spoken list of voice commands">You can say: read, stop, next page, say that again, go back, back a paragraph, faster, slower, where am I, battery, or close. You can talk over me at any time.</string>
     <string name="voice_not_understood" description="Spoken when speech isn't a command">Sorry, I didn\'t get that. Say help to hear what you can say.</string>
     <string name="voice_nothing_read_yet" description="Spoken when asked to repeat before anything was read">Nothing read yet. Hold the book in front of you and say read.</string>

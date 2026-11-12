@@ -39,6 +39,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.VideoCaptureHandler
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolHub
 import com.meta.wearable.dat.mockdevice.MockDeviceKit
 import com.meta.wearable.dat.mockdevice.api.GlassesModel
 import com.meta.wearable.dat.mockdevice.api.MockDeviceKitConfig
@@ -71,11 +72,14 @@ class InstrumentationTest {
 
   @Before
   fun setup() {
+    // Touch-driven bench: keep the home voice menu from starting the session under the taps.
+    ToolHub.homeMenuEnabled = false
     grantPermissions()
   }
 
   @After
   fun tearDown() {
+    ToolHub.homeMenuEnabled = true
     MockDeviceKit.getInstance(targetContext).disable()
   }
 
