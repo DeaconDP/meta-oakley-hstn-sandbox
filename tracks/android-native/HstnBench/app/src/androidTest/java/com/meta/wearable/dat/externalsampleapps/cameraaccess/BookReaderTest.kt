@@ -31,6 +31,7 @@ import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.PageLayout
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.TextDistance
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.MlKitOcr
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolHub
 import com.meta.wearable.dat.mockdevice.MockDeviceKit
 import com.meta.wearable.dat.mockdevice.api.GlassesModel
 import com.meta.wearable.dat.mockdevice.api.MockGlasses
@@ -68,6 +69,8 @@ class BookReaderTest {
 
   @Before
   fun setup() {
+    // Touch-driven: keep the home voice menu from starting the session under the taps.
+    ToolHub.homeMenuEnabled = false
     listOf(
             "android.permission.BLUETOOTH",
             "android.permission.BLUETOOTH_CONNECT",
@@ -85,6 +88,7 @@ class BookReaderTest {
 
   @After
   fun tearDown() {
+    ToolHub.homeMenuEnabled = true
     MockDeviceKit.getInstance(targetContext).disable()
   }
 

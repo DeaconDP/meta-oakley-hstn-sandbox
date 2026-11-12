@@ -24,6 +24,14 @@
     <string name="tool_ask_not_in_text" description="Spoken when the text doesn't answer the question">The text doesn\'t say.</string>
     <string name="tool_ask_nothing_read" description="Spoken when a question is asked before anything was read">I haven\'t read anything yet, so I can\'t answer that.</string>
     <string name="tool_ask_failed" description="Spoken when answering a question failed">Sorry, I couldn\'t answer that just now.</string>
+    <!-- Home voice menu (CameraScreen with no tool open; ToolHub home mode) -->
+    <string name="home_welcome" description="Spoken when the main menu is ready after connecting to the glasses">Ready. Say read my book, read my mail, labels, watch for text, light, or what can I say.</string>
+    <string name="home_back" description="Spoken when going back to the main menu from a tool">Main menu.</string>
+    <string name="home_prompt" description="Spoken when the user asks for the main menu again or says start">Main menu. Say read my book, read my mail, labels, watch for text, light, or what can I say.</string>
+    <string name="home_help" description="Spoken for help in the main menu">This is the main menu. Say read my book, read my mail, labels, watch for, then what to look for, light, or what colour is this. You can also say battery, faster, slower, or close the app. In any tool, say main menu to come back here.</string>
+    <string name="home_help_in_tool" description="Added to a tool's help when there is a main menu">Say main menu for other tools.</string>
+    <string name="home_reminder_last" description="Last silence reminder in the main menu">Say read my book, read my mail, labels, watch for text, light, or what can I say. I\'ll stay quiet now.</string>
+    <string name="home_heading" description="Screen: heading for the voice menu on the camera screen">Voice menu</string>
     <!-- Screen -->
     <string name="tool_close" description="Close button on a tool screen; %1$s is the tool name">Close <xliff:g id="tool">%1$s</xliff:g></string>
     <string name="tool_status_idle" description="Tool status line before anything happens">Ready</string>

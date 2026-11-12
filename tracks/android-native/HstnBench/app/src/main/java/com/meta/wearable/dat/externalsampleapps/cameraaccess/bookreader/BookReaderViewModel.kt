@@ -649,6 +649,8 @@ class BookReaderViewModel(
       GlobalCommand.Help -> handle(VoiceCommand.Help)
       GlobalCommand.Battery -> handle(VoiceCommand.Battery)
       GlobalCommand.Close -> handle(VoiceCommand.Close)
+      // "Main menu", "close the app": ToolHub leaves the reader (onLeaving keeps the bookmark).
+      GlobalCommand.Home, GlobalCommand.ExitApp -> return false
       is GlobalCommand.Open -> {
         // "Read a book" in the book reader: same as "read".
         if (command.request.tool != ToolId.BOOK) return false
@@ -756,7 +758,11 @@ class BookReaderViewModel(
       is VoiceCommand.SetRate -> changeRate(command.rate)
       VoiceCommand.WhereAmI -> reply(whereAmI())
       VoiceCommand.Battery -> reply(hub.batteryReport())
-      VoiceCommand.Help -> reply(str(R.string.voice_help))
+      VoiceCommand.Help ->
+          reply(
+              if (hub.hasHomeMenu) str(R.string.voice_help) + " " + str(R.string.home_help_in_tool)
+              else str(R.string.voice_help),
+          )
       is VoiceCommand.ReadFurniture -> {
         setReadFurniture(command.enabled)
         reply(str(if (command.enabled) R.string.voice_furniture_on else R.string.voice_furniture_off))
@@ -767,7 +773,8 @@ class BookReaderViewModel(
       }
       VoiceCommand.Close -> {
         stop()
-        sayAside(str(R.string.voice_goodbye))
+        // Back to the main menu (which says so) or out of the app (goodbye): ToolHub decides.
+        sayAside(str(if (hub.closeLeavesApp) R.string.voice_goodbye else R.string.voice_bookmark_saved))
         _uiState.update { it.copy(closeRequested = true) }
       }
     }
