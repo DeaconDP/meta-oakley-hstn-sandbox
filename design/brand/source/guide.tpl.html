@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpeakUp Brand Guide</title>
+<meta name="description" content="SpeakUp brand identity: the speaking lens mark, palette with WCAG contrast ratios, type, the voice ribbon, and voice and tone.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#0B0B1A; --dusk:#1E1A3D; --line:#3A3470; --yellow:#FFD60A;
+  --paper:#FFF8E7; --coral:#FF6B5B; --cyan:#3DD9EB; --muted:{{MUTED}};
+  --bg:var(--night); --surface:var(--dusk); --text:var(--paper);
+  --r-md:16px; --r-lg:24px; --r-xl:32px;
+}
+*{box-sizing:border-box}
+html{background:var(--bg);color:var(--text);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);font:400 1.25rem/1.55 "Atkinson Hyperlegible",system-ui,sans-serif;letter-spacing:.01em}
+a{color:var(--yellow);text-underline-offset:.2em;text-decoration-thickness:2px}
+:focus-visible{outline:4px solid var(--yellow);outline-offset:3px;border-radius:6px}
+.skip{position:absolute;left:16px;top:-80px;background:var(--yellow);color:var(--night);padding:12px 20px;border-radius:12px;font-weight:700;z-index:9}
+.skip:focus{top:16px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+@media(min-width:720px){.wrap{padding:0 32px}}
+header.hero{position:relative;overflow:hidden;padding:72px 0 64px;
+  background:radial-gradient(ellipse 70% 80% at 30% 40%,#2A2456 0%,#16132F 50%,var(--night) 100%)}
+.hero .lock{width:min(560px,100%);height:auto;display:block}
+.hero p.tag{font-size:clamp(1.75rem,4vw,2.5rem);font-weight:700;margin:28px 0 8px;line-height:1.2}
+.hero p.sub{max-width:40ch;margin:0}
+.chip{display:inline-block;font-size:1.125rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--yellow);margin:0 0 12px}
+nav.toc{border-block:1px solid var(--line);background:var(--night);position:sticky;top:0;z-index:5}
+nav.toc ul{list-style:none;margin:0;padding:8px 0;display:flex;gap:4px 20px;flex-wrap:wrap}
+nav.toc a{display:inline-block;padding:10px 4px;font-size:1.125rem;color:var(--paper);text-decoration:none;font-weight:700}
+nav.toc a:hover{color:var(--yellow);text-decoration:underline}
+section{padding:72px 0 8px}
+h2{font-size:clamp(1.9rem,4vw,2.4rem);line-height:1.2;margin:0 0 12px}
+h3{font-size:1.5rem;line-height:1.3;margin:32px 0 8px}
+.lede{max-width:62ch;margin:0 0 32px}
+.grid{display:grid;gap:20px}
+@media(min-width:720px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:24px}
+.card.light{background:var(--paper);color:var(--night);border-color:var(--paper)}
+.stage{display:grid;place-items:center;min-height:240px;border-radius:var(--r-md);background:var(--night)}
+.card.light .stage{background:var(--paper)}
+.cap{margin:16px 0 0;font-size:1.125rem}
+.sizes{display:flex;align-items:flex-end;gap:28px;flex-wrap:wrap;color:var(--yellow)}
+.sizes figure{margin:0;text-align:center}
+.sizes figcaption{font-size:1.125rem;color:var(--paper);margin-top:8px}
+.icon-row{display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap}
+.icon-row svg{display:block;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+/* palette */
+.swatches{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.sw{border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--line);background:var(--surface)}
+.sw .chipc{height:120px;display:flex;align-items:flex-end;padding:14px 16px;font-weight:700;font-size:1.375rem}
+.sw dl{margin:0;padding:14px 16px;display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:1.125rem}
+.sw dt{font-weight:700}.sw dd{margin:0}
+table{width:100%;border-collapse:collapse;font-size:1.125rem}
+caption{text-align:left;font-weight:700;font-size:1.25rem;padding-bottom:12px}
+th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-weight:700}
+td.n{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.pill{display:inline-block;padding:2px 12px;border-radius:999px;font-weight:700;font-size:1rem;white-space:nowrap}
+.aaa{background:var(--yellow);color:var(--night)}
+.aa{background:var(--paper);color:var(--night)}
+.ui{background:var(--cyan);color:var(--night)}
+.fail{background:var(--coral);color:var(--night)}
+.sample{display:inline-block;padding:6px 12px;border-radius:10px;font-weight:700;min-width:7.5em}
+.tablewrap{overflow-x:auto;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);padding:8px 16px 16px}
+/* type */
+.type-row{display:grid;gap:4px 24px;padding:18px 0;border-bottom:1px solid var(--line)}
+@media(min-width:720px){.type-row{grid-template-columns:200px 1fr}}
+.type-row .meta{font-size:1.125rem;color:var(--muted)}
+.type-row .meta b{color:var(--paper)}
+/* ribbon */
+.ribbon-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);padding:24px}
+.ribbon-stage{position:relative;border-radius:var(--r-lg);background:radial-gradient(ellipse at 50% 50%,#1E1A3D 0%,var(--night) 75%);padding:28px 16px}
+#ribbon-svg{width:100%;height:180px;display:block}
+.state-label{display:flex;align-items:center;gap:12px;font-size:1.75rem;font-weight:700;margin:0 0 8px;min-height:2.6rem}
+.state-dot{width:18px;height:18px;border-radius:50%;flex:none}
+.seg{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
+.seg button{font:inherit;font-weight:700;font-size:1.125rem;min-height:56px;padding:0 22px;border-radius:999px;cursor:pointer;
+  background:transparent;color:var(--paper);border:2px solid var(--paper)}
+.seg button[aria-pressed="true"]{background:var(--yellow);color:var(--night);border-color:var(--yellow)}
+.states{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));margin-top:24px}
+.st{background:var(--night);border-radius:var(--r-md);padding:16px;border-left:8px solid}
+.st b{display:block;font-size:1.25rem}
+.st span{font-size:1.125rem;color:var(--muted)}
+/* do / dont */
+.dd{display:grid;gap:20px}
+@media(min-width:720px){.dd{grid-template-columns:1fr 1fr}}
+.do,.dont{border-radius:var(--r-lg);padding:24px;background:var(--surface);border:2px solid}
+.do{border-color:var(--cyan)}.dont{border-color:var(--coral)}
+.do h3,.dont h3{margin-top:0;display:flex;gap:10px;align-items:center}
+.do ul,.dont ul{margin:0;padding-left:1.2em}.do li,.dont li{margin:8px 0}
+.mini{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
+.mini figure{margin:0;text-align:center;font-size:1rem;max-width:150px}
+.mini .box{width:132px;height:100px;border-radius:16px;display:grid;place-items:center;margin-bottom:8px}
+/* voice */
+.say{display:grid;gap:12px}
+.line{display:grid;gap:4px 16px;padding:16px 20px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line)}
+@media(min-width:720px){.line{grid-template-columns:1fr 1fr}}
+.line .yes::before{content:"Say  ";font-weight:700;color:var(--cyan)}
+.line .no::before{content:"Not  ";font-weight:700;color:var(--coral)}
+.line .no{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--coral);text-decoration-thickness:2px}
+blockquote{margin:0;font-size:clamp(1.5rem,3vw,2rem);font-weight:700;line-height:1.3;max-width:28ch}
+footer{margin-top:88px;padding:48px 0 64px;border-top:1px solid var(--line)}
+footer .credit{font-size:1.5rem;font-weight:700;margin:16px 0 4px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.9em;background:var(--night);padding:1px 6px;border-radius:6px;border:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="hero">
+  <div class="wrap">
+    <p class="chip">Brand guide · v1</p>
+    <h1 class="sr">SpeakUp brand guide</h1>
+    {{LOCKUP_HERO}}
+    <p class="tag">Your glasses, out loud.</p>
+    <p class="sub">SpeakUp is a voice-first assistant for blind and low-vision people, working through Oakley Meta HSTN glasses. This page sets out how it looks, moves and talks. In this identity, legibility is what makes it beautiful.</p>
+  </div>
+</header>
+<nav class="toc" aria-label="Sections">
+  <div class="wrap"><ul>
+    <li><a href="#mark">Mark</a></li><li><a href="#icon">App icon</a></li><li><a href="#colour">Colour</a></li>
+    <li><a href="#type">Type</a></li><li><a href="#ribbon">Voice ribbon</a></li><li><a href="#rules">Do and don't</a></li>
+    <li><a href="#voice">Voice and tone</a></li>
+  </ul></div>
+</nav>
+<main id="main" class="wrap">
+
+<section id="mark" aria-labelledby="h-mark">
+  <h2 id="h-mark">The speaking lens</h2>
+  <p class="lede">A pair of rounded lenses, cut out of a speech bubble. The bubble's right edge is the first ripple, and three sound arcs carry on outward from it. It says three things at once: glasses, voice, and what the glasses see coming back out loud. It is one solid shape with no thin lines, so it holds up at 24&nbsp;px.</p>
+  <div class="grid g2">
+    <div class="card"><div class="stage" style="color:var(--yellow)">{{MARK_LG}}</div>
+      <p class="cap"><b>Primary.</b> Signal Yellow on Night. 13.81:1.</p></div>
+    <div class="card light"><div class="stage" style="color:var(--night)">{{MARK_LG}}</div>
+      <p class="cap"><b>On light.</b> Night on Paper. Yellow never goes on Paper.</p></div>
+  </div>
+  <h3>Sizes</h3>
+  <div class="card"><div class="sizes" role="list">
+    <figure role="listitem">{{MARK_24}}<figcaption>24 px</figcaption></figure>
+    <figure role="listitem">{{MARK_32}}<figcaption>32</figcaption></figure>
+    <figure role="listitem">{{MARK_48}}<figcaption>48</figcaption></figure>
+    <figure role="listitem">{{MARK_96}}<figcaption>96</figcaption></figure>
+    <figure role="listitem">{{MARK_160}}<figcaption>160</figcaption></figure>
+  </div><p class="cap">The smallest size is 24&nbsp;px. Below that, use the word "SpeakUp" instead.</p></div>
+  <h3>Lockup</h3>
+  <div class="grid g2">
+    <div class="card"><div class="stage" style="padding:24px">{{LOCKUP_DARK}}</div>
+      <p class="cap">The wordmark is set in Atkinson Hyperlegible Bold and converted to outlines. Its cap height is half the height of the mark. Leave clear space all round equal to one lens.</p></div>
+    <div class="card light"><div class="stage" style="padding:24px;color:var(--night)">{{LOCKUP_MONO}}</div>
+      <p class="cap">Single colour: Night on Paper, or Paper on Night.</p></div>
+  </div>
+</section>
+
+<section id="icon" aria-labelledby="h-icon">
+  <h2 id="h-icon">App icon</h2>
+  <p class="lede">The yellow mark on Night, lit by a soft violet glow, as if the room is listening. The glow is the only depth effect: no bevels, no gloss. On Android the mark sits inside the 66&nbsp;dp safe zone, and the themed icon uses the same single shape.</p>
+  <div class="icon-row">
+    <figure style="margin:0">{{ICON_LG}}<figcaption class="cap">Store, 1024 px</figcaption></figure>
+    <figure style="margin:0">{{ICON_MD}}<figcaption class="cap">Home screen</figcaption></figure>
+    <figure style="margin:0">{{ICON_SM}}<figcaption class="cap">Settings</figcaption></figure>
+  </div>
+</section>
+
+<section id="colour" aria-labelledby="h-colour">
+  <h2 id="h-colour">Colour</h2>
+  <p class="lede">The palette is dark first: a night sky with one bright signal. Yellow is the brand and the main action. Cyan means the app is listening and Coral means it is speaking. Each state also has a word and a sound, because colour alone never carries meaning.</p>
+  <div class="swatches">
+    <div class="sw"><div class="chipc" style="background:#0B0B1A;color:#FFF8E7;border-bottom:1px solid var(--line)">Night</div><dl><dt>Hex</dt><dd>#0B0B1A</dd><dt>Use</dt><dd>Page</dd></dl></div>
+    <div class="sw"><div class="chipc" style="background:#1E1A3D;color:#FFF8E7">Dusk</div><dl><dt>Hex</dt><dd>#1E1A3D</dd><dt>Use</dt><dd>Cards</dd></dl></div>
+    <div class="sw"><div class="chipc" style="background:#3A3470;color:#FFF8E7">Dusk Line</div><dl><dt>Hex</dt><dd>#3A3470</dd><dt>Use</dt><dd>Dividers</dd></dl></div>
+    <div class="sw"><div class="chipc" style="background:#FFD60A;color:#0B0B1A">Signal Yellow</div><dl><dt>Hex</dt><dd>#FFD60A</dd><dt>Use</dt><dd>Brand, actions</dd></dl></div>
+    <div class="sw"><div class="chipc" style="background:#FFF8E7;color:#0B0B1A">Paper</div><dl><dt>Hex</dt><dd>#FFF8E7</dd><dt>Use</dt><dd>Text, light page</dd></dl></div>
+    <div class="sw"><div class="chipc" style="background:#3DD9EB;color:#0B0B1A">Listen Cyan</div><dl><dt>Hex</dt><dd>#3DD9EB</dd><dt>Use</dt><dd>Listening</dd></dl></div>
+    <div class="sw"><div class="chipc" style="background:#FF6B5B;color:#0B0B1A">Voice Coral</div><dl><dt>Hex</dt><dd>#FF6B5B</dd><dt>Use</dt><dd>Speaking, warnings</dd></dl></div>
+  </div>
+  <h3>Contrast, measured</h3>
+  <p class="lede">WCAG&nbsp;2 ratios. Target: 7:1 for body text (AAA), never below 4.5:1, and 3:1 for the edges of controls.</p>
+  <div class="tablewrap"><table>
+    <caption>Text and boundary pairs</caption>
+    <thead><tr><th scope="col">Sample</th><th scope="col">Pair</th><th scope="col">Ratio</th><th scope="col">Rating and rule</th></tr></thead>
+    <tbody>{{CONTRAST_ROWS}}</tbody>
+  </table></div>
+</section>
+
+<section id="type" aria-labelledby="h-type">
+  <h2 id="h-type">Type</h2>
+  <p class="lede">Atkinson Hyperlegible, from the Braille Institute. Letters that are easy to mix up are drawn so they look different: I, l and 1; 0 and O; b and d. Body text on the phone is never smaller than 20&nbsp;sp, and every size follows the system font-size setting.</p>
+  <div class="card">
+    <div class="type-row"><div class="meta"><b>Display</b><br>44 / 52 Bold</div><div style="font:700 2.75rem/1.18 'Atkinson Hyperlegible',sans-serif">Bus 42 is here.</div></div>
+    <div class="type-row"><div class="meta"><b>Headline</b><br>34 / 42 Bold</div><div style="font:700 2.125rem/1.24 'Atkinson Hyperlegible',sans-serif">Three new letters</div></div>
+    <div class="type-row"><div class="meta"><b>Title</b><br>26 / 34 Bold</div><div style="font:700 1.625rem/1.3 'Atkinson Hyperlegible',sans-serif">Read my mail</div></div>
+    <div class="type-row"><div class="meta"><b>Body large</b><br>22 / 32</div><div style="font-size:1.375rem;line-height:1.45">It's a gas bill from Northern Power. It's due on the 3rd.</div></div>
+    <div class="type-row"><div class="meta"><b>Body</b><br>20 / 30, the minimum</div><div style="font-size:1.25rem;line-height:1.5">Hold the page about a hand's width away. I'll tell you when it's in view.</div></div>
+    <div class="type-row"><div class="meta"><b>Label</b><br>20 / 26 Bold</div><div style="font-weight:700;font-size:1.25rem;letter-spacing:.02em">Start listening</div></div>
+    <div class="type-row" style="border:0"><div class="meta"><b>Caption</b><br>18 / 26, for extra detail only</div><div style="font-size:1.125rem">Last read 2 minutes ago</div></div>
+  </div>
+  <p class="cap">Il1 O0 bd qp rn m. Every pair stays distinct.</p>
+</section>
+
+<section id="ribbon" aria-labelledby="h-ribbon">
+  <h2 id="h-ribbon">The voice ribbon</h2>
+  <p class="lede">Our signature motif: a soft waveform that shows the conversation. When SpeakUp listens, the ribbon turns Cyan and its waves move in towards the glasses. When it speaks, the ribbon turns Coral and the waves move out. The state is always written next to it in words. If reduce motion is on, the ribbon stays still.</p>
+  <div class="ribbon-card">
+    <p class="state-label" aria-live="polite"><span class="state-dot" id="dot" aria-hidden="true"></span><span id="slabel">Listening</span></p>
+    <div class="ribbon-stage"><svg id="ribbon-svg" viewBox="0 0 800 180" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <defs><linearGradient id="fade" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".15" stop-color="#fff"/><stop offset=".85" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      <mask id="m"><rect width="800" height="180" fill="url(#fade)"/></mask></defs>
+      <g mask="url(#m)" fill="none" stroke-linecap="round">
+        <path id="w3" stroke-width="3" opacity=".35"/><path id="w2" stroke-width="5" opacity=".6"/><path id="w1" stroke-width="8"/>
+      </g></svg></div>
+    <div class="seg" role="group" aria-label="Preview a state">
+      <button type="button" data-s="idle" aria-pressed="false">Idle</button>
+      <button type="button" data-s="listening" aria-pressed="true">Listening</button>
+      <button type="button" data-s="thinking" aria-pressed="false">Thinking</button>
+      <button type="button" data-s="speaking" aria-pressed="false">Speaking</button>
+      <button type="button" data-s="error" aria-pressed="false">Error</button>
+    </div>
+    <div class="states">
+      <div class="st" style="border-color:var(--yellow)"><b>Idle</b><span>Signal Yellow · "Ready" · breathing</span></div>
+      <div class="st" style="border-color:var(--cyan)"><b>Listening</b><span>Listen Cyan · follows the mic · waves move in</span></div>
+      <div class="st" style="border-color:var(--paper)"><b>Thinking</b><span>Paper · "Working on it" · soft pulses</span></div>
+      <div class="st" style="border-color:var(--coral)"><b>Speaking</b><span>Voice Coral · follows the voice · waves move out</span></div>
+      <div class="st" style="border-color:var(--coral);border-left-style:dashed"><b>Error</b><span>Coral · stops still · with a spoken reason and an icon</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="rules" aria-labelledby="h-rules">
+  <h2 id="h-rules">Do and don't</h2>
+  <div class="mini" aria-hidden="true">
+    <figure><div class="box" style="background:var(--night);color:var(--yellow);border:1px solid var(--line)">{{MARK_56}}</div>Yellow on Night</figure>
+    <figure><div class="box" style="background:var(--paper);color:var(--night)">{{MARK_56}}</div>Night on Paper</figure>
+    <figure><div class="box" style="background:var(--yellow);color:var(--night)">{{MARK_56}}</div>Night on Yellow</figure>
+  </div>
+  <div class="dd">
+    <div class="do"><h3><span aria-hidden="true">✓</span> Do</h3><ul>
+      <li>Keep the mark solid, in a single colour.</li>
+      <li>Use Night text on Yellow, Cyan and Coral fills.</li>
+      <li>Put a word next to every state colour.</li>
+      <li>Use 20&nbsp;sp or more for body text and 56&nbsp;dp or more for touch targets.</li>
+      <li>Use a 4&nbsp;px yellow focus ring, 3&nbsp;px away from the control.</li>
+      <li>Give every control a Paper edge, or a fill that reaches 3:1.</li>
+    </ul></div>
+    <div class="dont"><h3><span aria-hidden="true">✕</span> Don't</h3><ul>
+      <li>Don't put Yellow, Cyan or Coral text on Paper. They measure 1.3 to 2.6:1.</li>
+      <li>Don't use Coral for body text on Dusk. It measures 5.91:1, which is fine for large text only.</li>
+      <li>Don't rely on Dusk Line as the only edge of a button. It measures 1.77:1.</li>
+      <li>Don't stretch, outline, rotate or add gradients to the mark.</li>
+      <li>Don't use the mark below 24&nbsp;px, or on a busy photo.</li>
+      <li>Don't use thin or condensed weights for text people need to read.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="voice" aria-labelledby="h-voice">
+  <h2 id="h-voice">Voice and tone</h2>
+  <p class="lede">The app talks, so its voice is the brand. SpeakUp sounds like a calm friend reading over your shoulder. It uses short sentences and plain words, and it puts the important part first. It's warm, but it never gushes. It says what it is doing, and it never says "please wait".</p>
+  <blockquote>"Got it. Looking for bus 42. I'll tell you when I see it."</blockquote>
+  <h3>Principles</h3>
+  <div class="grid g3">
+    <div class="card"><b>Lead with the answer.</b><br>"Gas bill, £42, due Friday." The detail comes after.</div>
+    <div class="card"><b>One idea per sentence.</b><br>The user can't scan back, so short sentences are a kindness.</div>
+    <div class="card"><b>Say what's happening.</b><br>Never leave silence or say "please wait". Say "Reading the page."</div>
+  </div>
+  <h3>Lines</h3>
+  <div class="say">
+    <div class="line"><span class="yes">Reading the page.</span><span class="no">Please wait while we process your request.</span></div>
+    <div class="line"><span class="yes">I can't see any text yet. Try moving the page closer.</span><span class="no">Error: OCR returned no results.</span></div>
+    <div class="line"><span class="yes">Bus 42 is coming. It's on your left.</span><span class="no">Target detected: "42".</span></div>
+    <div class="line"><span class="yes">That's a can of chickpeas, 400 grams.</span><span class="no">Barcode scan successful! Product identified.</span></div>
+    <div class="line"><span class="yes">The glasses lost connection. I'm trying again.</span><span class="no">Oops! Something went wrong.</span></div>
+  </div>
+</section>
+</main>
+<footer>
+  <div class="wrap">
+    <div style="color:var(--yellow);width:56px">{{MARK_56}}</div>
+    <p class="credit">By deac online · Worldbuild.io</p>
+    <p style="margin:0;color:var(--muted)">SpeakUp. Your glasses, out loud. Atkinson Hyperlegible is © Braille Institute of America, licensed under the SIL Open Font License&nbsp;1.1.</p>
+  </div>
+</footer>
+<script>
+(function(){
+  var S={idle:{c:"#FFD60A",l:"Ready",a:.18,dir:0,f:1},listening:{c:"#3DD9EB",l:"Listening",a:.75,dir:-1,f:1.4},
+    thinking:{c:"#FFF8E7",l:"Working on it",a:.35,dir:1,f:2.4,pulse:1},speaking:{c:"#FF6B5B",l:"Speaking",a:.95,dir:1,f:1.7},
+    error:{c:"#FF6B5B",l:"Problem: the glasses lost connection",a:0,dir:0,f:1,err:1}};
+  var cur="listening",amp=S.listening.a,t=0,ws=[document.getElementById("w1"),document.getElementById("w2"),document.getElementById("w3")];
+  var dot=document.getElementById("dot"),lab=document.getElementById("slabel");
+  var rm=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function path(k,ph,a,s){var d="",W=800,H=90;for(var x=0;x<=W;x+=8){var u=x/W,env=Math.sin(Math.PI*u);
+    var y=Math.sin(u*Math.PI*2*s.f*(1+k*.35)+ph)*.6+Math.sin(u*Math.PI*5.3*s.f+ph*1.7+k)*.4;
+    if(s.pulse){y*=.5+.5*Math.cos((u-((ph/6)%1+1)%1)*Math.PI*6);} if(s.err){y=u>.47&&u<.53?-.5*Math.sin((u-.47)/.06*Math.PI):0;a=.5;}
+    d+=(x?"L":"M")+x+" "+(H+y*a*env*70*(1-k*.22)).toFixed(1);}return d;}
+  function draw(){var s=S[cur];amp+=(s.a-amp)*.08;var a=s.idle?amp:amp*(cur==="idle"?.6+.4*Math.sin(t*1.6):cur==="listening"||cur==="speaking"?.75+.25*Math.sin(t*3.1)*Math.sin(t*1.3):1);
+    for(var k=0;k<3;k++){ws[k].setAttribute("d",path(k,t*2.4*(s.dir||.3)+k*.9,a,s));ws[k].setAttribute("stroke",s.c);}}
+  function loop(){t+=1/60;draw();if(!rm)requestAnimationFrame(loop);}
+  function set(n){cur=n;var s=S[n];dot.style.background=s.c;lab.textContent=s.l;if(rm){amp=s.a;t=1.2;draw();}
+    document.querySelectorAll(".seg button").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.s===n?"true":"false");});}
+  document.querySelectorAll(".seg button").forEach(function(b){b.addEventListener("click",function(){set(b.dataset.s);});});
+  set("listening");loop();
+})();
+</script>
+</body>
+</html>
