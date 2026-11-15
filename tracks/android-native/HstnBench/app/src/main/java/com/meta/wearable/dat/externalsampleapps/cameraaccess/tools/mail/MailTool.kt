@@ -38,6 +38,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpColors
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpButton
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.VoiceState
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.voiceStateFor
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.AttachTool
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolAccent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolScaffold
@@ -62,7 +66,13 @@ fun MailScreen(ctx: ToolScreenContext) {
   AttachTool(ctx.hub, vm, ctx.request)
   val ui by vm.ui.collectAsStateWithLifecycle()
   val mail by vm.mail.collectAsStateWithLifecycle()
-  ToolScaffold(toolId = ToolId.MAIL, title = stringResource(R.string.mail_name), ui = ui, onClose = ctx.onClose) {
+  val voiceState =
+      when (mail.phase) {
+        MailPhase.LOOKING -> VoiceState.THINKING
+        MailPhase.READING -> VoiceState.SPEAKING
+        else -> voiceStateFor(ui.microphone)
+      }
+  ToolScaffold(toolId = ToolId.MAIL, title = stringResource(R.string.mail_name), ui = ui, onClose = ctx.onClose, voiceState = voiceState) {
     Column(
         modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -87,12 +97,12 @@ fun MailScreen(ctx: ToolScreenContext) {
       }
       mail.letter?.let { LetterFacts(it) }
       if (mail.sentence.isNotEmpty()) {
-        Text(stringResource(R.string.mail_sentence_heading), color = Color.White, fontSize = 18.sp, modifier = Modifier.semantics { heading() })
+        Text(stringResource(R.string.mail_sentence_heading), color = SpeakUpColors.PaperMuted, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
         Text(mail.sentence, color = ToolAccent, fontSize = 24.sp, modifier = Modifier.testTag("mail_sentence"))
       }
       mail.letter?.let { letter ->
-        Text(stringResource(R.string.mail_text_heading), color = Color.White, fontSize = 18.sp, modifier = Modifier.semantics { heading() })
-        Text(letter.safeText, color = Color.White, fontSize = 20.sp, modifier = Modifier.testTag("mail_text"))
+        Text(stringResource(R.string.mail_text_heading), color = SpeakUpColors.PaperMuted, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
+        Text(letter.safeText, color = SpeakUpColors.Paper, fontSize = 20.sp, modifier = Modifier.testTag("mail_text"))
       }
     }
   }
@@ -116,7 +126,7 @@ private fun LetterFacts(letter: Letter) {
   amount?.let { Fact(R.string.mail_label_amount, it, "mail_amount") }
   letter.due?.let { Fact(R.string.mail_label_due, if (it.sure) it.spoken else stringResource(R.string.mail_amount_unsure), "mail_due") }
   if (letter.pages.size > 1) {
-    Text(stringResource(R.string.mail_label_pages, letter.pages.size), color = Color.White, fontSize = 22.sp)
+    Text(stringResource(R.string.mail_label_pages, letter.pages.size), color = SpeakUpColors.Paper, fontSize = 22.sp)
   }
 }
 
@@ -124,7 +134,7 @@ private fun LetterFacts(letter: Letter) {
 private fun Fact(label: Int, value: String, tag: String) {
   Text(
       stringResource(label, value),
-      color = Color.White,
+      color = SpeakUpColors.Paper,
       fontSize = 22.sp,
       fontWeight = FontWeight.SemiBold,
       modifier = Modifier.testTag(tag),
@@ -139,12 +149,11 @@ private fun BigButton(
     modifier: Modifier = Modifier.fillMaxWidth(),
     onClick: () -> Unit,
 ) {
-  Button(
+  SpeakUpButton(
+      label = stringResource(label),
       onClick = onClick,
       enabled = enabled,
-      modifier = modifier.heightIn(min = 64.dp).testTag(tag),
-      colors = ButtonDefaults.buttonColors(containerColor = ToolAccent, contentColor = Color.Black),
-  ) {
-    Text(stringResource(label), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-  }
+      minHeight = 64.dp,
+      modifier = modifier.testTag(tag),
+  )
 }

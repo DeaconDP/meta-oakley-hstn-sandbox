@@ -9,15 +9,13 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 
+/**
+ * A full-width SpeakUp button: Signal Yellow for the main action, Voice Coral when [isDestructive].
+ * At least 56dp tall and grows with the font scale.
+ */
 @Composable
 fun SwitchButton(
     label: String,
@@ -26,19 +24,11 @@ fun SwitchButton(
     isDestructive: Boolean = false,
     enabled: Boolean = true,
 ) {
-  Button(
-      modifier = modifier.height(56.dp).fillMaxWidth(),
+  SpeakUpButton(
+      label = label,
       onClick = onClick,
-      colors =
-          ButtonDefaults.buttonColors(
-              containerColor =
-                  if (isDestructive) AppColor.DestructiveBackground else AppColor.DeepBlue,
-              disabledContainerColor = Color.Gray,
-              disabledContentColor = Color.DarkGray,
-              contentColor = if (isDestructive) AppColor.DestructiveForeground else Color.White,
-          ),
+      modifier = modifier.fillMaxWidth(),
+      kind = if (isDestructive) ButtonKind.DANGER else ButtonKind.PRIMARY,
       enabled = enabled,
-  ) {
-    Text(label)
-  }
+  )
 }

@@ -25,14 +25,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -50,25 +45,30 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.BookReaderUiState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.BookReaderViewModel
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.Microphone
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bookreader.ReaderPhase
 import java.util.Locale
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.MicStatusLine
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolHeader
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.voiceStateFor
 
-private val ReaderBackground = Color.Black
-private val ReaderAccent = AppColor.Yellow
+private val ReaderBackground = SpeakUpColors.Night
+private val ReaderAccent = SpeakUpColors.SignalYellow
 
 @Composable
 fun BookReaderScreen(
@@ -91,24 +91,26 @@ fun BookReaderScreen(
               .navigationBarsPadding()
               .padding(horizontal = 16.dp, vertical = 8.dp)
               .testTag("book_reader_screen"),
-      verticalArrangement = Arrangement.spacedBy(10.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(
-          text = stringResource(R.string.book_reader_title),
-          color = Color.White,
-          fontSize = 26.sp,
-          fontWeight = FontWeight.Bold,
-          modifier = Modifier.weight(1f).semantics { heading() },
+    ToolHeader(
+        title = stringResource(R.string.book_reader_title),
+        closeDescription = stringResource(R.string.book_reader_close),
+        onClose = onClose,
+        closeTag = "book_close",
+    )
+
+    // Decorative; the status card below says the same in words.
+    if (LocalDensity.current.fontScale < 1.6f) {
+      VoiceRibbon(
+          state =
+              when {
+                ui.isCapturing -> VoiceState.THINKING
+                ui.phase == ReaderPhase.READING -> VoiceState.SPEAKING
+                else -> voiceStateFor(ui.microphone)
+              },
+          height = 44.dp,
       )
-      IconButton(onClick = onClose, modifier = Modifier.size(56.dp).testTag("book_close")) {
-        Icon(
-            imageVector = Icons.Filled.Close,
-            contentDescription = stringResource(R.string.book_reader_close),
-            tint = Color.White,
-            modifier = Modifier.size(32.dp),
-        )
-      }
     }
 
     StatusLine(ui)
@@ -124,10 +126,8 @@ fun BookReaderScreen(
             ),
         onClick = viewModel::startOrPause,
         modifier = Modifier.testTag("book_start_pause"),
-        container = ReaderAccent,
-        content = Color.Black,
+        primary = true,
         height = 80,
-        fontSize = 26,
     )
 
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -169,46 +169,42 @@ fun BookReaderScreen(
 @Composable
 private fun StatusLine(ui: BookReaderUiState) {
   val status = ui.status.ifEmpty { stringResource(R.string.book_status_idle) }
-  Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+  SpeakUpCard(modifier = Modifier.fillMaxWidth()) {
     Text(
         text = status,
         color = ReaderAccent,
-        fontSize = 22.sp,
-        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.testTag("book_status"),
     )
     Text(
         text = stringResource(R.string.book_pages_read, ui.pagesRead),
-        color = Color.White,
-        fontSize = 18.sp,
+        color = SpeakUpColors.Paper,
+        style = MaterialTheme.typography.bodyLarge,
     )
-    Text(
-        text =
-            stringResource(
-                when (ui.microphone) {
-                  Microphone.GLASSES -> R.string.voice_mic_glasses
-                  Microphone.PHONE -> R.string.voice_mic_phone
-                  Microphone.NONE -> R.string.voice_mic_none
-                },
-            ),
-        color = Color.White,
-        fontSize = 18.sp,
-        modifier = Modifier.testTag("book_voice_mic"),
-    )
+    MicStatusLine(microphone = ui.microphone, tag = "book_voice_mic")
     if (ui.heard.isNotEmpty()) {
       Text(
           text = stringResource(R.string.voice_heard, ui.heard),
-          color = Color.White,
-          fontSize = 18.sp,
+          color = SpeakUpColors.PaperMuted,
+          style = MaterialTheme.typography.bodyMedium,
           modifier = Modifier.testTag("book_voice_heard"),
       )
     }
     if (!ui.speechAvailable) {
-      Text(
-          text = stringResource(R.string.book_speech_unavailable),
-          color = Color.White,
-          fontSize = 18.sp,
-      )
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Filled.Warning,
+            contentDescription = null,
+            tint = SpeakUpColors.VoiceCoral,
+            modifier = Modifier.size(26.dp),
+        )
+        Spacer(modifier = Modifier.size(10.dp))
+        Text(
+            text = stringResource(R.string.book_speech_unavailable),
+            color = SpeakUpColors.Paper,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+      }
     }
   }
 }
@@ -218,19 +214,16 @@ private fun BigButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    container: Color = Color.White,
-    content: Color = Color.Black,
+    primary: Boolean = false,
     height: Int = 64,
-    fontSize: Int = 20,
 ) {
-  Button(
+  SpeakUpButton(
+      label = label,
       onClick = onClick,
-      modifier = modifier.fillMaxWidth().heightIn(min = height.dp),
-      shape = RoundedCornerShape(16.dp),
-      colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = content),
-  ) {
-    Text(text = label, fontSize = fontSize.sp, fontWeight = FontWeight.Bold)
-  }
+      modifier = modifier.fillMaxWidth(),
+      kind = if (primary) ButtonKind.PRIMARY else ButtonKind.SECONDARY,
+      minHeight = height.dp,
+  )
 }
 
 @Composable
@@ -248,13 +241,11 @@ private fun RateControl(rate: Float, onRate: (Float) -> Unit) {
           onClick = { onRate(rate - 0.25f) },
           modifier = Modifier.weight(1f).testTag("book_rate_slower"),
           height = 56,
-          fontSize = 18,
       )
       Text(
           text = label,
-          color = Color.White,
-          fontSize = 22.sp,
-          fontWeight = FontWeight.SemiBold,
+          color = SpeakUpColors.Paper,
+          style = MaterialTheme.typography.titleMedium,
           modifier = Modifier.testTag("book_rate_value"),
       )
       BigButton(
@@ -262,7 +253,6 @@ private fun RateControl(rate: Float, onRate: (Float) -> Unit) {
           onClick = { onRate(rate + 0.25f) },
           modifier = Modifier.weight(1f).testTag("book_rate_faster"),
           height = 56,
-          fontSize = 18,
       )
     }
     Slider(
@@ -274,7 +264,9 @@ private fun RateControl(rate: Float, onRate: (Float) -> Unit) {
             SliderDefaults.colors(
                 thumbColor = ReaderAccent,
                 activeTrackColor = ReaderAccent,
-                inactiveTrackColor = Color.White.copy(alpha = 0.5f),
+                inactiveTrackColor = SpeakUpColors.DuskLine,
+                activeTickColor = SpeakUpColors.Night,
+                inactiveTickColor = SpeakUpColors.PaperMuted,
             ),
         modifier =
             Modifier.fillMaxWidth().testTag("book_rate_slider").semantics {
@@ -295,17 +287,24 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
               .testTag(tag),
       verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text(text = label, color = Color.White, fontSize = 20.sp, modifier = Modifier.weight(1f))
+    Text(
+        text = label,
+        color = SpeakUpColors.Paper,
+        style = MaterialTheme.typography.bodyLarge,
+        modifier = Modifier.weight(1f),
+    )
     Spacer(modifier = Modifier.size(12.dp))
     Switch(
         checked = checked,
         onCheckedChange = null,
         colors =
             SwitchDefaults.colors(
-                checkedThumbColor = Color.Black,
+                checkedThumbColor = SpeakUpColors.Night,
                 checkedTrackColor = ReaderAccent,
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color.DarkGray,
+                checkedBorderColor = ReaderAccent,
+                uncheckedThumbColor = SpeakUpColors.PaperMuted,
+                uncheckedTrackColor = SpeakUpColors.Dusk,
+                uncheckedBorderColor = SpeakUpColors.PaperMuted,
             ),
     )
   }
@@ -322,15 +321,17 @@ private fun PageText(ui: BookReaderUiState, modifier: Modifier = Modifier) {
       modifier =
           modifier
               .fillMaxWidth()
-              .background(Color(0xFF111111), RoundedCornerShape(12.dp))
-              .padding(12.dp)
+              .clip(MaterialTheme.shapes.medium)
+              .background(SpeakUpColors.Dusk)
+              .border(1.dp, SpeakUpColors.DuskLine, MaterialTheme.shapes.medium)
+              .padding(16.dp)
               .verticalScroll(rememberScrollState()),
   ) {
     Text(
         text = if (ui.pageText.isEmpty()) AnnotatedString(empty) else text,
-        color = Color.White,
+        color = SpeakUpColors.Paper,
         fontSize = 26.sp,
-        lineHeight = 38.sp,
+        lineHeight = 40.sp,
         modifier = Modifier.testTag("book_page_text"),
     )
   }
@@ -347,7 +348,7 @@ private fun highlighted(page: String, chunks: List<String>, current: Int): Annot
         if (at < 0) return@buildAnnotatedString
         if (i == current) {
           addStyle(
-              SpanStyle(background = ReaderAccent, color = Color.Black),
+              SpanStyle(background = ReaderAccent, color = SpeakUpColors.Night),
               at,
               at + chunks[i].length,
           )

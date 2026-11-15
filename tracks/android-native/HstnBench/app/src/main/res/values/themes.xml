@@ -1,7 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.CameraAccess" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:colorBackground">#000000</item>
+    <!-- SpeakUp: dark-first. Night page, light (Paper) system-bar icons, Signal Yellow accent.
+         Compose colours live in ui/Theme.kt (SpeakUpColors); keep these in step. -->
+    <style name="Theme.CameraAccess" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorBackground">#FF0B0B1A</item>
+        <item name="android:windowBackground">@color/speakup_night</item>
+        <item name="android:colorPrimary">#FFFFD60A</item>
+        <item name="android:colorAccent">#FFFFD60A</item>
+        <item name="android:textColorPrimary">#FFFFF8E7</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- Android 12+ launch splash (platform API, minSdk 31): the SpeakUp launcher icon,
+             whose foreground is the mark, on Night. -->
+        <item name="android:windowSplashScreenBackground">@color/speakup_night</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/speakup_night</item>
     </style>
+
+    <color name="speakup_night">#FF0B0B1A</color>
 </resources>

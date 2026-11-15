@@ -28,6 +28,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
@@ -43,6 +44,7 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolRegistry
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.LaunchIntent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolLaunch
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.CameraAccessScaffold
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpTheme
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 import com.meta.wearable.dat.mockdevice.MockDeviceKit
 import com.meta.wearable.dat.mockdevice.api.MockDeviceKitConfig
@@ -143,7 +145,11 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     maybeStartMockDeviceTestServer()
-    enableEdgeToEdge()
+    // SpeakUp is dark-first: light system-bar icons over the Night page.
+    enableEdgeToEdge(
+        statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+    )
     val launchTool =
         ToolLaunch.parse(
             LaunchIntent(
@@ -161,12 +167,14 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
     Log.i(TAG, "launch tool=$launchTool")
     setupVoice.setLaunchedTool(launchTool?.let { getString(ToolRegistry.spec(it.tool).nameRes) })
     setContent {
-      CameraAccessScaffold(
-          viewModel = viewModel,
-          onRequestWearablesPermission = ::requestWearablesPermission,
-          onRequestRecordAudioPermission = ::requestRecordAudioPermission,
-          launchTool = launchTool,
-      )
+      SpeakUpTheme {
+        CameraAccessScaffold(
+            viewModel = viewModel,
+            onRequestWearablesPermission = ::requestWearablesPermission,
+            onRequestRecordAudioPermission = ::requestRecordAudioPermission,
+            launchTool = launchTool,
+        )
+      }
     }
   }
 

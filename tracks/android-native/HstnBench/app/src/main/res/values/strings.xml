@@ -2,25 +2,26 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2" project="cameraaccess">
 
     <!-- App -->
-    <string name="app_name" description="Launcher label / app name">HSTN Bench</string>
+    <string name="app_name" description="Launcher label / app name">SpeakUp</string>
+    <string name="speakup_tagline" description="Brand tagline under the SpeakUp wordmark">Your glasses, out loud.</string>
 
     <!-- App chrome -->
-    <string name="scaffold_error_icon_description" description="Content description for the error snackbar icon">Camera Access error</string>
+    <string name="scaffold_error_icon_description" description="Content description for the error snackbar icon">Error</string>
     <string name="debug_menu_description" description="Content description for the debug menu button">Debug menu</string>
 
     <!-- Home Screen -->
     <string name="register_button_title" description="Connect App">Connect my glasses</string>
     <string name="home_redirect_message" description="Redirect message">You\'ll be redirected to the Meta AI app to confirm your connection.</string>
-    <string name="home_tip_session_title" description="Tip title about starting a session">Start a session</string>
-    <string name="home_tip_session" description="Tip about starting a session">Connect to your glasses to get started.</string>
-    <string name="home_tip_preview_title" description="Tip title about preview">Start preview</string>
-    <string name="home_tip_preview" description="Tip about preview">See the live camera feed from your glasses.</string>
-    <string name="home_tip_capture_title" description="Tip title about capture">Capture</string>
-    <string name="home_tip_capture" description="Tip about capture">Take photos and record video with audio.</string>
+    <string name="home_tip_session_title" description="Tip title about starting a session">Connect once</string>
+    <string name="home_tip_session" description="Tip about starting a session">Link SpeakUp with the Meta AI app. You only do this once.</string>
+    <string name="home_tip_preview_title" description="Tip title about preview">Just say it</string>
+    <string name="home_tip_preview" description="Tip about preview">Ask for what you need: read my book, read my mail, labels, watch for text, or light.</string>
+    <string name="home_tip_capture_title" description="Tip title about capture">Hear it back</string>
+    <string name="home_tip_capture" description="Tip about capture">SpeakUp answers out loud. Talk over it any time.</string>
     <string name="error_activity_unavailable" description="Error shown when registration is tapped but no activity is available">Can\'t open right now. Try again.</string>
 
     <!-- Camera Screen -->
-    <string name="camera_access_icon_description" description="Camera Access icon description">Camera Access icon</string>
+    <string name="camera_access_icon_description" description="Camera Access icon description">Glasses camera</string>
     <string name="live_preview" description="Live preview content description">Live preview</string>
     <string name="waiting_for_active_device" description="Waiting for active device message">Waiting for an active device</string>
     <string name="status_session" description="Session status chip label">Session</string>
@@ -53,7 +54,7 @@
     <string name="update_firmware_button_title" description="Open firmware update">Update firmware</string>
     <string name="update_required_title" description="Update required warning title">Update required</string>
     <string name="update_required_subtitle" description="Update required placeholder subtitle">Apply the update to start your camera.</string>
-    <string name="update_required_firmware_message" description="Firmware update required warning">Your glasses need a firmware update before Camera Access can start.</string>
+    <string name="update_required_firmware_message" description="Firmware update required warning">Your glasses need a firmware update before SpeakUp can use the camera.</string>
 
     <!-- Camera permission redirect -->
     <string name="camera_permission_redirect_title" description="Camera permission redirect title">Allow camera access</string>

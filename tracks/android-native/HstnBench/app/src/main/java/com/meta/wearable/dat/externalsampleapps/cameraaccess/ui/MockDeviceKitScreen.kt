@@ -29,7 +29,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -156,7 +156,7 @@ private fun ActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     containerColor: Color = AppColor.DeepBlue,
-    contentColor: Color = Color.White,
+    contentColor: Color = SpeakUpColors.OnAccent,
 ) {
   Button(
       modifier = modifier,
@@ -244,10 +244,10 @@ private fun MockDeviceCard(
             colors =
                 ButtonDefaults.buttonColors(
                     containerColor = AppColor.Red,
-                    contentColor = Color.White,
+                    contentColor = SpeakUpColors.OnAccent,
                 ),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-            modifier = Modifier.height(32.dp),
+            modifier = Modifier.heightIn(min = 48.dp),
         ) {
           Text(
               text = stringResource(R.string.unpair),
@@ -268,7 +268,7 @@ private fun MockDeviceCard(
           Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
             // Power toggle
             Row(
-                modifier = Modifier.fillMaxWidth().height(36.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -287,7 +287,7 @@ private fun MockDeviceCard(
 
             // Donned toggle
             Row(
-                modifier = Modifier.fillMaxWidth().height(36.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -306,7 +306,7 @@ private fun MockDeviceCard(
 
             // Unfolded toggle
             Row(
-                modifier = Modifier.fillMaxWidth().height(36.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {

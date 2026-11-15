@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpColors
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpButton
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.AttachTool
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolAccent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolScaffold
@@ -72,7 +74,7 @@ fun WatchScreen(ctx: ToolScreenContext) {
                 w.phase == WatchPhase.WATCHING -> stringResource(R.string.watch_screen_target, w.target!!)
                 else -> stringResource(R.string.watch_screen_stopped, w.target!!)
               },
-          color = Color.White,
+          color = SpeakUpColors.Paper,
           fontSize = 30.sp,
           fontWeight = FontWeight.Bold,
           modifier = Modifier.testTag("watch_target"),
@@ -93,16 +95,16 @@ fun WatchScreen(ctx: ToolScreenContext) {
                     w.ocrMs!!,
                     w.fps?.let { String.format(Locale.US, "%.1f", it) } ?: "-",
                 ),
-            color = Color.White,
-            fontSize = 16.sp,
+            color = SpeakUpColors.Paper,
+            fontSize = 20.sp,
             modifier = Modifier.testTag("watch_pace"),
         )
       }
       if (w.phase == WatchPhase.WATCHING && w.lastRead != null) {
         Text(
             text = stringResource(R.string.watch_screen_read, w.lastRead!!.ifEmpty { stringResource(R.string.watch_screen_read_nothing) }),
-            color = Color.White,
-            fontSize = 18.sp,
+            color = SpeakUpColors.Paper,
+            fontSize = 20.sp,
             modifier = Modifier.testTag("watch_read"),
         )
       }
@@ -130,12 +132,11 @@ fun WatchScreen(ctx: ToolScreenContext) {
 
 @Composable
 private fun BigButton(label: String, tag: String, enabled: Boolean = true, onClick: () -> Unit) {
-  Button(
+  SpeakUpButton(
+      label = label,
       onClick = onClick,
       enabled = enabled,
-      colors = ButtonDefaults.buttonColors(containerColor = ToolAccent, contentColor = Color.Black),
-      modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).testTag(tag),
-  ) {
-    Text(label, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-  }
+      minHeight = 64.dp,
+      modifier = Modifier.fillMaxWidth().testTag(tag),
+  )
 }

@@ -22,12 +22,14 @@
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,7 +55,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -120,20 +121,32 @@ fun CameraAccessScaffold(
                   .navigationBarsPadding()
                   .padding(horizontal = 16.dp, vertical = 32.dp),
           snackbar = { data ->
+            // Dusk card with a Voice Coral edge and warning icon: the error is in words and an
+            // icon, not colour alone.
             Snackbar(
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                modifier =
+                    Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                        .border(2.dp, SpeakUpColors.VoiceCoral, RoundedCornerShape(24.dp)),
                 shape = RoundedCornerShape(24.dp),
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                containerColor = SpeakUpColors.Dusk,
+                contentColor = SpeakUpColors.Paper,
             ) {
-              Row(verticalAlignment = Alignment.CenterVertically) {
+              Row(
+                  verticalAlignment = Alignment.CenterVertically,
+                  modifier = Modifier.padding(vertical = 8.dp),
+              ) {
                 Icon(
                     imageVector = Icons.Default.Error,
                     contentDescription = stringResource(R.string.scaffold_error_icon_description),
-                    tint = MaterialTheme.colorScheme.error,
+                    tint = SpeakUpColors.VoiceCoral,
+                    modifier = Modifier.size(28.dp),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(data.visuals.message)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = data.visuals.message,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = SpeakUpColors.Paper,
+                )
               }
             }
           },
@@ -143,8 +156,8 @@ fun CameraAccessScaffold(
         FloatingActionButton(
             onClick = { viewModel.showDebugMenu() },
             modifier = Modifier.align(Alignment.CenterEnd),
-            containerColor = AppColor.DeepBlue,
-            contentColor = Color.White,
+            containerColor = SpeakUpColors.Dusk,
+            contentColor = SpeakUpColors.Paper,
         ) {
           Icon(
               Icons.Default.BugReport,

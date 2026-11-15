@@ -22,6 +22,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.AndroidExternalSurface
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -57,6 +59,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -90,13 +93,14 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.Microphone
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.MicStatusLine
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolAccent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolHub
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolRegistry
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolScreenContext
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolId
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolRequest
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.voiceStateFor
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
@@ -106,12 +110,16 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.camera.CameraUiStat
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.camera.CameraViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 
-// Scrims behind the top/bottom bars so the white controls stay legible over the live feed. Hoisted
+// Night scrims behind the top/bottom bars so the controls stay legible over the live feed. Hoisted
 // so they're allocated once instead of on every bar recomposition (the recording timer ticks).
 private val TopScrimBrush =
-    Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent))
+    Brush.verticalGradient(listOf(SpeakUpColors.Night.copy(alpha = 0.85f), Color.Transparent))
 private val BottomScrimBrush =
-    Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)))
+    Brush.verticalGradient(
+        0f to Color.Transparent,
+        0.25f to SpeakUpColors.Night.copy(alpha = 0.8f),
+        1f to SpeakUpColors.Night.copy(alpha = 0.94f),
+    )
 private const val PREVIEW_ASPECT_RATIO = 9f / 16f
 
 @Composable
@@ -184,7 +192,7 @@ fun CameraScreen(
 
   val isUpdateRequired = wearablesUi.isFirmwareUpdateRequired
 
-  Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+  Box(modifier = modifier.fillMaxSize().background(SpeakUpColors.Night)) {
     PreviewBackground(
         ui = ui,
         hasActiveDevice = wearablesUi.hasActiveDevice,
@@ -323,46 +331,45 @@ private fun HomeVoicePanel(hub: ToolHub) {
   Column(
       modifier =
           Modifier.fillMaxWidth()
-              .padding(horizontal = 20.dp)
-              .clip(RoundedCornerShape(16.dp))
-              .background(Color.Black.copy(alpha = 0.7f))
-              .padding(16.dp)
+              .padding(horizontal = 16.dp)
+              .clip(MaterialTheme.shapes.medium)
+              .background(SpeakUpColors.Dusk.copy(alpha = 0.94f))
+              .border(1.dp, SpeakUpColors.DuskLine, MaterialTheme.shapes.medium)
+              .padding(SpeakUpDimens.CardPadding)
               .testTag("home_voice_panel"),
-      verticalArrangement = Arrangement.spacedBy(6.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
-    Text(
-        text = stringResource(R.string.home_heading),
-        color = Color.White,
-        fontSize = 18.sp,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.semantics { heading() },
-    )
-    Text(
-        text =
-            stringResource(
-                when (mic) {
-                  Microphone.GLASSES -> R.string.voice_mic_glasses
-                  Microphone.PHONE -> R.string.voice_mic_phone
-                  Microphone.NONE -> R.string.voice_mic_none
-                },
-            ),
-        color = Color.White,
-        fontSize = 16.sp,
-        modifier = Modifier.testTag("home_voice_mic"),
-    )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Icon(
+          painter = painterResource(R.drawable.speakup_mark),
+          contentDescription = null,
+          tint = SpeakUpColors.SignalYellow,
+          modifier = Modifier.size(28.dp),
+      )
+      Spacer(modifier = Modifier.width(10.dp))
+      Text(
+          text = stringResource(R.string.home_heading),
+          color = SpeakUpColors.Paper,
+          style = MaterialTheme.typography.titleLarge,
+          modifier = Modifier.semantics { heading() },
+      )
+    }
+    // Decorative: the mic line and status below say the same in words.
+    VoiceRibbon(state = voiceStateFor(mic), height = 40.dp)
+    MicStatusLine(microphone = mic, tag = "home_voice_mic")
     if (status.isNotEmpty()) {
       Text(
           text = status,
           color = ToolAccent,
-          fontSize = 18.sp,
+          style = MaterialTheme.typography.titleMedium,
           modifier = Modifier.testTag("home_status"),
       )
     }
     if (heard.isNotEmpty()) {
       Text(
           text = stringResource(R.string.voice_heard, heard),
-          color = Color.White,
-          fontSize = 16.sp,
+          color = SpeakUpColors.PaperMuted,
+          style = MaterialTheme.typography.bodyMedium,
           modifier = Modifier.testTag("home_voice_heard"),
       )
     }
@@ -408,7 +415,7 @@ private fun PreviewBackground(
       Box(
           modifier =
               Modifier.fillMaxSize()
-                  .background(Color.Black.copy(alpha = 0.35f))
+                  .background(SpeakUpColors.Night.copy(alpha = 0.6f))
                   .testTag("paused_overlay"),
           contentAlignment = Alignment.Center,
       ) {
@@ -419,21 +426,20 @@ private fun PreviewBackground(
           Icon(
               imageVector = Icons.Filled.Pause,
               contentDescription = null,
-              tint = Color.White,
-              modifier = Modifier.size(36.dp),
+              tint = SpeakUpColors.SignalYellow,
+              modifier = Modifier.size(48.dp),
           )
           Spacer(modifier = Modifier.height(8.dp))
           Text(
               text = stringResource(R.string.paused_title),
-              color = Color.White,
-              fontSize = 20.sp,
-              fontWeight = FontWeight.SemiBold,
+              color = SpeakUpColors.Paper,
+              style = MaterialTheme.typography.headlineSmall,
           )
           Spacer(modifier = Modifier.height(4.dp))
           Text(
               text = stringResource(R.string.paused_subtitle),
-              color = Color.White.copy(alpha = 0.7f),
-              fontSize = 15.sp,
+              color = SpeakUpColors.Paper,
+              style = MaterialTheme.typography.bodyLarge,
               textAlign = TextAlign.Center,
           )
         }
@@ -442,10 +448,10 @@ private fun PreviewBackground(
 
     if ((ui.isBusy || (ui.hasStream && !ui.hasReceivedFirstFrame)) && !ui.isPaused) {
       Box(
-          modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
+          modifier = Modifier.fillMaxSize().background(SpeakUpColors.Night.copy(alpha = 0.5f)),
           contentAlignment = Alignment.Center,
       ) {
-        CircularProgressIndicator(color = Color.White)
+        CircularProgressIndicator(color = SpeakUpColors.SignalYellow, strokeWidth = 5.dp)
       }
     }
   }
@@ -491,21 +497,32 @@ private fun StatusPlaceholder(
     Icon(
         painter = painterResource(id = R.drawable.camera_access_icon),
         contentDescription = stringResource(R.string.camera_access_icon_description),
-        tint = Color.White,
+        tint = SpeakUpColors.SignalYellow,
         modifier = Modifier.size(88.dp),
     )
-    Spacer(modifier = Modifier.height(12.dp))
-    Text(text = title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+    Spacer(modifier = Modifier.height(16.dp))
+    Text(
+        text = title,
+        color = SpeakUpColors.Paper,
+        style = MaterialTheme.typography.headlineMedium,
+        textAlign = TextAlign.Center,
+    )
     if (subtitle != null) {
       Spacer(modifier = Modifier.height(8.dp))
-      Text(text = subtitle, color = Color.White.copy(alpha = 0.7f), fontSize = 15.sp)
+      Text(
+          text = subtitle,
+          color = SpeakUpColors.PaperMuted,
+          style = MaterialTheme.typography.bodyLarge,
+          textAlign = TextAlign.Center,
+      )
     }
     if (showWaitingRow) {
       Spacer(modifier = Modifier.height(12.dp))
       Text(
           text = stringResource(R.string.waiting_for_active_device),
-          color = Color.White.copy(alpha = 0.7f),
-          fontSize = 14.sp,
+          color = SpeakUpColors.PaperMuted,
+          style = MaterialTheme.typography.bodyMedium,
+          textAlign = TextAlign.Center,
       )
     }
   }
@@ -526,10 +543,17 @@ private fun TopBar(
           Modifier.fillMaxWidth()
               .background(TopScrimBrush)
               .statusBarsPadding()
-              .padding(horizontal = 20.dp, vertical = 16.dp),
+              .padding(horizontal = 16.dp, vertical = 12.dp),
       verticalAlignment = Alignment.Top,
   ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(
+        modifier =
+            Modifier.weight(1f, fill = false)
+                .clip(MaterialTheme.shapes.small)
+                .background(SpeakUpColors.Night.copy(alpha = 0.7f))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
       StatusChip(
           label = stringResource(R.string.status_session),
           value = ui.sessionStateText,
@@ -544,22 +568,32 @@ private fun TopBar(
       )
     }
 
-    Spacer(modifier = Modifier.weight(1f))
+    Spacer(modifier = Modifier.width(12.dp))
 
     Box {
       // Pinned to TopEnd so it stays put when the Disconnect popover below widens this Box.
-      Icon(
-          imageVector = Icons.Filled.LinkOff,
-          contentDescription = stringResource(R.string.unregister_button_title),
-          tint = Color.White,
+      Box(
           modifier =
-              Modifier.align(Alignment.TopEnd).size(28.dp).clickable(onClick = onToggleSettings),
-      )
+              Modifier.align(Alignment.TopEnd)
+                  .size(SpeakUpDimens.MinTouchTarget)
+                  .clip(CircleShape)
+                  .background(SpeakUpColors.Dusk)
+                  .border(2.dp, SpeakUpColors.DuskLine, CircleShape)
+                  .clickable(onClick = onToggleSettings),
+          contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+            imageVector = Icons.Filled.LinkOff,
+            contentDescription = stringResource(R.string.unregister_button_title),
+            tint = SpeakUpColors.Paper,
+            modifier = Modifier.size(28.dp),
+        )
+      }
       if (showSettingsMenu) {
         SwitchButton(
             label = stringResource(R.string.unregister_button_title),
             onClick = onDisconnect,
-            modifier = Modifier.align(Alignment.TopEnd).offset(y = 40.dp).width(150.dp),
+            modifier = Modifier.align(Alignment.TopEnd).offset(y = 64.dp).width(220.dp),
             isDestructive = true,
             enabled = isDisconnectEnabled,
         )
@@ -570,20 +604,15 @@ private fun TopBar(
 
 @Composable
 private fun StatusChip(label: String, value: String, active: Boolean, present: Boolean) {
-  val dotColor = if (active) AppColor.Green else if (present) AppColor.Yellow else Color.Gray
-  Row(
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(6.dp),
-  ) {
-    Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(dotColor))
-    Text(
-        text = "$label: $value",
-        color = Color.White.copy(alpha = 0.85f),
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Medium,
-        fontFamily = FontFamily.Monospace,
-    )
-  }
+  // The value is in words; the dot repeats it: filled cyan = active, yellow ring = present,
+  // grey ring = none.
+  StateDotLabel(
+      text = "$label: $value",
+      dot =
+          if (active) SpeakUpColors.ListenCyan
+          else if (present) SpeakUpColors.SignalYellow else SpeakUpColors.PaperMuted,
+      filled = active,
+  )
 }
 
 // MARK: - Bottom bar
@@ -608,8 +637,8 @@ private fun BottomBar(
           Modifier.fillMaxWidth()
               .background(BottomScrimBrush)
               .navigationBarsPadding()
-              .padding(horizontal = 24.dp, vertical = 24.dp),
-      verticalArrangement = Arrangement.spacedBy(14.dp),
+              .padding(horizontal = 16.dp, vertical = 20.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     if (isUpdateRequired) {
       UpdateRequiredMessage()
@@ -646,9 +675,8 @@ private fun ToolButtons(ui: CameraUiState, onOpenTool: (ToolId) -> Unit) {
   Column(modifier = visible, verticalArrangement = Arrangement.spacedBy(10.dp)) {
     Text(
         text = stringResource(R.string.tools_heading),
-        color = Color.White,
-        fontSize = 15.sp,
-        fontWeight = FontWeight.SemiBold,
+        color = SpeakUpColors.Paper,
+        style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.semantics { heading() },
     )
     for (spec in book) {
@@ -658,6 +686,7 @@ private fun ToolButtons(ui: CameraUiState, onOpenTool: (ToolId) -> Unit) {
           label = stringResource(spec.buttonRes),
           contentDescription = stringResource(spec.buttonDescriptionRes),
           enabled = ui.isStreaming,
+          primary = true,
           onClick = { onOpenTool(spec.id) },
       )
     }
@@ -670,6 +699,7 @@ private fun ToolButtons(ui: CameraUiState, onOpenTool: (ToolId) -> Unit) {
               label = stringResource(spec.buttonRes),
               contentDescription = stringResource(spec.buttonDescriptionRes),
               enabled = ui.isStreaming,
+              primary = true,
               onClick = { onOpenTool(spec.id) },
           )
         }
@@ -742,7 +772,7 @@ private fun CaptureRow(
             if (ui.includeAudioInStream) stringResource(R.string.mic_on)
             else stringResource(R.string.mic_off),
         enabled = micEnabled,
-        tint = if (ui.includeAudioInStream) Color.White else Color.White.copy(alpha = 0.45f),
+        tint = if (ui.includeAudioInStream) SpeakUpColors.ListenCyan else SpeakUpColors.PaperMuted,
         onClick = onToggleMic,
     )
   }
@@ -779,34 +809,52 @@ private fun CapturePill(
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    primary: Boolean = false,
 ) {
+  val container =
+      when {
+        !enabled -> SpeakUpColors.Dusk.copy(alpha = 0.85f)
+        primary -> SpeakUpColors.SignalYellow
+        else -> SpeakUpColors.Dusk
+      }
+  val content =
+      when {
+        !enabled -> SpeakUpColors.DisabledContent
+        primary -> SpeakUpColors.OnAccent
+        else -> SpeakUpColors.Paper
+      }
   Row(
       modifier =
           modifier
-              .height(50.dp)
-              .clip(RoundedCornerShape(percent = 50))
-              .background(Color.White.copy(alpha = if (enabled) 0.18f else 0.08f))
+              .heightIn(min = SpeakUpDimens.MinTouchTarget)
+              .clip(PillShape)
+              .background(container)
+              .border(2.dp, if (primary && enabled) container else pillEdge(enabled), PillShape)
               .clickable(enabled = enabled, onClick = onClick)
               .semantics { this.contentDescription = contentDescription }
-              .padding(horizontal = 12.dp),
+              .padding(horizontal = 14.dp, vertical = 8.dp),
       horizontalArrangement = Arrangement.Center,
       verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(
         imageVector = icon,
         contentDescription = null,
-        tint = if (enabled) Color.White else Color.White.copy(alpha = 0.45f),
-        modifier = Modifier.size(20.dp),
+        tint = content,
+        modifier = Modifier.size(24.dp),
     )
     Spacer(modifier = Modifier.width(8.dp))
     Text(
         text = label,
-        color = if (enabled) Color.White else Color.White.copy(alpha = 0.45f),
-        fontSize = 15.sp,
-        fontWeight = FontWeight.SemiBold,
+        color = content,
+        style = MaterialTheme.typography.labelMedium,
+        textAlign = TextAlign.Center,
     )
   }
 }
+
+/** Pill outline: light when it can be pressed, quiet when it can't. */
+private fun pillEdge(enabled: Boolean): Color =
+    if (enabled) SpeakUpColors.PaperMuted else SpeakUpColors.DuskLine
 
 @Composable
 private fun RecordPill(
@@ -816,16 +864,22 @@ private fun RecordPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+  // Recording: Voice Coral with Night content, a stop icon and the running time.
   val background =
-      if (isRecording) AppColor.RecordAccent.copy(alpha = 0.5f)
-      else Color.White.copy(alpha = if (enabled) 0.18f else 0.08f)
+      when {
+        isRecording -> SpeakUpColors.VoiceCoral
+        enabled -> SpeakUpColors.Dusk
+        else -> SpeakUpColors.Dusk.copy(alpha = 0.85f)
+      }
   Row(
       modifier =
           modifier
-              .height(50.dp)
-              .clip(RoundedCornerShape(percent = 50))
+              .heightIn(min = SpeakUpDimens.MinTouchTarget)
+              .clip(PillShape)
               .background(background)
-              .clickable(enabled = enabled, onClick = onClick),
+              .border(2.dp, if (isRecording) background else pillEdge(enabled), PillShape)
+              .clickable(enabled = enabled, onClick = onClick)
+              .padding(horizontal = 14.dp, vertical = 8.dp),
       horizontalArrangement = Arrangement.Center,
       verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -833,17 +887,16 @@ private fun RecordPill(
       Icon(
           imageVector = Icons.Filled.Stop,
           contentDescription = stringResource(R.string.stop_recording),
-          tint = Color.White,
-          modifier = Modifier.size(20.dp),
+          tint = SpeakUpColors.OnAccent,
+          modifier = Modifier.size(24.dp),
       )
       Spacer(modifier = Modifier.width(8.dp))
       val minutes = elapsedSeconds / 60
       val seconds = elapsedSeconds % 60
       Text(
           text = String.format(java.util.Locale.ROOT, "%02d:%02d", minutes, seconds),
-          color = Color.White,
-          fontSize = 15.sp,
-          fontWeight = FontWeight.SemiBold,
+          color = SpeakUpColors.OnAccent,
+          style = MaterialTheme.typography.labelMedium,
           fontFamily = FontFamily.Monospace,
           modifier = Modifier.testTag("recording_indicator"),
       )
@@ -851,15 +904,14 @@ private fun RecordPill(
       Icon(
           imageVector = Icons.Filled.Videocam,
           contentDescription = stringResource(R.string.record_video),
-          tint = if (enabled) AppColor.RecordAccent else Color.White.copy(alpha = 0.45f),
-          modifier = Modifier.size(20.dp),
+          tint = if (enabled) SpeakUpColors.VoiceCoral else SpeakUpColors.DisabledContent,
+          modifier = Modifier.size(24.dp),
       )
       Spacer(modifier = Modifier.width(8.dp))
       Text(
           text = stringResource(R.string.record_label),
-          color = if (enabled) Color.White else Color.White.copy(alpha = 0.45f),
-          fontSize = 15.sp,
-          fontWeight = FontWeight.SemiBold,
+          color = if (enabled) SpeakUpColors.Paper else SpeakUpColors.DisabledContent,
+          style = MaterialTheme.typography.labelMedium,
       )
     }
   }
@@ -872,22 +924,23 @@ private fun CircleIconButton(
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = Color.White,
+    tint: Color = SpeakUpColors.Paper,
 ) {
   Box(
       modifier =
           modifier
-              .size(50.dp)
+              .size(SpeakUpDimens.MinTouchTarget)
               .clip(CircleShape)
-              .background(Color.White.copy(alpha = if (enabled) 0.18f else 0.08f))
+              .background(if (enabled) SpeakUpColors.Dusk else SpeakUpColors.Dusk.copy(alpha = 0.85f))
+              .border(2.dp, pillEdge(enabled), CircleShape)
               .clickable(enabled = enabled, onClick = onClick),
       contentAlignment = Alignment.Center,
   ) {
     Icon(
         imageVector = icon,
         contentDescription = contentDescription,
-        tint = if (enabled) tint else Color.White.copy(alpha = 0.45f),
-        modifier = Modifier.size(22.dp),
+        tint = if (enabled) tint else SpeakUpColors.DisabledContent,
+        modifier = Modifier.size(26.dp),
     )
   }
 }
@@ -898,29 +951,29 @@ private fun UpdateRequiredMessage(modifier: Modifier = Modifier) {
       modifier =
           modifier
               .fillMaxWidth()
-              .clip(RoundedCornerShape(20.dp))
-              .background(AppColor.UpdateRequiredBackground)
-              .padding(16.dp),
+              .clip(MaterialTheme.shapes.medium)
+              .background(SpeakUpColors.Dusk)
+              .border(2.dp, SpeakUpColors.VoiceCoral, MaterialTheme.shapes.medium)
+              .padding(SpeakUpDimens.CardPadding),
       horizontalArrangement = Arrangement.spacedBy(12.dp),
       verticalAlignment = Alignment.Top,
   ) {
     Icon(
         imageVector = Icons.Filled.Warning,
         contentDescription = null,
-        tint = AppColor.UpdateRequiredForeground,
-        modifier = Modifier.size(24.dp),
+        tint = SpeakUpColors.VoiceCoral,
+        modifier = Modifier.size(28.dp),
     )
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
       Text(
           text = stringResource(R.string.update_required_title),
-          color = AppColor.UpdateRequiredForeground,
-          fontWeight = FontWeight.SemiBold,
-          fontSize = 16.sp,
+          color = SpeakUpColors.Paper,
+          style = MaterialTheme.typography.titleMedium,
       )
       Text(
           text = stringResource(R.string.update_required_firmware_message),
-          color = AppColor.UpdateRequiredForeground,
-          fontSize = 15.sp,
+          color = SpeakUpColors.Paper,
+          style = MaterialTheme.typography.bodyLarge,
       )
     }
   }

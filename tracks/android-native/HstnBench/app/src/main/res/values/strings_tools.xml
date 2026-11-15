@@ -25,7 +25,7 @@
     <string name="tool_ask_nothing_read" description="Spoken when a question is asked before anything was read">I haven\'t read anything yet, so I can\'t answer that.</string>
     <string name="tool_ask_failed" description="Spoken when answering a question failed">Sorry, I couldn\'t answer that just now.</string>
     <!-- Home voice menu (CameraScreen with no tool open; ToolHub home mode) -->
-    <string name="home_welcome" description="Spoken when the main menu is ready after connecting to the glasses">Ready. Say read my book, read my mail, labels, watch for text, light, or what can I say.</string>
+    <string name="home_welcome" description="Spoken when the main menu is ready after connecting to the glasses">SpeakUp is ready. Say read my book, read my mail, labels, watch for text, light, or what can I say.</string>
     <string name="home_back" description="Spoken when going back to the main menu from a tool">Main menu.</string>
     <string name="home_prompt" description="Spoken when the user asks for the main menu again or says start">Main menu. Say read my book, read my mail, labels, watch for text, light, or what can I say.</string>
     <string name="home_help" description="Spoken for help in the main menu">This is the main menu. Say read my book, read my mail, labels, watch for, then what to look for, light, or what colour is this. You can also say battery, faster, slower, or close the app. In any tool, say main menu to come back here.</string>
