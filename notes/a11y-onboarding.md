@@ -82,7 +82,32 @@ Every failure gets a spoken sentence, an earcon, and one action. It's never just
 - **Voice control.** On by default, off switch in settings. The setup step after Welcome explains the microphone and speech recognition in speech, then asks. Skipped setup and updates from older builds get the same explanation and dialogs on the main screen. A denial is spoken with the fix, and every button keeps working. Details and the audio rules are in `A11y/Voice/` and the header of `A11y/Core/A11yAudioSession.swift`.
 - **Detect, don't ask.** Read `isVoiceOverRunning`, `isZoomEnabled` (via the accessibility settings APIs), the Dynamic Type size, Bold Text, Increase Contrast and Reduce Motion, and adapt to them. Only one question on the first screen: "Do you want a guided setup, or skip to the app?"
 - **Low vision is its own path.** People using Zoom or large text want visual onboarding that scales: Dynamic Type up to AX5, targets of 60 pt or more, contrast of 7:1 or more in an optional high-contrast theme, no meaning carried by colour alone, `accessibilityIgnoresInvertColors` on camera previews, and the magnifier view (ROADMAP step 5) reachable from the first screen.
-- **UI style.** Changed 2026-11-03: a playful, chunky style (SF Rounded, 3D buttons on a darker lip, an original vector mascot, a path of tiles, a streak and a daily goal), all in `A11y/Theme/` and `A11y/Progress/`. The look never carries meaning alone: every state is also words and shape. Bright faces take dark text, and the lip doubles as the outline, because a bright green alone is only about 2:1 on white. Lowest computed ratios, enforced by `ThemePaletteTests`: text on faces 7.80:1 light, 8.54:1 dark, 9.35:1 Increase Contrast light, 10.59:1 Increase Contrast dark; ink on page and cards at least 13.5:1, secondary ink at least 8.4:1; control boundaries at least 3.58:1 and progress fill on its track at least 3.42:1 in every variant. Main green `#63D420` with `#0B2200` text (8.82:1) and lip `#2E7D0C` (5.18:1 on white); dark `#7BE241` with the same text (10.29:1) on page `#101C24`. A missed day ends the current streak count but costs nothing else, and is never mentioned.
+- **UI style.** Changed 2026-11-03: a playful, chunky style (3D buttons on a darker lip, an original vector mascot, a path of tiles, a streak and a daily goal), all in `A11y/Theme/` and `A11y/Progress/`. The look never carries meaning alone: every state is also words and shape. Bright faces take dark text, and the lip doubles as the outline, because a bright face alone is under 3:1 on a light page (white on Signal Yellow is about 1.5:1). A missed day ends the current streak count but costs nothing else, and is never mentioned.
+- **SpeakUp palette (iOS).** Rebranded 2026-11-14 as SpeakUp ("Your glasses, out loud."). Typeface Atkinson Hyperlegible (Regular and Bold, bundled from `A11y/Theme/Fonts`, scaled with `Font.custom(_:size:relativeTo:)` so Dynamic Type still works; Bold Text switches to Bold). Brand colours: Night `#0B0B1A`, Dusk `#1E1A3D`, Dusk Line `#3A3470`, Signal Yellow `#FFD60A` (main action, Night text on it, 13.81:1), Paper `#FFF8E7`, Voice Coral `#FF6B5B` (speaking, warnings), Listen Cyan `#3DD9EB` (listening). The voice indicator shows a cyan bar while listening and a coral bar while the app talks or can't listen; its words say the same thing. Values per variant in `ThemePalette.swift`:
+
+  | | Light | Dark | Increase Contrast light | Increase Contrast dark |
+  |---|---|---|---|---|
+  | Page / card | Paper `#FFF8E7` / `#FFFFFF` | Night `#0B0B1A` / Dusk `#1E1A3D` | `#FFFFFF` / `#FFFFFF` | `#000000` / Night `#0B0B1A` |
+  | Ink / soft ink | Night / `#37325C` | Paper / `#D6D0EE` | `#000000` / Dusk | `#FFFFFF` / `#F0ECFF` |
+  | Main face / lip / text | `#FFD60A` / `#8A6400` / Night | `#FFD60A` / `#B89400` / Night | `#FFD60A` / `#5C4200` / `#000000` | `#FFE14D` / `#E0B800` / `#000000` |
+  | Listening cue | `#00727F` | `#3DD9EB` | `#004E57` | `#6FE6F3` |
+  | Speaking cue | `#C0392B` | `#FF6B5B` | `#8A1C12` | `#FF8A7D` |
+  | Progress fill / track | `#8A6400` / `#E6E1F0` | `#FFD60A` / Dusk Line `#3A3470` | `#5C4200` / `#E6E1F0` | `#FFE14D` / `#2A2550` |
+
+  Lowest computed ratios, enforced by `ThemePaletteTests` (minimum in brackets):
+
+  | Pair | Light | Dark | IC light | IC dark |
+  |---|---|---|---|---|
+  | Text on button faces (4.5 / 7) | 6.97 | 6.97 | 9.18 | 9.18 |
+  | Night text on Signal Yellow | 13.81 | 13.81 | 14.88 | 16.13 |
+  | Ink on page and cards (4.5 / 7) | 18.41 | 15.61 | 21.00 | 19.50 |
+  | Soft ink on page and cards (4.5 / 7) | 11.18 | 11.11 | 16.53 | 16.85 |
+  | Locked text on locked face (4.5 / 7) | 10.00 | 10.75 | 13.96 | 14.86 |
+  | Control boundaries: outlines and lips (3) | 4.84 | 3.89 | 9.31 | 6.34 |
+  | Listening and speaking cues (3) | 5.14 | 5.91 | 9.31 | 8.53 |
+  | Progress fill on its track (3) | 4.20 | 7.81 | 7.34 | 10.91 |
+
+  The lowest text pair is Night on Voice Coral (6.97:1), so Coral buttons keep Night text and the Increase Contrast variants lighten Coral to `#FF8A7D`. Green stays for success and "connected" marks and the celebration card (the yellow mascot would vanish on a yellow card). `AccentColor` and `appPrimaryColor` are `#8A6400` in light mode (5.08:1 on Paper) and Signal Yellow in dark mode (13.81:1 on Night).
 - **Sighted help is allowed, not assumed.** Step 0 may need it. Every step from 2 onward must be completable alone. A "hand to a helper" mode can show the Meta AI steps visually without hiding what's happening from the user.
 
 ## How to test it

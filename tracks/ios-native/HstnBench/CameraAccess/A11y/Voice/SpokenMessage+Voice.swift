@@ -40,7 +40,7 @@ extension SpokenMessage {
   static let voiceControlKeepOff = "Voice control stays off. You can turn it on in the app's settings."
 
   static let voicePermissionDenied =
-    "Voice control is off because the microphone or speech recognition isn't allowed. Every button still works. To fix it, open Settings, find HSTN Reader, and turn both on."
+    "Voice control is off because the microphone or speech recognition isn't allowed. Every button still works. To fix it, open Settings, find SpeakUp, and turn both on."
 
   static let voiceNoOnDeviceRecognition =
     "Voice control can't start: this phone has no on-device speech recognition for English. To add it, open Settings, General, Keyboard, and turn on Enable Dictation. Every button still works."

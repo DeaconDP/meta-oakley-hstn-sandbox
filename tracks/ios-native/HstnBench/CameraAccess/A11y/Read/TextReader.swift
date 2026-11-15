@@ -2,7 +2,7 @@
  * TextReader - "Read it aloud (word for word)": trigger, frame, OCR, framing check, then the
  * text sentence by sentence, with next / previous / repeat / stop
  *
- * Flow for one trigger (Read button, VoiceOver "Read text", Siri "Read this with HSTN Reader"):
+ * Flow for one trigger (Read button, VoiceOver "Read text", Siri "Read this with SpeakUp"):
  * 1. At once: cut whatever the app is saying, play the "working" earcon (inside the 100 ms
  *    budget) and start the working tick, so the wait is never silent.
  * 2. Make sure the stream is up; if not, take the next step (start session / preview) and wait.

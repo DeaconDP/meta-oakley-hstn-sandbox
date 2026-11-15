@@ -25,8 +25,21 @@ final class ThemePaletteTests: XCTestCase {
   func testKnownRatios() {
     XCTAssertEqual(ThemeRGB(0x000000).contrast(with: ThemeRGB(0xFFFFFF)), 21, accuracy: 0.001)
     XCTAssertEqual(ThemeRGB(0xFFFFFF).contrast(with: ThemeRGB(0xFFFFFF)), 1, accuracy: 0.001)
-    // White on a bright green: why the bright faces carry dark text.
-    XCTAssertLessThan(ThemeRGB(0xFFFFFF).contrast(with: ThemePalette.light.green.face), 3)
+    // White on Signal Yellow: why the bright faces carry dark text.
+    XCTAssertLessThan(ThemeRGB(0xFFFFFF).contrast(with: ThemePalette.light.yellow.face), 3)
+  }
+
+  func testSpeakUpBrandColours() {
+    // Signal Yellow is the main action's face in the standard variants, with Night text on it.
+    for palette in [ThemePalette.light, ThemePalette.dark] {
+      XCTAssertEqual(palette.yellow.face, ThemeRGB(0xFFD60A), palette.name)
+      XCTAssertEqual(palette.yellow.onFace, ThemeRGB(0x0B0B1A), palette.name)
+    }
+    XCTAssertEqual(ThemePalette.light.page, ThemeRGB(0xFFF8E7), "Paper")
+    XCTAssertEqual(ThemePalette.dark.page, ThemeRGB(0x0B0B1A), "Night")
+    XCTAssertEqual(ThemePalette.dark.surface, ThemeRGB(0x1E1A3D), "Dusk")
+    XCTAssertEqual(ThemePalette.dark.listen, ThemeRGB(0x3DD9EB), "Listen Cyan")
+    XCTAssertEqual(ThemePalette.dark.speak, ThemeRGB(0xFF6B5B), "Voice Coral")
   }
 
   func testTextMeetsItsMinimumInEveryVariant() {
@@ -53,9 +66,22 @@ final class ThemePaletteTests: XCTestCase {
           assertContrast(palette.colors(for: tone).lip, background, atLeast: 3, "\(tone) lip", in: palette)
         }
       }
+      for background in [palette.page, palette.surface] {
+        assertContrast(palette.listen, background, atLeast: 3, "listening cue", in: palette)
+        assertContrast(palette.speak, background, atLeast: 3, "speaking cue", in: palette)
+      }
       assertContrast(palette.fill, palette.track, atLeast: 3, "progress fill on its track", in: palette)
       assertContrast(palette.fill, palette.surface, atLeast: 3, "progress fill on its card", in: palette)
     }
+  }
+
+  func testBrandFontIsBundledAndRegistered() {
+    for name in [BrandFont.regular, BrandFont.bold] {
+      XCTAssertNotNil(UIFont(name: name, size: 17), "\(name) isn't registered: check UIAppFonts and the bundle")
+    }
+    XCTAssertEqual(BrandFont.name(for: .medium, boldText: false), BrandFont.regular)
+    XCTAssertEqual(BrandFont.name(for: .heavy, boldText: false), BrandFont.bold)
+    XCTAssertEqual(BrandFont.name(for: .regular, boldText: true), BrandFont.bold, "Bold Text makes it bold")
   }
 
   func testDynamicColoursFollowDarkModeAndIncreaseContrast() {
@@ -291,6 +317,14 @@ final class VoiceIndicatorModelTests: XCTestCase {
     XCTAssertEqual(noDictation.fix, .openSettings)
     let notAsked = model(.unavailable, reason: "Waiting", mic: .notDetermined)
     XCTAssertEqual(notAsked.fix, .askPermission)
+  }
+
+  func testSignalIsCyanWhileListeningAndCoralWhileTalkingOrStuck() {
+    XCTAssertEqual(model(.listening).signal, .listening)
+    XCTAssertEqual(model(.listening, speaking: true).signal, .speaking)
+    XCTAssertEqual(model(.unavailable, reason: "Waiting").signal, .warning)
+    XCTAssertEqual(model(.off).signal, .quiet)
+    XCTAssertEqual(model(.paused, reason: "A recording is running.").signal, .quiet)
   }
 
   func testOffOffersTurningItBackOn() {

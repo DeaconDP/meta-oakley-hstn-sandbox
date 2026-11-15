@@ -47,16 +47,23 @@ struct HomeScreenView: View {
         FlowingVoiceIndicator()
 
         // The name VoiceOver reads for the app icon, so the user knows where they are.
-        Text("HSTN Reader")
-          .font(.rounded(.largeTitle, weight: .black))
-          .foregroundStyle(Theme.ink)
-          .fixedSize(horizontal: false, vertical: true)
-          .accessibilityAddTraits(.isHeader)
+        VStack(alignment: .leading, spacing: 2) {
+          Text("SpeakUp")
+            .font(.rounded(.largeTitle, weight: .black))
+            .foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+          Text("Your glasses, out loud.")
+            .font(.rounded(.title3, weight: .bold))
+            .foregroundStyle(Theme.inkSoft)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
 
         VStack(alignment: .leading, spacing: 0) {
           HomeTipRow(
             systemImage: "eyeglasses",
-            tone: .green,
+            tone: .yellow,
             title: "Start a session",
             text: "Connect to your glasses to get started."
           )

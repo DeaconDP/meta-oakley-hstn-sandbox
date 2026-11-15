@@ -275,7 +275,7 @@ struct VerbosityStep: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
           }
-          .buttonStyle(ChunkyButtonStyle(tone: selected ? .green : .neutral))
+          .buttonStyle(ChunkyButtonStyle(tone: selected ? .yellow : .neutral))
           .accessibilityLabel(level.title)
           .accessibilityAddTraits(selected ? .isSelected : [])
           .accessibilityHint("Chooses this level and plays a sample answer.")

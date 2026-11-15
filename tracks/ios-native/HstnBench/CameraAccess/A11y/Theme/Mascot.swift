@@ -1,5 +1,5 @@
 /*
- * Mascot - a small round reader wearing the glasses from the app icon (design/app-icon-glyph.svg)
+ * Mascot - SpeakUp's small round reader in Signal Yellow and Night, wearing the glasses from the app icon
  *
  * All vector, drawn in the icon's 512 x 512 space and scaled to fit. It reflects state with its
  * eyes, mouth and props, and it is decorative: hidden from VoiceOver, kept as is under Smart Invert,
@@ -15,9 +15,9 @@ enum MascotMood: String, CaseIterable, Sendable {
 struct Mascot: View {
   var mood: MascotMood = .idle
 
-  private let bodyColor = Color(red: 1, green: 0.79, blue: 0.2)
-  private let bodyShade = Color(red: 0.88, green: 0.6, blue: 0)
-  private let ink = Color(red: 0.075, green: 0.15, blue: 0.106)
+  private let bodyColor = Color(red: 1, green: 0.839, blue: 0.039)  // Signal Yellow #FFD60A
+  private let bodyShade = Color(red: 0.851, green: 0.659, blue: 0)  // #D9A800, a deeper yellow, not orange
+  private let ink = Color(red: 0.043, green: 0.043, blue: 0.102)  // Night #0B0B1A
 
   var body: some View {
     ZStack {

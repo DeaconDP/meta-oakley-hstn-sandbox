@@ -125,7 +125,7 @@ struct VoiceControlStep: View {
           if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
         }
         .buttonStyle(.a11yPrimary)
-        .accessibilityHint("Turn on Microphone and Speech Recognition for HSTN Reader.")
+        .accessibilityHint("Turn on Microphone and Speech Recognition for SpeakUp.")
         .accessibilityIdentifier("voice_open_settings_button")
         Button("Continue", action: onContinue)
           .buttonStyle(.a11ySecondary)

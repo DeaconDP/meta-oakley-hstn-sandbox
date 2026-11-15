@@ -11,7 +11,7 @@ enum SpokenMessage {
   // MARK: Onboarding
 
   static let welcome =
-    "Welcome. This app works with your Oakley Meta glasses and talks to you through them. Do you want a guided setup, or skip to the app?"
+    "Welcome to SpeakUp: your glasses, out loud. It works with your Oakley Meta glasses and talks to you through them. Do you want a guided setup, or skip to the app?"
 
   static let beforeMetaAIHandoff =
     "You'll switch to the Meta AI app to confirm. Choose Connect. When you come back here you'll hear a chime."

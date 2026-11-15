@@ -14,7 +14,7 @@
 import SwiftUI
 
 struct ChunkyButtonStyle: ButtonStyle {
-  var tone: Tone = .green
+  var tone: Tone = .yellow
   var lipHeight: CGFloat = 6
   var radius: CGFloat = Theme.buttonRadius
 
@@ -25,7 +25,7 @@ struct ChunkyButtonStyle: ButtonStyle {
 
 extension ButtonStyle where Self == ChunkyButtonStyle {
   /// The one main action on a screen.
-  static var a11yPrimary: ChunkyButtonStyle { ChunkyButtonStyle(tone: .green) }
+  static var a11yPrimary: ChunkyButtonStyle { ChunkyButtonStyle(tone: .yellow) }
   /// Every other choice.
   static var a11ySecondary: ChunkyButtonStyle { ChunkyButtonStyle(tone: .neutral, lipHeight: 5) }
 }

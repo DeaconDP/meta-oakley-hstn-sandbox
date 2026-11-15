@@ -574,7 +574,7 @@ struct CameraView: View {
     .accessibilityElement(children: .combine)
   }
 
-  private func tileStyle(big: Bool, tone: Tone = .green) -> ChunkyButtonStyle {
+  private func tileStyle(big: Bool, tone: Tone = .yellow) -> ChunkyButtonStyle {
     big ? ChunkyButtonStyle(tone: tone, lipHeight: 8, radius: 30) : ChunkyButtonStyle(tone: .neutral, lipHeight: 6, radius: 26)
   }
 
@@ -613,7 +613,7 @@ struct CameraView: View {
     return Button {
       TextReader.shared.read()
     } label: {
-      PathTileLabel(icon: "text.viewfinder", title: "Read text", coin: big ? .neutral : .green, isBig: big, say: .read, lockedNote: needsPreviewNote)
+      PathTileLabel(icon: "text.viewfinder", title: "Read text", coin: big ? .neutral : .yellow, isBig: big, say: .read, lockedNote: needsPreviewNote)
     }
     .buttonStyle(tileStyle(big: big))
     .accessibilityIdentifier("read_button")
@@ -885,7 +885,7 @@ private struct LivePreviewView: View {
 // MARK: - Update banner
 
 struct UpdateRequiredMessage: View {
-  private let message = "Your glasses need a firmware update before HSTN Reader can start."
+  private let message = "Your glasses need a firmware update before SpeakUp can start."
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
