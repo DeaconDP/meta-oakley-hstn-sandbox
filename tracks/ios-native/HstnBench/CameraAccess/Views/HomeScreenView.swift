@@ -26,8 +26,15 @@ struct HomeScreenView: View {
 
   var body: some View {
     content
-      .onAppear { VoiceControl.shared.setScreen(.home, handler: handleVoice) }
-      .onDisappear { VoiceControl.shared.clearScreen { $0 == .home } }
+      .onAppear {
+        VoiceControl.shared.setScreen(.home, handler: handleVoice)
+        // Spoken tips after a quiet spell: "say connect". Not while Meta AI is being opened.
+        VoiceCoach.shared.provide(for: .home) { [viewModel] in viewModel.isConnecting ? nil : .notLinked }
+      }
+      .onDisappear {
+        VoiceControl.shared.clearScreen { $0 == .home }
+        VoiceCoach.shared.stopProviding(for: .home)
+      }
   }
 
   /// Help, stop, repeat, faster and slower are VoiceControl's own.

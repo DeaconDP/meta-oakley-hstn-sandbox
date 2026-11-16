@@ -43,6 +43,18 @@ A user reported being forced onto the on-screen buttons before the app was conne
 - **Tests**: `SetupGrammarTest` (5) and `SetupFlowTest` (12) on the JVM; `SetupVoiceTest` (instrumented, mock with `initiallyRegistered = false`): welcome spoken, "help", "don't connect" doesn't register, "connect" speaks the handoff and reaches the registered screen with the setup mic released; a failed registration speaks "didn't open". Speech is injected with `SetupVoice.hear()` because the phone recogniser can't be fed audio in a test. **Not yet run on a phone** (the A26 wasn't reachable on 2026-11-12).
 - **Not covered**: Meta AI's own registration screens (outside our control; open question 1 above), whether focus/TalkBack land sensibly on return, the phone recogniser's restart beeps on Samsung, and the real time from Wearables init to the registered state (the 2.5 s settle is a guess).
 
+## Spoken tips (ios-native, 2026-11-16)
+
+The status lines name buttons ("Start a session to use the camera"), so a user running the app by voice could sit on a screen without knowing which words it takes. `A11y/Voice/VoiceCoach.swift` now says what to say next after a quiet spell. It's the iOS counterpart of Android's IdleNudge.
+
+- **When:** only while voice control is listening, with the tips setting on (the default), and while nothing is being said or read. The first tip comes after 8 s of quiet, then more at 30 s, 1 min and 2 min. The last one says "I'll stop reminding you now. Say help whenever you need me." A voice command, a VoiceOver focus move, or a new situation starts the count over. Once a situation's first tip has been heard to the end three times, that situation starts at 30 s instead. Replay setup brings the 8 s tips back.
+- **What:** one line per situation: each setup step, not linked (home), glasses not found, folded or not worn, camera off ("Hold a page, a letter or a label in front of you and say read"), camera on (with the framing tip), after a page ("say read for something new, back or next, repeat"), and paused. Short verbosity gives shorter lines. When VoiceOver's speech could reach the mic, every command is given as "reader, …". Nothing is suggested during a wait, an alert, a recording, the preview sheet or a required update.
+- **Reading goal:** the first tip on the camera screen adds "Two more pages reach today's goal" only when the user is part way there. It never speaks at zero pages and never mentions a missed day, in keeping with ReadingProgress's no-penalty rule.
+- **In-app only.** Nothing reaches the user outside the app (decided 2026-11-16).
+- **Settings:** "Turn spoken tips off/on" next to the voice control toggle. It's disabled while voice control is off.
+- **Tests:** `VoiceCoachTests` (16): the schedule, the lines, the driver on a fake clock, and a check that every "say X" in every tip parses as a command on the screen where it's offered.
+- **Not covered:** taps that change nothing and say nothing don't count as acting, so a sighted user tapping around can still hear a tip. Not tried on the real phone yet.
+
 ## Launch (every day)
 
 The goal is to get from "I want to read this" to an answer without looking for an icon.

@@ -1,0 +1,353 @@
+/*
+ * VoiceCoach - after a quiet spell, says what the user can say next
+ *
+ * A blind user who has just connected, or just heard a page, may not know the app is waiting for
+ * them, or which words it takes. The status lines name buttons ("Start a session to use the
+ * camera"); the coach names words ("Hold some text in front of you and say read"). Same idea as
+ * the Android track's IdleNudge (notes/tools-layer.md > Silence reminders).
+ *
+ * When: only while voice control is listening (the tips are all "say ..."), the tips setting is on,
+ * and nothing is being said or read. Quiet means quiet on both sides: while the app speaks or
+ * reads the gap restarts without using up a tip. The first tip comes 8 s into the quiet, then 30 s,
+ * 1 min and 2 min later; the last one says it will stop, and then it stays quiet until the user
+ * acts. A command, a VoiceOver focus move, or a change of situation (the camera came on, a page
+ * was read) starts over. Once a situation's first tip has been heard three times, that situation
+ * starts at the 30 s gap: the user has learned it. Replay setup brings the quick tips back.
+ *
+ * Never: from outside the app, about missed days, or over the user. The reading goal is mentioned
+ * only as pages still to go today once at least one page is read (ReadingProgress: no penalties).
+ *
+ * Pure parts (VoiceCoachSchedule, VoiceCoachLines, CameraViewModel.coachSituation) are unit
+ * tested; the driver takes its world through Environment, so tests run it with a fake clock.
+ */
+
+import Foundation
+import MWDATCore
+import UIKit
+
+/// What the screen is waiting for, as far as tips go. nil from a screen means "don't prompt now":
+/// a wait, an alert, a recording, a preview sheet.
+enum CoachSituation: Equatable, Sendable {
+  case setup(OnboardingStep)
+  /// The home screen: registered with Meta AI not yet.
+  case notLinked
+  case noGlasses
+  /// Folded, or not worn with no session.
+  case glassesNotReady
+  /// Glasses ready, camera not running.
+  case cameraOff
+  case cameraOn
+  /// The camera is on and a page has been read.
+  case afterReading
+  case paused
+
+  /// Stable key for counting how often a tip was heard.
+  var key: String {
+    switch self {
+    case .setup(let step): "setup.\(step.rawValue)"
+    case .notLinked: "notLinked"
+    case .noGlasses: "noGlasses"
+    case .glassesNotReady: "glassesNotReady"
+    case .cameraOff: "cameraOff"
+    case .cameraOn: "cameraOn"
+    case .afterReading: "afterReading"
+    case .paused: "paused"
+    }
+  }
+}
+
+// MARK: - When
+
+/// When to give the next tip. Pure: times in, a tip index out.
+struct VoiceCoachSchedule: Equatable, Sendable {
+  static let newUserGaps: [TimeInterval] = [8, 30, 60, 120]
+  static let familiarGaps: [TimeInterval] = [30, 60, 120]
+  /// A situation's first tip heard to the end this many times counts as learned.
+  static let learnedAfter = 3
+
+  let gaps: [TimeInterval]
+  private(set) var quietSince: Date
+  private(set) var given = 0
+
+  init(gaps: [TimeInterval], start: Date) {
+    self.gaps = gaps
+    quietSince = start
+  }
+
+  init(timesHeard: Int, start: Date) {
+    self.init(gaps: timesHeard >= Self.learnedAfter ? Self.familiarGaps : Self.newUserGaps, start: start)
+  }
+
+  /// The user said or did something: tips start over from the first gap.
+  mutating func userActed(at now: Date) {
+    quietSince = now
+    given = 0
+  }
+
+  /// Something is being said or read: the quiet hasn't started yet.
+  mutating func busy(at now: Date) {
+    quietSince = now
+  }
+
+  /// The tip to give now (0 = first), or nil if it isn't time yet or all have been given.
+  mutating func due(at now: Date) -> Int? {
+    guard given < gaps.count, now.timeIntervalSince(quietSince) >= gaps[given] else { return nil }
+    quietSince = now
+    given += 1
+    return given - 1
+  }
+
+  /// The final tip, after which the coach stays quiet until the user acts.
+  func isLast(_ tip: Int) -> Bool { tip == gaps.count - 1 }
+}
+
+// MARK: - What
+
+enum VoiceCoachLines {
+  /// The whole line for one tip. Later tips start "I'm still listening."; the last one says it will
+  /// stop. `wakeWord`: commands are given as "reader, read", since bare ones are ignored right now.
+  static func line(
+    for situation: CoachSituation, tip: Int, isLast: Bool, wakeWord: Bool, verbosity: Verbosity, pagesToday: Int
+  ) -> String {
+    let words = Words(wakeWord: wakeWord)
+    let short = verbosity == .short
+    var parts: [String] = []
+    if tip > 0, !short { parts.append("I'm still listening.") }
+    parts.append(hint(for: situation, words, short: short))
+    if tip == 0, !short, let goal = goalLine(for: situation, pagesToday: pagesToday) { parts.append(goal) }
+    if isLast { parts.append("I'll stop reminding you now. \(words.sayFirst("help")) whenever you need me.") }
+    return parts.joined(separator: " ")
+  }
+
+  /// Spoken commands, with the wake word when it's needed.
+  struct Words {
+    let wakeWord: Bool
+
+    func say(_ command: String) -> String { wakeWord ? "say reader, \(command)" : "say \(command)" }
+    /// At the start of a sentence.
+    func sayFirst(_ command: String) -> String { wakeWord ? "Say reader, \(command)" : "Say \(command)" }
+  }
+
+  static func hint(for situation: CoachSituation, _ w: Words, short: Bool) -> String {
+    switch situation {
+    case .setup(.welcome):
+      return short
+        ? "\(w.sayFirst("continue")), or \(w.say("skip"))."
+        : "To begin, \(w.say("continue")) for a guided setup, or \(w.say("skip")) to go straight to the app."
+    case .setup(.speakerTest):
+      return short
+        ? "\(w.sayFirst("yes")), \(w.say("no")), or \(w.say("replay"))."
+        : "Did you hear the test in your glasses? \(w.sayFirst("yes")) or \(w.say("no")), or \(w.say("replay")) to hear it again."
+    case .setup(.connect):
+      return short
+        ? "\(w.sayFirst("connect")), or \(w.say("skip"))."
+        : "\(w.sayFirst("connect")) to link your glasses through the Meta AI app, or \(w.say("skip")) to do it later."
+    case .setup:
+      return short
+        ? "\(w.sayFirst("continue")), or \(w.say("skip"))."
+        : "\(w.sayFirst("continue")) for the next step, \(w.say("back")) to go back, or \(w.say("skip"))."
+    case .notLinked:
+      return short
+        ? "\(w.sayFirst("connect")) to link your glasses."
+        : "Your glasses aren't linked to SpeakUp yet. \(w.sayFirst("connect")), and I'll open the Meta AI app so you can approve it."
+    case .noGlasses:
+      return short
+        ? "Glasses not found. \(w.sayFirst("status")) to check again."
+        : "I can't find your glasses. Check that Bluetooth is on and the glasses are out of the case, then \(w.say("status"))."
+    case .glassesNotReady:
+      return "Put your glasses on and unfold them, then \(w.say("status"))."
+    case .cameraOff:
+      return short
+        ? "Hold up some text and \(w.say("read"))."
+        : "Want me to read something? Hold a page, a letter or a label in front of you and \(w.say("read")). "
+          + "Or \(w.say("connect")) to just turn the camera on."
+    case .cameraOn:
+      return short
+        ? "Hold up some text and \(w.say("read"))."
+        : "The camera's on. Hold some text about an arm's length away, a little to your right, and \(w.say("read")). "
+          + "Or \(w.say("take a photo"))."
+    case .afterReading:
+      return short
+        ? "\(w.sayFirst("read")) for something new."
+        : "\(w.sayFirst("read")) to read something new. \(w.sayFirst("back")) or \(w.say("next")) moves between sentences, "
+          + "and \(w.say("repeat")) says one again."
+    case .paused:
+      return "Paused. Tap your glasses to carry on, or \(w.say("status"))."
+    }
+  }
+
+  /// "Two more pages reach today's goal." Only part way there: never at zero, never about a missed day.
+  static func goalLine(for situation: CoachSituation, pagesToday: Int) -> String? {
+    switch situation {
+    case .cameraOff, .cameraOn, .afterReading: break
+    default: return nil
+    }
+    let left = ReadingProgress.dailyGoal - pagesToday
+    guard pagesToday > 0, left > 0 else { return nil }
+    return left == 1 ? "One more page reaches today's goal." : "\(spelled(left).capitalizedFirst) more pages reach today's goal."
+  }
+
+  private static func spelled(_ number: Int) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .spellOut
+    formatter.locale = Locale(identifier: "en")
+    return formatter.string(from: NSNumber(value: number)) ?? String(number)
+  }
+}
+
+extension String {
+  fileprivate var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}
+
+// MARK: - The camera screen's situation
+
+extension CameraViewModel {
+  /// What a tip should be about on the camera screen, or nil when nothing should be suggested.
+  func coachSituation(updateRequired: Bool, hasReadSentences: Bool) -> CoachSituation? {
+    // A sheet, an alert or a recording owns the moment; the update has its own button and line.
+    if activePreview != nil || showError || showCameraPermissionRedirectConfirm || isRecording || updateRequired {
+      return nil
+    }
+    if !hasActiveDevice { return .noGlasses }
+    if hingeState == .closed || (donState == .doffed && !hasSession) { return .glassesNotReady }
+    switch a11yPhase {
+    case .idle, .sessionReady: return .cameraOff
+    case .streaming: return hasReadSentences ? .afterReading : .cameraOn
+    case .paused: return .paused
+    case .noDevice: return .noGlasses
+    case .sessionStarting, .previewStarting, .waitingForDevice, .stopping: return nil
+    }
+  }
+}
+
+// MARK: - The driver
+
+@MainActor
+final class VoiceCoach {
+  static let shared = VoiceCoach(environment: .live)
+
+  struct Environment {
+    /// Tests and UI tests: never runs its own clock or speaks unless ticked.
+    var isInert: Bool
+    var now: @MainActor () -> Date
+    var tipsEnabled: @MainActor () -> Bool
+    var isListening: @MainActor () -> Bool
+    /// The app is speaking or reading.
+    var isBusy: @MainActor () -> Bool
+    var screen: @MainActor () -> VoiceScreen?
+    var lastCommandAt: @MainActor () -> Date?
+    var needsWakeWord: @MainActor () -> Bool
+    var verbosity: @MainActor () -> Verbosity
+    var pagesToday: @MainActor () -> Int
+    var timesHeard: @MainActor (_ key: String) -> Int
+    var noteHeard: @MainActor (_ key: String) -> Void
+    var say: @MainActor (_ text: String, _ onFinish: @escaping Announcer.Completion) -> Void
+  }
+
+  private let environment: Environment
+  private var schedule: VoiceCoachSchedule
+  private var situation: CoachSituation?
+  private var lastSeenCommandAt: Date?
+  private var isSpeakingTip = false
+  /// The camera and home screens' state, for the screen that set it. Setup needs none.
+  private var provider: (screen: VoiceScreen, situation: @MainActor () -> CoachSituation?)?
+  private var loop: Task<Void, Never>?
+  private var observer: NSObjectProtocol?
+
+  init(environment: Environment) {
+    self.environment = environment
+    schedule = VoiceCoachSchedule(gaps: VoiceCoachSchedule.newUserGaps, start: environment.now())
+  }
+
+  /// Starts the once-a-second check. Idempotent; does nothing in tests.
+  func begin() {
+    guard loop == nil, !environment.isInert else { return }
+    // VoiceOver users exploring the screen are busy, not stuck.
+    observer = NotificationCenter.default.addObserver(
+      forName: UIAccessibility.elementFocusedNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.userActed() }
+    }
+    loop = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .seconds(1))
+        self?.tick()
+      }
+    }
+  }
+
+  /// The camera or home screen says what it's waiting for. Replaces the last screen's.
+  func provide(for screen: VoiceScreen, _ situation: @escaping @MainActor () -> CoachSituation?) {
+    provider = (screen, situation)
+  }
+
+  /// A screen going away: only drops its own, since the next screen may have appeared first.
+  func stopProviding(for screen: VoiceScreen) {
+    if provider?.screen == screen { provider = nil }
+  }
+
+  /// A touch, a focus move, anything the user did that voice control didn't see.
+  func userActed() {
+    schedule.userActed(at: environment.now())
+  }
+
+  /// One check: gives a tip if one is due. Called every second by begin(), and by tests.
+  func tick() {
+    let now = environment.now()
+    let commandAt = environment.lastCommandAt()
+    if commandAt != lastSeenCommandAt {
+      lastSeenCommandAt = commandAt
+      schedule.userActed(at: now)
+    }
+    let current = currentSituation()
+    if current != situation {
+      situation = current
+      schedule = VoiceCoachSchedule(timesHeard: current.map { environment.timesHeard($0.key) } ?? 0, start: now)
+    }
+    guard let current, environment.tipsEnabled(), environment.isListening(), !isSpeakingTip, !environment.isBusy() else {
+      schedule.busy(at: now)
+      return
+    }
+    guard let tip = schedule.due(at: now) else { return }
+    let line = VoiceCoachLines.line(
+      for: current, tip: tip, isLast: schedule.isLast(tip), wakeWord: environment.needsWakeWord(),
+      verbosity: environment.verbosity(), pagesToday: environment.pagesToday())
+    isSpeakingTip = true
+    environment.say(line) { [weak self] finished in
+      guard let self else { return }
+      self.isSpeakingTip = false
+      self.schedule.busy(at: self.environment.now())
+      if finished, tip == 0 { self.environment.noteHeard(current.key) }
+    }
+  }
+
+  private func currentSituation() -> CoachSituation? {
+    switch environment.screen() {
+    case .setup(let step)?:
+      return .setup(step)
+    case let screen?:
+      guard let provider, provider.screen == screen else { return nil }
+      return provider.situation()
+    case nil:
+      return nil
+    }
+  }
+}
+
+extension VoiceCoach.Environment {
+  static let live = VoiceCoach.Environment(
+    isInert: LaunchOptions.isAutomatedTest,
+    now: { Date() },
+    tipsEnabled: { A11yPreferences.shared.voiceTipsEnabled },
+    isListening: { VoiceControl.shared.status == .listening },
+    isBusy: { Announcer.shared.isSpeaking || TextReader.shared.isActive },
+    screen: { VoiceControl.shared.screen },
+    lastCommandAt: { VoiceControl.shared.lastCommandAt },
+    needsWakeWord: { VoiceControl.shared.needsWakeWord },
+    verbosity: { A11yPreferences.shared.verbosity },
+    pagesToday: { ReadingProgressStore.shared.summary.pagesToday },
+    timesHeard: { A11yPreferences.shared.voiceTipsHeard[$0] ?? 0 },
+    noteHeard: { A11yPreferences.shared.voiceTipsHeard[$0, default: 0] += 1 },
+    say: { text, onFinish in Announcer.shared.say(text, interrupt: false, onFinish: onFinish) }
+  )
+}

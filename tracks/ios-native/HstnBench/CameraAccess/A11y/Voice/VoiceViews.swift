@@ -28,6 +28,15 @@ struct VoiceSettingsRows: View {
     .accessibilityHint("Runs the app by speaking. Buttons always work.")
     .accessibilityIdentifier("voice_control_toggle")
     CustomButton(
+      title: preferences.voiceTipsEnabled ? "Turn spoken tips off" : "Turn spoken tips on", style: .secondary,
+      isDisabled: !voice.isEnabled
+    ) {
+      preferences.voiceTipsEnabled.toggle()
+      Announcer.shared.say(preferences.voiceTipsEnabled ? SpokenMessage.voiceTipsOn : SpokenMessage.voiceTipsOff)
+    }
+    .accessibilityHint("After a quiet spell, says what you can say next. Needs voice control.")
+    .accessibilityIdentifier("voice_tips_toggle")
+    CustomButton(
       title: preferences.useVoiceOverVoice ? "Use the British voice" : "Use VoiceOver's voice", style: .secondary,
       isDisabled: false
     ) {

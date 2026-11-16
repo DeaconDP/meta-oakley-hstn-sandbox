@@ -152,9 +152,15 @@ struct CameraView: View {
       }
       TextReader.shared.source = viewModel
       VoiceControl.shared.setScreen(.camera, handler: handleVoice)
+      // Spoken tips after a quiet spell ("Hold some text in front of you and say read").
+      VoiceCoach.shared.provide(for: .camera) { [viewModel, wearablesVM] in
+        viewModel.coachSituation(
+          updateRequired: wearablesVM.requiresFirmwareUpdate, hasReadSentences: TextReader.shared.hasSentences)
+      }
     }
     .onDisappear {
       VoiceControl.shared.clearScreen { $0 == .camera }
+      VoiceCoach.shared.stopProviding(for: .camera)
       LaunchActionRouter.shared.statusProvider = nil
       let reader = TextReader.shared
       if reader.source === viewModel {

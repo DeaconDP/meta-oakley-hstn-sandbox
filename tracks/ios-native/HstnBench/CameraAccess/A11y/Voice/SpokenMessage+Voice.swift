@@ -60,6 +60,10 @@ extension SpokenMessage {
 
   static let voiceRateFollowsVoiceOver = "Speech is using your VoiceOver speaking rate. Change it in VoiceOver settings."
 
+  static let voiceTipsOn = "Spoken tips on. After a quiet spell, I'll say what you can say next."
+
+  static let voiceTipsOff = "Spoken tips off. Say help whenever you need the commands."
+
   static let voiceFaster = "Faster."
 
   static let voiceSlower = "Slower."

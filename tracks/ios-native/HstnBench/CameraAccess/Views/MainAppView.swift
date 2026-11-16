@@ -39,7 +39,10 @@ struct MainAppView: View {
       }
     }
     .safeAreaInset(edge: .top, spacing: 0) { VoiceDownloadNoticeBanner() }
-    .onAppear { VoiceControl.shared.begin() }
+    .onAppear {
+      VoiceControl.shared.begin()
+      VoiceCoach.shared.begin()
+    }
     // After setup, and behind the first status line: say once how to get a British voice.
     .task(id: preferences.onboardingCompleted) {
       guard preferences.onboardingCompleted else { return }

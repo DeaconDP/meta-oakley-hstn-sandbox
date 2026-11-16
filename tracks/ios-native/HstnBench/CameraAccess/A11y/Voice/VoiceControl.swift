@@ -88,6 +88,9 @@ final class VoiceControl {
     return VoiceCommandParser.availableCommands(context: context(on: screen))
   }
 
+  /// Bare commands aren't safe right now, so prompts should say "reader, ..." (see VoiceCommand).
+  var needsWakeWord: Bool { environment.micHearsVoiceOver(activeListener) }
+
   /// For settings: "Voice control: listening".
   var statusText: String {
     switch status {
