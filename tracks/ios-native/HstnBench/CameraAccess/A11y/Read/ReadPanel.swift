@@ -1,6 +1,6 @@
 /*
- * ReadPanel - the camera screen's reading card: where the reader is, the sentence being read in
- * large print, the last timing, and Previous / Repeat / Next / Stop
+ * ReadPanel - the main screen's reading card: where the reader is, the sentence being read in
+ * large print, and Previous / Repeat / Next / Stop
  *
  * The large-print sentence is for low-vision users following along (notes/a11y-prior-art.md > 3,
  * "large-print live transcript"). Controls are at least 60 pt, labelled for VoiceOver, and shown
@@ -58,7 +58,8 @@ struct ReadPanel: View {
         }
       }
 
-      if let timing = reader.lastTiming {
+      // Timings are for the benchmark and UI tests, not users (bench.sh reads them from the log).
+      if LaunchOptions.isUITesting, let timing = reader.lastTiming {
         Text(timing.summary)
           .font(.rounded(.footnote, weight: .medium))
           .foregroundStyle(Theme.inkSoft)

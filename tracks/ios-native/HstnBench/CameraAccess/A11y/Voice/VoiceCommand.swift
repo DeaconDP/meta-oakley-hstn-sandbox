@@ -20,18 +20,19 @@ enum VoiceCommand: String, CaseIterable, Sendable {
   case repeatLast
   case status
   case connect
-  case takePhoto
+  /// Connect again after an attempt that didn't finish. Does what connect does.
+  case tryAgain
   case faster
   case slower
   case help
-  /// Setup: continue / next. While a page is read: next sentence.
+  /// While a page is read: next sentence. On the first screen: go on.
   case continueOn
-  /// Setup: previous step. While a page is read: previous sentence.
+  /// While a page is read: previous sentence.
   case back
-  case skip
+  /// The first screen: yes, connect.
   case yes
+  /// The first screen: not now, skip.
   case no
-  case testSpeaker
 
   /// The word or phrase help offers for it, and the name the UI shows as the last command.
   var phrase: String {
@@ -41,23 +42,22 @@ enum VoiceCommand: String, CaseIterable, Sendable {
     case .repeatLast: "repeat"
     case .status: "status"
     case .connect: "connect"
-    case .takePhoto: "take a photo"
+    case .tryAgain: "try again"
     case .faster: "faster"
     case .slower: "slower"
     case .help: "help"
     case .continueOn: "continue"
     case .back: "back"
-    case .skip: "skip"
     case .yes: "yes"
-    case .no: "no"
-    case .testSpeaker: "test the speaker"
+    case .no: "not now"
     }
   }
 }
 
 /// Which screen commands apply to.
 enum VoiceScreen: Equatable, Sendable {
-  case setup(OnboardingStep)
+  /// The one first-run screen (OnboardingView).
+  case welcome
   case home
   case camera
 }
@@ -100,17 +100,15 @@ enum VoiceCommandParser {
     .stop: ["stop", "pause", "quiet", "be quiet", "stop reading", "stop talking", "hush"],
     .repeatLast: ["repeat", "repeat that", "repeat this", "again", "say again", "say that again", "what did you say"],
     .status: ["status", "whats the status", "what is the status", "are you ready", "is it ready"],
-    .connect: ["connect", "connect glasses", "connect my glasses", "connect the glasses", "start", "start session", "start a session", "start the session", "start camera", "start the camera", "start preview", "start the preview"],
-    .takePhoto: ["take a photo", "take photo", "take a picture", "take picture", "photo", "picture"],
+    .connect: ["connect", "connect glasses", "connect my glasses", "connect the glasses"],
+    .tryAgain: ["try again", "retry", "try it again", "try that again", "connect again"],
     .faster: ["faster", "speak faster", "talk faster", "speed up"],
     .slower: ["slower", "speak slower", "talk slower", "slow down"],
     .help: ["help", "what can i say", "commands", "what can you do"],
-    .continueOn: ["continue", "next", "next step", "next sentence", "go on", "carry on", "i understand", "start guided setup", "guided setup"],
-    .back: ["back", "go back", "previous", "previous step", "previous sentence"],
-    .skip: ["skip", "skip this", "skip it", "skip this step", "skip step", "skip to the app", "skip setup"],
-    .yes: ["yes", "yeah", "yep", "yes i heard it", "i heard it", "i heard that", "turn it on"],
-    .no: ["no", "nope", "no i didnt", "i didnt hear it", "not now", "no thanks"],
-    .testSpeaker: ["test the speaker", "test speaker", "speaker test", "play test", "play the test", "replay"],
+    .continueOn: ["continue", "next", "next sentence", "go on", "carry on"],
+    .back: ["back", "go back", "previous", "previous sentence"],
+    .yes: ["yes", "yeah", "yep", "yes please"],
+    .no: ["no", "nope", "not now", "no thanks", "not yet", "later", "maybe later", "skip", "skip it", "skip this", "skip setup", "skip for now"],
   ]
 
   private static let phraseLookup: [String: VoiceCommand] = {
@@ -138,7 +136,7 @@ enum VoiceCommandParser {
     if !hadWake, context.isSpeaking || context.requiresWakeWord { return .ignored(.needsWakeWord) }
     if overlaps(tokens, spoken: normalize(context.spokenText), hadWake: hadWake) { return .ignored(.overlapsSpeech) }
 
-    guard let command = phraseLookup[stripFiller(afterWake).joined(separator: " ")] else {
+    guard let command = match(afterWake) else {
       return hadWake ? .notUnderstood : .ignored(.unrecognized)
     }
     guard availableCommands(context: context).contains(command) else {
@@ -160,21 +158,27 @@ enum VoiceCommandParser {
     return (true, Array(rest.dropFirst()))
   }
 
-  private static func stripFiller(_ tokens: [String]) -> [String] {
+  /// The command for the words, peeling filler off one piece at a time and checking for a phrase
+  /// after each. Checking as it goes keeps phrases that end in a filler word ("not now", "skip for
+  /// now") whole.
+  private static func match(_ tokens: [String]) -> VoiceCommand? {
     var rest = tokens
-    var changed = true
-    while changed {
-      changed = false
-      for filler in leadingFiller where rest.count > filler.count && Array(rest.prefix(filler.count)) == filler {
-        rest.removeFirst(filler.count)
-        changed = true
-      }
-      for filler in trailingFiller where rest.count > filler.count && Array(rest.suffix(filler.count)) == filler {
-        rest.removeLast(filler.count)
-        changed = true
-      }
+    while true {
+      if let command = phraseLookup[rest.joined(separator: " ")] { return command }
+      guard let shorter = stripOneFiller(rest) else { return nil }
+      rest = shorter
     }
-    return rest
+  }
+
+  /// One leading filler removed, or else one trailing filler. nil if there is none to remove.
+  private static func stripOneFiller(_ tokens: [String]) -> [String]? {
+    for filler in leadingFiller where tokens.count > filler.count && Array(tokens.prefix(filler.count)) == filler {
+      return Array(tokens.dropFirst(filler.count))
+    }
+    for filler in trailingFiller where tokens.count > filler.count && Array(tokens.suffix(filler.count)) == filler {
+      return Array(tokens.dropLast(filler.count))
+    }
+    return nil
   }
 
   /// Did the mic just hear the app? With the wake word, only an exact run in the spoken text counts
@@ -206,29 +210,17 @@ enum VoiceCommandParser {
   static func availableCommands(context: VoiceContext) -> [VoiceCommand] {
     let always: [VoiceCommand] = [.help, .stop, .repeatLast, .faster, .slower]
     switch context.screen {
+    case .welcome:
+      return [.connect, .tryAgain, .continueOn, .yes, .no] + always
     case .home:
-      return [.connect, .status] + always
+      return [.connect, .tryAgain, .status] + always
     case .camera:
       let reading: [VoiceCommand] = context.hasReadSentences ? [.continueOn, .back] : []
-      return [.read, .takePhoto, .status, .connect] + reading + always
-    case .setup(let step):
-      return setupCommands(step) + always
+      return [.read, .status] + reading + always
     }
   }
 
-  private static func setupCommands(_ step: OnboardingStep) -> [VoiceCommand] {
-    switch step {
-    case .welcome: [.continueOn, .yes, .skip, .no]
-    case .voiceControl: [.yes, .no, .continueOn, .back, .skip]
-    case .sounds: [.continueOn, .back, .skip]
-    case .speakerTest: [.yes, .no, .testSpeaker, .continueOn, .back, .skip]
-    case .verbosity: [.continueOn, .back, .skip]
-    case .disclaimer: [.continueOn, .back, .skip]
-    case .connect: [.connect, .continueOn, .yes, .no, .back, .skip]
-    }
-  }
-
-  /// "You can say: read, take a photo, status..." for the commands valid right now.
+  /// "You can say: read, status..." for the commands valid right now.
   static func helpLine(context: VoiceContext) -> String {
     let words = availableCommands(context: context).filter { $0 != .help }.map(\.phrase).joined(separator: ", ")
     let lead = context.requiresWakeWord || context.isSpeaking ? "Say reader first, then one of these" : "You can say"

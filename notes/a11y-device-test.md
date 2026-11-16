@@ -11,15 +11,12 @@ Written 2026-10-30. The checklist for the first real-hardware run (ROADMAP step 
 ## 1. Walkthrough with VoiceOver and Screen Curtain
 Turn on VoiceOver, then Screen Curtain (three-finger triple-tap). Don't look at the screen. For each step, note where you got lost, anything silent, anything spoken twice, and any control with a wrong or missing label.
 
-- [ ] **Welcome:** the first thing heard makes sense. "Guided setup" and "Skip" are both reachable.
-- [ ] **Learn the sounds:** each sound can be told apart from the others through the glasses speakers. Note any pair that sounds the same.
-- [ ] **Speaker test:** with the glasses on, the screen says the output is "glasses", and the test phrase plays in the glasses, not the phone. Then turn Bluetooth off and repeat: the screen says "phone speaker" and the "No" fixes make sense.
-- [ ] **Detail level:** the three samples sound clearly different. With VoiceOver on, speech follows VoiceOver's rate.
-- [ ] **Safety and privacy:** they're read once and not repeated on the next launch.
+- [ ] **Welcome (since 2026-11-17 the only setup screen):** the first thing heard makes sense, safety sentence included. Connect glasses and Not now are both reachable. The long disclaimer doesn't play again on the main screen.
 - [ ] **Connect → Meta AI:**
   - Write down exactly what VoiceOver reads on Meta AI's confirm screen.
   - Write down the real label of the button to press (update `SpokenMessage.beforeMetaAIHandoff` if it isn't "Connect").
-  - When you're back in the app, note where focus lands and whether the chime and "Connected to …" play.
+  - When you're back in the app, note where focus lands and whether the chime and "Connected to …. Hold up a page and say read." play, and that the main screen comes next with no other step.
+  - With Bluetooth audio off, connecting also says sound is on the phone speaker. With the glasses' audio on, it doesn't.
 - [ ] **Cancel path:** start again, press Back or Cancel in Meta AI, return. You should hear "Connection wasn't finished…" within about 5 s, and Try again should work.
 - [ ] **Camera permission:**
   - The explanation plays before the switch to Meta AI. Write down the labels of Meta AI's permission screen.
@@ -65,21 +62,21 @@ Delete any earlier install first for the first three items. On-device recognitio
 - [ ] With VoiceOver on and the British voice: how badly do the app's lines collide with VoiceOver reading the screen?
 
 **Starting**
-- [ ] Setup's Voice control step: the reason is spoken before the two dialogs. Allow both: the rising "listening" cue and "Voice control is on. Say help at any time."
+- [ ] Setup's screen: the reason is spoken after the welcome line, before the two dialogs. Allow both: the rising "listening" cue and "Voice control is on. Say help at any time."
 - [ ] iOS's own speech recognition dialog says speech data is sent to Apple, even though this app requires on-device recognition. Note whether that reads as a contradiction next to the app's privacy line.
 - [ ] Deny either one: you hear why and how to fix it, all buttons work, and after allowing in Settings and returning, listening starts by itself. Note where iOS really lists the two switches.
 - [ ] Update path: on an install with setup already done, the same explanation and dialogs come on the main screen.
 - [ ] en-ZA phone: note which recognition language was used. If there's no on-device model, you should hear the dictation message; write down what actually fixes it.
 
 **Phone mic (no session)**
-- [ ] Each command works by voice in a quiet room: read, stop, repeat, status, connect, take a photo, faster, slower, help, and in setup continue, next, back, skip, yes, no, test the speaker. Note words it mishears, and how long from your last word to the "heard" tone (about 0.7 s by design, plus the earcon).
+- [ ] Each command works by voice in a quiet room: read, stop, repeat, status, connect, take a photo, faster, slower, help, and on the setup screen connect, try again, yes, not now, skip, repeat. Note words it mishears, and how long from your last word to the "heard" tone (about 0.7 s by design, plus the earcon).
 - [ ] A conversation next to the phone for two minutes: nothing happens, no speech and no tone.
 - [ ] Reading a page aloud on the phone speaker: the page's own words don't trigger anything. "Reader, stop" stops it. "Stop" alone doesn't. "Reader, gibberish" gets the brief reply and the reading carries on.
 - [ ] VoiceOver on, output on the phone speaker: bare commands are refused, "reader, ..." works, and VoiceOver reading a button label doesn't press anything. Then on the glasses speaker with the phone mic: bare commands work.
 
 **Audio, with the glasses on and connected**
-- [ ] While listening on the phone mic: the speaker test says "glasses" and the sound is clearly stereo-quality A2DP, not call quality. Check `currentRoute` if in doubt: output `bluetoothA2DP`, input built-in mic.
-- [ ] Without glasses, while listening: the speaker test says "phone speaker" and it comes from the loudspeaker, not the earpiece.
+- [ ] While listening on the phone mic: the route is "glasses" (no phone-speaker tip after connecting) and the sound is clearly stereo-quality A2DP, not call quality. Check `currentRoute` if in doubt: output `bluetoothA2DP`, input built-in mic.
+- [ ] Without glasses, while listening: sound comes from the loudspeaker, not the earpiece.
 - [ ] Music playing: it keeps playing when listening starts, ducks under speech, and comes back about 2 s after speech ends. Listen for a recognition gap or click at that moment (the mic is paused briefly to release the ducking).
 - [ ] Earcons while listening: still immediate. Film or time accepting a command: tone within 100 ms of acceptance.
 - [ ] Record a video: listening pauses, recording has glasses-mic sound (HFP), voice comes back with the cue afterwards. Do it twice quickly. The photo reply and "Recording stopped" still play properly.

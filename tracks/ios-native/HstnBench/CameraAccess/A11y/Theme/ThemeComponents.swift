@@ -1,6 +1,6 @@
 /*
- * ThemeComponents - the pieces every screen shares: cards, the mascot's speech bubble, the chunky
- * progress bar, the lesson page, path tiles and the reading progress card
+ * ThemeComponents - the pieces every screen shares: cards, the mascot's speech bubble, the lesson
+ * page and the tile label for big buttons
  */
 
 import SwiftUI
@@ -86,57 +86,7 @@ struct SpeechBubbleShape: Shape {
   }
 }
 
-// MARK: - Progress bar
-
-/// Thick and rounded. Decorative by itself: whoever uses it gives the value in words and to VoiceOver.
-struct ChunkyProgressBar: View {
-  var fraction: Double
-
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(\.colorSchemeContrast) private var contrast
-  @ScaledMetric(relativeTo: .caption) private var height: CGFloat = 18
-
-  var body: some View {
-    let barHeight = min(height, 30)
-    GeometryReader { geometry in
-      let clamped = max(0, min(1, fraction))
-      ZStack(alignment: .leading) {
-        Capsule().fill(Theme.track)
-        if clamped > 0 {
-          Capsule()
-            .fill(Theme.fill)
-            .frame(width: max(barHeight, geometry.size.width * clamped))
-            .overlay(alignment: .top) {
-              // The highlight that makes it look moulded.
-              Capsule()
-                .fill(Color.white.opacity(0.35))
-                .frame(height: barHeight * 0.22)
-                .padding(.horizontal, barHeight * 0.4)
-                .padding(.top, barHeight * 0.18)
-            }
-        }
-      }
-      .overlay { Capsule().strokeBorder(Theme.stroke, lineWidth: contrast == .increased ? 3 : 2) }
-      .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.7), value: clamped)
-    }
-    .frame(height: barHeight)
-    .accessibilityHidden(true)
-  }
-}
-
 // MARK: - Lesson page
-
-private struct LessonHeaderKey: EnvironmentKey {
-  nonisolated(unsafe) static let defaultValue: AnyView? = nil
-}
-
-extension EnvironmentValues {
-  /// What a LessonPage shows above its content (the step title, in setup).
-  var lessonHeader: AnyView? {
-    get { self[LessonHeaderKey.self] }
-    set { self[LessonHeaderKey.self] = newValue }
-  }
-}
 
 /// One thing per screen, with its main buttons in reach at the bottom. At large text sizes the
 /// buttons would take up the screen if pinned, so everything scrolls together instead.
@@ -145,7 +95,6 @@ struct LessonPage<Content: View, Footer: View>: View {
   @ViewBuilder var footer: Footer
 
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-  @Environment(\.lessonHeader) private var header
   @Environment(\.colorSchemeContrast) private var contrast
 
   private var pinsFooter: Bool { dynamicTypeSize <= .xLarge }
@@ -155,7 +104,6 @@ struct LessonPage<Content: View, Footer: View>: View {
     VStack(spacing: 0) {
       ScrollView {
         VStack(alignment: .leading, spacing: 20) {
-          if let header { header }
           content
           if !pinsFooter {
             VStack(spacing: 12) { footer }
@@ -184,10 +132,9 @@ struct LessonPage<Content: View, Footer: View>: View {
   }
 }
 
-// MARK: - Path tiles
+// MARK: - Tiles
 
-/// What goes inside a tile's button: a round coin, the name, and the "Say ..." line. The biggest tile
-/// is the one main action right now.
+/// What goes inside a big button: a round coin, the name, and the "Say ..." line.
 struct PathTileLabel: View {
   let icon: String
   let title: String
@@ -258,110 +205,5 @@ struct TileCoin: View {
     .frame(width: size, height: size)
     .padding(.bottom, 3)
     .accessibilityHidden(true)
-  }
-}
-
-/// The dots between tiles. Purely visual, and gone at accessibility sizes, where every point of
-/// height is needed for the text.
-struct PathDots: View {
-  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-  var body: some View {
-    if dynamicTypeSize.isAccessibilitySize {
-      Color.clear.frame(height: 12).accessibilityHidden(true)
-    } else {
-      VStack(spacing: 4) {
-        ForEach(0..<2, id: \.self) { _ in
-          Circle().fill(Theme.stroke).frame(width: 8, height: 8)
-        }
-      }
-      .frame(maxWidth: .infinity)
-      .padding(.vertical, 4)
-      .accessibilityHidden(true)
-    }
-  }
-}
-
-enum PathSide {
-  case left, right, center
-}
-
-extension View {
-  /// The path's zigzag. Tiles keep their width at large text, so reflow beats a nudge there.
-  func pathSide(_ side: PathSide) -> some View {
-    modifier(PathSideModifier(side: side))
-  }
-}
-
-private struct PathSideModifier: ViewModifier {
-  let side: PathSide
-  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-  func body(content: Content) -> some View {
-    let nudge: CGFloat = dynamicTypeSize >= .xLarge ? 0 : 26
-    content
-      .padding(.leading, side == .right ? nudge : 0)
-      .padding(.trailing, side == .left ? nudge : 0)
-  }
-}
-
-// MARK: - Reading progress
-
-/// The streak and today's pages: one element, one spoken value.
-struct ReadingProgressCard: View {
-  private var store: ReadingProgressStore { ReadingProgressStore.shared }
-
-  var body: some View {
-    // Re-reads the date each minute, so the card turns over at midnight by itself.
-    TimelineView(.everyMinute) { _ in
-      let summary = store.summary
-      VStack(alignment: .leading, spacing: 10) {
-        ViewThatFits(in: .horizontal) {
-          HStack(spacing: 12) {
-            streak(summary)
-            Spacer(minLength: 0)
-            pages(summary)
-          }
-          VStack(alignment: .leading, spacing: 6) {
-            streak(summary)
-            pages(summary)
-          }
-        }
-        ChunkyProgressBar(fraction: summary.fraction)
-        if let best = summary.bestText {
-          Text(best)
-            .font(.rounded(.footnote, weight: .semibold))
-            .foregroundStyle(Theme.inkSoft)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-      }
-      .themeCard()
-      .accessibilityElement(children: .ignore)
-      .accessibilityLabel("Reading progress")
-      .accessibilityValue(summary.spokenValue)
-      .accessibilityIdentifier("reading_progress")
-    }
-  }
-
-  private func streak(_ summary: ReadingSummary) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 6) {
-      Image(systemName: summary.streak > 0 ? "flame.fill" : "flame")
-        .foregroundStyle(Theme.lip(.orange))
-      Text(summary.streakText)
-        .foregroundStyle(Theme.ink)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    .font(.rounded(.headline, weight: .heavy))
-  }
-
-  private func pages(_ summary: ReadingSummary) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 6) {
-      Image(systemName: summary.goalReached ? "checkmark.seal.fill" : "book.fill")
-        .foregroundStyle(Theme.lip(.green))
-      Text(summary.pagesText)
-        .foregroundStyle(Theme.ink)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    .font(.rounded(.subheadline, weight: .bold))
   }
 }

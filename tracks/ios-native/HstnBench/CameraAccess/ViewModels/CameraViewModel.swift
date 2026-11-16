@@ -13,42 +13,16 @@ import Observation
 import SwiftUI
 import UIKit
 
-extension TimeInterval {
-  /// Formats a duration as `mm:ss`.
-  var formattedRecordingTime: String {
-    let minutes = Int(self) / 60
-    let seconds = Int(self) % 60
-    return String(format: "%02d:%02d", minutes, seconds)
-  }
-}
-
-/// A capture awaiting preview/share — a still photo or a recorded video file.
-/// Drives a single `.sheet(item:)` so photo and video share one presentation.
-enum CapturePreview: Identifiable {
-  case photo(UIImage)
-  case video(URL)
-
-  var id: String {
-    switch self {
-    case .photo: return "photo"
-    case .video(let url): return "video:\(url.absoluteString)"
-    }
-  }
-}
-
-/// Drives the camera screen by exercising the SDK's camera lifecycle as explicit
-/// steps: create/start a `DeviceSession`, add and start a `Stream`, capture or
-/// record, stop the stream, end the session. Owns the screen-scoped pieces —
-/// active-device monitoring, the `DeviceSession`, and its `Stream`. The UI binds to
-/// the SDK's own `DeviceSessionState` / `StreamState` so the sample shows the real
-/// state machine.
+/// The glasses camera for the reader: creates and starts a `DeviceSession`, adds and starts a
+/// `Stream`, keeps the latest decoded frame, and takes a still when the reader asks for one. Nobody
+/// drives these steps by hand: a Read trigger takes them (CameraViewModel+Read), and backgrounding
+/// ends the session. Owns active-device monitoring, the `DeviceSession` and its `Stream`.
 @Observable
 @MainActor
 final class CameraViewModel {
   // MARK: - Device
 
-  /// Whether an eligible device is currently active. Drives the "Put on your
-  /// glasses" placeholder. Sourced from the auto device selector.
+  /// Whether an eligible device is currently active. Sourced from the auto device selector.
   private(set) var hasActiveDevice: Bool = false
 
   /// Physical state of the active glasses (DAT `DeviceState`), for the spoken status line and the
@@ -68,15 +42,9 @@ final class CameraViewModel {
   /// `.idle`/`.stopped` mean no live session.
   var sessionState: DeviceSessionState = .idle
 
-  // MARK: - Preview
+  // MARK: - Stream
 
-  /// The latest decoded preview frame. Read only by the isolated `LivePreviewView`
-  /// so the ~24fps updates don't re-render the whole screen.
-  var currentVideoFrame: UIImage?
-  var hasReceivedFirstFrame: Bool = false
-
-  /// The most recent decoded stream frame and when it arrived, for "Read it aloud". Unlike
-  /// `currentVideoFrame` it keeps updating while a capture preview is up, and it isn't observed,
+  /// The most recent decoded stream frame and when it arrived, for "Read it aloud". Not observed,
   /// so ~24 updates a second don't re-render anything.
   @ObservationIgnored private(set) var latestReadFrame: ReadFrame?
 
@@ -84,28 +52,8 @@ final class CameraViewModel {
   /// no live stream.
   var streamState: StreamState = .stopped
 
-  // MARK: - Capture preview
-
-  /// The capture currently shown in the preview/share sheet (photo or video).
-  var activePreview: CapturePreview?
-  var isCapturingPhoto: Bool = false
-
-  // MARK: - Video recording
-
-  var isRecording: Bool = false
-  /// Wall-clock start of the active recording (first written frame), mirrored from the
-  /// recorder. Drives the isolated `RecordingTimerLabel`'s `TimelineView`, so the timer
-  /// counts continuously — including through a stream pause. `nil` when not recording.
-  var recordingStartDate: Date?
-  /// A stop is finalizing the file. Record stays disabled until it's done, so a new recording
-  /// can't start under a recorder (and audio session) that is still being released.
-  private(set) var isFinishingRecording: Bool = false
-  /// Whether to record the glasses-microphone (Bluetooth HFP) audio into videos
-  /// (sound-in-video). Toggled from the mic button shown while streaming.
-  var includeAudioInStream: Bool = true
-  /// Mic denied — iOS won't re-prompt. Drives the toggle's disabled look + tap-to-Settings.
-  /// Still required for glasses audio: iOS gates HFP capture behind mic permission too.
-  var micDenied: Bool { AVAudioApplication.shared.recordPermission == .denied }
+  /// A still for the reader is on its way.
+  private(set) var isCapturingPhoto: Bool = false
 
   // MARK: - Errors
 
@@ -134,47 +82,20 @@ final class CameraViewModel {
     }
   }
 
-  /// Human-readable session state for the status line.
-  var sessionStateText: String { sessionState.description }
-
   // MARK: - Derived stream state
 
   var isStreaming: Bool { streamState == .streaming }
   /// A stream is attached (in any non-terminal state).
   var hasStream: Bool { streamState != .stopped }
 
-  /// A session or stream start/stop is in flight. The UI shows a spinner and
-  /// disables the controls until the SDK settles on a stable state, so transient
-  /// states never need their own controls or labels.
+  /// A session or stream start/stop is in flight.
   var isBusy: Bool {
     isSessionStarting || sessionState == .stopping
       || streamState == .starting || streamState == .waitingForDevice || streamState == .stopping
   }
 
-  /// Human-readable stream state for the status line. `StreamState` has no
-  /// `description`, so map it here.
-  var streamStateText: String {
-    switch streamState {
-    case .streaming: return "streaming"
-    case .starting: return "starting"
-    case .waitingForDevice: return "waiting for device"
-    case .stopping: return "stopping"
-    case .stopped: return "stopped"
-    case .paused: return "paused"
-    }
-  }
-
-  /// The stream is paused (device-initiated, e.g. a single cap-touch tap). The
-  /// last frame is retained, so the preview can stay on screen frozen.
+  /// The stream is paused (device-initiated, e.g. a single cap-touch tap).
   var isPaused: Bool { streamState == .paused }
-
-  /// The preview surface (live frames, or the last held frame) should fill the
-  /// screen: while streaming, while paused (frozen on the last frame), or while
-  /// tearing down with a last frame so the stop loader overlays the preview.
-  var showsLivePreview: Bool {
-    isStreaming
-      || ((streamState == .paused || streamState == .stopping) && currentVideoFrame != nil)
-  }
 
   // MARK: - Private
 
@@ -185,14 +106,11 @@ final class CameraViewModel {
   @ObservationIgnored private var isStoppingForBackground: Bool = false
   @ObservationIgnored private var backgroundStopSuppressionTask: Task<Void, Never>?
 
-  @ObservationIgnored private let videoRecorder = VideoRecorder()
-  // Decodes compressed hvc1 frames for on-screen preview. Not required for
-  // recording — the passthrough writer handles compressed frames directly.
+  // Decodes compressed hvc1 frames into images for the reader.
   @ObservationIgnored private let videoFrameDecoder = VideoFrameDecoder()
 
-  // Step-2 benchmark: timings and the spoken reply after each photo.
+  // Step-2 benchmark timings.
   @ObservationIgnored private let benchClock = BenchClock.shared
-  @ObservationIgnored private let ttsReply = TtsReply()
   /// Set when a stream starts; the first frame to arrive clears it and ends `stream_to_first_frame`.
   @ObservationIgnored private let awaitingFirstFrame = FirstFrameLatch()
 
@@ -201,18 +119,13 @@ final class CameraViewModel {
   @ObservationIgnored private let sessionTokenBag = ListenerTokenBag()
   @ObservationIgnored private let streamTokenBag = ListenerTokenBag()
   @ObservationIgnored private let deviceStateTokenBag = ListenerTokenBag()
-  /// Bumped per recording start, so a slow stop of an older recording doesn't release the audio
-  /// session while a newer one owns it.
-  @ObservationIgnored private var recordingGeneration = 0
   /// A startStreaming() call is between its permission check and adding the camera, so a
   /// second caller (the reader nudging the stream along) doesn't start another one.
   @ObservationIgnored private(set) var isStreamStartInFlight = false
-  /// Waiting for an in-stream photo taken for reading (no preview sheet, no photo reply).
+  /// Waiting for an in-stream photo taken for reading.
   @ObservationIgnored private var readPhotoContinuation: CheckedContinuation<UIImage?, Never>?
   @ObservationIgnored private var readPhotoToken = 0
 
-  @ObservationIgnored private let photoCaptureFailureMessage =
-    "Couldn't capture photo. There may not be enough storage, or another capture is in progress. Try again in a few moments."
   @ObservationIgnored private let backgroundStopErrorSuppressionTimeout: Duration
 
   // MARK: - Init
@@ -233,20 +146,13 @@ final class CameraViewModel {
     appLifecycleTask?.cancel()
     backgroundStopSuppressionTask?.cancel()
     deviceSession?.stop()
-    // Never leave earcons locked out of the audio session if the screen goes away mid-recording.
-    if isRecording {
-      A11yAudioSession.recordingOwnsSession = false
-      VoiceControl.shared.recordingDidEnd()
-    }
     VoiceControl.shared.detachGlasses()
   }
 
   // MARK: - Lifecycle step 1: session
 
-  /// Creates and starts a `DeviceSession` (no stream yet). This is the first
-  /// explicit step — a session can stay connected with no active stream. The
-  /// state observer drives `sessionState`; we only seed an optimistic
-  /// `.starting` so the UI reflects the in-flight request immediately.
+  /// Creates and starts a `DeviceSession` (no stream yet). The state observer drives
+  /// `sessionState`; we only seed an optimistic `.starting` so the in-flight request shows at once.
   func startSession() {
     guard !hasSession else { return }
     benchClock.start("session_start")
@@ -285,7 +191,7 @@ final class CameraViewModel {
   /// confirmed, not a surprise.
   func startStreaming() async {
     guard let session = deviceSession, session.state == .started else {
-      showError(.plain(SpokenMessage.startSessionFirst, action: hasSession ? nil : .startSession))
+      showError(.plain(SpokenMessage.cameraStreamFailed, action: .tryAgain))
       return
     }
     guard camera == nil, !isStreamStartInFlight else { return }
@@ -307,8 +213,9 @@ final class CameraViewModel {
 
   /// Confirmed from the permission prompt: requests camera access — this opens the
   /// Meta AI app and resumes when the user returns — then starts the stream if
-  /// access was granted.
-  func confirmCameraPermissionRedirect() async {
+  /// access was granted. `then` runs once "Camera access allowed" has been heard to the end
+  /// (the main screen reads, so the Read that asked for permission carries on by itself).
+  func confirmCameraPermissionRedirect(then: (@MainActor () -> Void)? = nil) async {
     showCameraPermissionRedirectConfirm = false
     guard let session = deviceSession, session.state == .started, camera == nil else { return }
     do {
@@ -323,7 +230,9 @@ final class CameraViewModel {
       return
     }
     // Back from Meta AI: say the result before the camera's own "starting" lines.
-    Announcer.shared.announce(SpokenMessage.cameraPermissionGranted, earcon: .done)
+    Announcer.shared.announce(SpokenMessage.cameraPermissionGranted, earcon: .done) { finished in
+      if finished { then?() }
+    }
     beginStream(on: session)
   }
 
@@ -331,9 +240,7 @@ final class CameraViewModel {
   /// must have ensured camera permission is granted first.
   private func beginStream(on session: DeviceSession) {
     guard camera == nil else { return }
-    // hvc1 (compressed HEVC) so frames can be written to file in passthrough mode.
-    // Glasses-mic (Bluetooth HFP) audio for sound-in-video is captured app-side by
-    // AudioCaptureHandler, so the SDK stream needs only the public video config (no audio codec).
+    // hvc1 (compressed HEVC), decoded by VideoFrameDecoder.
     let config = StreamConfiguration(
       videoCodec: VideoCodec.hvc1,
       resolution: StreamingResolution.low,
@@ -344,7 +251,7 @@ final class CameraViewModel {
       // Add the consolidated `Camera` capability and stream through `camera.stream`.
       benchClock.start("stream_to_first_frame")
       guard let newCamera = try session.addCamera(config: config) else {
-        showError(.plain(SpokenMessage.cameraStreamFailed, action: .startPreview))
+        showError(.plain(SpokenMessage.cameraStreamFailed, action: .tryAgain))
         return
       }
       camera = newCamera
@@ -356,7 +263,7 @@ final class CameraViewModel {
       newCamera.stream.start()
     } catch {
       camera = nil
-      showError(.plain(error.localizedDescription, action: .startPreview))
+      showError(.plain(error.localizedDescription, action: .tryAgain))
     }
   }
 
@@ -365,7 +272,6 @@ final class CameraViewModel {
   /// `.stopped` observer performs the teardown — we don't eagerly reset here.
   func stopStreaming() {
     guard let activeCamera = camera else { return }
-    videoRecorder.prepareToStop()
     // Reflect the in-flight request immediately; the observer drives it onward.
     streamState = .stopping
     // Stopping the camera cascades to its stream child and detaches the camera from the
@@ -375,32 +281,8 @@ final class CameraViewModel {
 
   // MARK: - Capture
 
-  func capturePhoto() {
-    // A second press (or Magic Tap) while the first photo is on its way isn't an error.
-    if isCapturingPhoto {
-      Announcer.shared.say(SpokenMessage.photoInProgress)
-      return
-    }
-    guard !isCapturingPhoto, isStreaming else {
-      showError(photoCaptureFailureMessage)
-      return
-    }
-    isCapturingPhoto = true
-    // Cut the narrator, so TtsReply's reply isn't spoken over it.
-    Announcer.shared.stop()
-    // Shutter earcon on the press itself, well inside the 100 ms budget.
-    EarconPlayer.shared.play(.capturing)
-    benchClock.start("capture_to_photo")
-    let success = camera?.stream.capturePhoto(format: .jpeg) ?? false
-    if !success {
-      isCapturingPhoto = false
-      showError(photoCaptureFailureMessage)
-    }
-  }
-
-  /// An in-stream photo for "Read it aloud": the reader gets the image, and nothing else happens
-  /// (no preview sheet, no "Photo captured" reply, no capture_to_photo metric). Times out after
-  /// 8 s; nil on any failure.
+  /// An in-stream photo for "Read it aloud", used when there's no recent frame or the text is too
+  /// small in one. Times out after 8 s; nil on any failure.
   func captureStillForReading() async -> UIImage? {
     guard isStreaming, !isCapturingPhoto, readPhotoContinuation == nil, let camera else { return nil }
     isCapturingPhoto = true
@@ -430,89 +312,8 @@ final class CameraViewModel {
     continuation.resume(returning: image)
   }
 
-  func toggleRecording() {
-    if isRecording {
-      Task { await stopVideoRecording() }
-    } else {
-      startVideoRecording()
-    }
-  }
-
-  func startVideoRecording() {
-    guard isStreaming, !isRecording, !isFinishingRecording else { return }
-    // Flip the intent flag synchronously so the toggle and UI don't lag the
-    // frame-driven recorder; the file starts on the next frame.
-    isRecording = true
-    recordingGeneration += 1
-    // Before the recorder takes the session (play-and-record for the glasses mic), so earcons and
-    // speech from here on play into it instead of switching it back to playback.
-    A11yAudioSession.recordingOwnsSession = true
-    // Voice control yields the mic and the session before the recorder configures them.
-    VoiceControl.shared.recordingWillStart()
-    // If the glasses mic isn't available, flip the mic off so the button reflects that this
-    // recording is video-only (the phone mic is never used). Left off afterward — the user can
-    // re-tap the mic to turn it back on.
-    videoRecorder.prepareToStart(includeAudio: includeAudioInStream) { [weak self] in
-      Task { @MainActor in self?.includeAudioInStream = false }
-    }
-  }
-
-  func stopVideoRecording() async {
-    guard isRecording else { return }
-    isRecording = false
-    recordingStartDate = nil
-    let generation = recordingGeneration
-    isFinishingRecording = true
-    // The writer starts on the first frame after the shutter opens. If stop lands
-    // before that frame arrives, wait briefly (shutter still open) so even a quick
-    // recording finalizes to a file and reliably opens the preview.
-    var elapsedNanos: UInt64 = 0
-    while !videoRecorder.isRecording, elapsedNanos < 500_000_000 {
-      try? await Task.sleep(nanoseconds: 25_000_000)
-      elapsedNanos += 25_000_000
-    }
-    // Show a preview/share sheet (mirrors the photo flow) for the finalized file.
-    let result = await videoRecorder.stopRecording()
-    // Released only once the recorder has finished with the session, on every outcome, and only
-    // if no newer recording has taken it since.
-    if recordingGeneration == generation, !isRecording {
-      A11yAudioSession.recordingOwnsSession = false
-      VoiceControl.shared.recordingDidEnd()
-    }
-    isFinishingRecording = false
-    switch result {
-    case .completed(let url):
-      // Announced here, not when isRecording flips: by now the recorder has released the session,
-      // so the earcon and speech get a clean playback session.
-      Announcer.shared.announce(SpokenMessage.recordingSaved, earcon: .done)
-      activePreview = .video(url)
-    case .noRecording:
-      // Reached only after the intent guard + start wait, so while streaming this
-      // means the recording never started (e.g. the writer failed to start).
-      showError(.plain(SpokenMessage.recordingNotStarted))
-    case .failed:
-      showError(.plain(SpokenMessage.recordingNotSaved))
-    }
-  }
-
-  // MARK: - Dismissers
-
   func dismissError() {
     showError = false
-  }
-
-  func dismissCapturePreview() {
-    guard let preview = activePreview else { return }
-    activePreview = nil
-    discardPreview(preview)
-  }
-
-  /// Deletes a finished video capture's temporary file. Photos are held in
-  /// memory, so there's nothing on disk to remove for them.
-  func discardPreview(_ preview: CapturePreview) {
-    if case .video(let url) = preview {
-      try? FileManager.default.removeItem(at: url)
-    }
   }
 
   // MARK: - Device monitoring
@@ -663,34 +464,12 @@ final class CameraViewModel {
         self.benchClock.end("stream_to_first_frame", detail: "size=\(Self.frameSize(frame))")
       }
 
-      // Append to the recorder (no-op unless recording) off the main actor so it
-      // keeps writing while the app is backgrounded.
-      self.appendVideoFrame(frame)
-
-      // Decode the compressed hvc1 frame for preview off the main actor.
-      let previewImage = self.videoFrameDecoder.decode(frame.sampleBuffer)
+      // Decode the compressed hvc1 frame off the main actor.
+      let image = self.videoFrameDecoder.decode(frame.sampleBuffer)
 
       Task { @MainActor [weak self] in
-        guard let self else { return }
-        if UIApplication.shared.applicationState != .background, let image = previewImage {
-          self.latestReadFrame = ReadFrame(image: image, arrivedAt: arrivedAt)
-        }
-        // Keep the live surface stable while a capture preview is onscreen.
-        if UIApplication.shared.applicationState != .background,
-          activePreview == nil,
-          !isCapturingPhoto,
-          let image = previewImage
-        {
-          self.currentVideoFrame = image
-          if !self.hasReceivedFirstFrame {
-            self.hasReceivedFirstFrame = true
-          }
-        }
-        // Capture the actual recording start (first written frame) once, so the timer
-        // anchors to the clip's start and matches its duration.
-        if self.isRecording, self.recordingStartDate == nil {
-          self.recordingStartDate = self.videoRecorder.recordingStartDate
-        }
+        guard let self, UIApplication.shared.applicationState != .background, let image else { return }
+        self.latestReadFrame = ReadFrame(image: image, arrivedAt: arrivedAt)
       }
     }.store(in: streamTokenBag)
 
@@ -706,9 +485,7 @@ final class CameraViewModel {
   private func handleStreamStateChange(_ state: StreamState) {
     streamState = state
     if state == .stopped {
-      // Terminal — finalize any recording, then converge teardown. Covers both
-      // user-initiated stop and SDK auto-stop (disconnect, error, session end).
-      Task { await stopVideoRecording() }
+      // Terminal: covers both a stop we asked for and SDK auto-stop (disconnect, error, session end).
       clearStreamResources()
     }
   }
@@ -723,16 +500,8 @@ final class CameraViewModel {
     camera?.stop()
     camera = nil
     streamState = .stopped
-    currentVideoFrame = nil
-    hasReceivedFirstFrame = false
     latestReadFrame = nil
     resolveReadPhoto(nil)
-  }
-
-  /// Appends a frame to the recorder. `nonisolated` so it keeps writing while the
-  /// app is backgrounded (the recorder is thread-safe).
-  nonisolated private func appendVideoFrame(_ frame: VideoFrame) {
-    videoRecorder.appendVideoFrame(frame.sampleBuffer)
   }
 
   private func handleStreamError(_ error: StreamError) {
@@ -740,7 +509,7 @@ final class CameraViewModel {
     // expected teardown noise from an intentional background-driven stop.
     guard !isStoppingForBackground else { return }
     // A failed photo for reading is the reader's to say ("The photo for reading wasn't taken").
-    if case .photoCaptureFailed = error, readPhotoContinuation != nil {
+    if case .photoCaptureFailed = error {
       resolveReadPhoto(nil)
       return
     }
@@ -748,24 +517,12 @@ final class CameraViewModel {
   }
 
   private func handlePhotoData(_ data: PhotoData) {
-    if readPhotoContinuation != nil {
-      let image = UIImage(data: data.data)
-      if let image {
-        let pixels = image.size.applying(CGAffineTransform(scaleX: image.scale, y: image.scale))
-        benchClock.end("read_photo", detail: "size=\(Int(pixels.width))x\(Int(pixels.height))")
-      }
-      resolveReadPhoto(image)
-      return
-    }
-    isCapturingPhoto = false
-    if let image = UIImage(data: data.data) {
+    let image = UIImage(data: data.data)
+    if let image {
       let pixels = image.size.applying(CGAffineTransform(scaleX: image.scale, y: image.scale))
-      benchClock.end("capture_to_photo", detail: "size=\(Int(pixels.width))x\(Int(pixels.height))")
-      // Earcon only: TtsReply speaks the reply, so the Announcer stays quiet (one voice).
-      EarconPlayer.shared.play(.done)
-      ttsReply.speak("Photo captured.", isRecording: isRecording)
-      activePreview = .photo(image)
+      benchClock.end("read_photo", detail: "size=\(Int(pixels.width))x\(Int(pixels.height))")
     }
+    resolveReadPhoto(image)
   }
 
   /// Encoded width x height of a stream frame, read from its format description.
@@ -773,10 +530,6 @@ final class CameraViewModel {
     guard let format = CMSampleBufferGetFormatDescription(frame.sampleBuffer) else { return "unknown" }
     let dimensions = CMVideoFormatDescriptionGetDimensions(format)
     return "\(dimensions.width)x\(dimensions.height)"
-  }
-
-  private func showError(_ message: String) {
-    showError(.plain(message))
   }
 
   private func showError(_ problem: CameraProblem) {

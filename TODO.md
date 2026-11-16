@@ -39,7 +39,8 @@
 - [x] Ask about the text (2026-11-06, notes/ask-about-the-text.md: on-device, no cloud needed: bundled WordNet 3.0 definitions with inflections, British/American spellings, "did you mean" from the text and "spell it"; who-is mentions, recap (survives a restart, kept with the bookmark), find + "next"; question barge-in, then "carry on". Claude Haiku 5.5 optional for open questions, only with an API key in local.properties; untested live)
 - [x] Light and colour (brightness tone, colour naming with hedging) (2026-11-06, notes/light-and-colour.md: log-pitch probe tone with smoothing, relative levels, blink detection, OKLab colour naming with white balance, two-colour split and hedging)
 - [x] Home voice menu: the camera screen is usable by voice with no tool open (normal icon, after closing a tool): connects and listens by itself, "read my mail" / "main menu" / "what can I say" / "close the app" (2026-11-12, notes/tools-layer.md > Home voice menu; JVM 284/0; `HomeVoiceMenuTest` written but not yet run on the A26)
-- [ ] Run `HomeVoiceMenuTest`, `ToolsTest`, `VoiceFirstLaunchTest` on the A26 mock after the home voice menu change
+- [x] Run `HomeVoiceMenuTest`, `ToolsTest`, `VoiceFirstLaunchTest`, `SetupVoiceTest`, `RegistrationButtonTest` after the home voice menu change (2026-11-16, emulator `HSTN_Mock_API34`, the A26 wasn't reachable: 9/9 after fixing `ToolHub.isSpeakingAside`, a flag cleared by the first finished aside while the next was still queued, so "Connecting…" ending made the welcome look finished and "read my mail" was dropped as echo; JVM 301/0. `VoiceFirstLaunchTest` was flaky once before the fix)
+- [ ] Repeat those five on the A26
 - [ ] Voice: end the session / unregister by voice, with a spoken confirmation for unregistering
 - [ ] Offline eval harness: Mock Device Kit `setCameraFeed`/`setCapturedImage` + VizWiz/TextVQA subset, replay mode for CI
 - [ ] TalkBack pass + WCAG 2.2 AA check of the companion UI

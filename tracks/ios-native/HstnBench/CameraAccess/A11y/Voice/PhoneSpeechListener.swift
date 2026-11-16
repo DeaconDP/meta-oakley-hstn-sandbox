@@ -241,7 +241,7 @@ final class PhoneMicTap: @unchecked Sendable {
     }
   }
 
-  /// Blocks until the mic is off and the session is handed back, so a recording that starts next
+  /// Blocks until the mic is off and the session is handed back, so whatever uses it next
   /// finds them free. Only reached while running, so it can't stall a call with no mic in use.
   func stop() {
     feed(nil)

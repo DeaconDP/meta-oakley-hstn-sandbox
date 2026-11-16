@@ -102,192 +102,16 @@ final class ThemePaletteTests: XCTestCase {
   }
 }
 
-final class ReadingProgressTests: XCTestCase {
-  private let monday = ReadingDay(year: 2026, month: 11, day: 2)
-  private func day(_ offset: Int, from start: ReadingDay? = nil) -> ReadingDay {
-    let base = start ?? monday
-    var utc = Calendar(identifier: .gregorian)
-    utc.timeZone = TimeZone(identifier: "UTC") ?? .gmt
-    let date = utc.date(from: DateComponents(year: base.year, month: base.month, day: base.day + offset, hour: 12)) ?? Date()
-    return ReadingDay(date, calendar: utc)
-  }
-
-  func testStartsEmpty() {
-    let progress = ReadingProgress()
-    XCTAssertEqual(progress.currentStreak(on: monday), 0)
-    XCTAssertEqual(progress.pagesRead(on: monday), 0)
-    XCTAssertEqual(progress.goalFraction(on: monday), 0)
-  }
-
-  func testPagesOnOneDayCountOnceForTheStreak() {
-    var progress = ReadingProgress()
-    progress.recordPage(on: monday)
-    progress.recordPage(on: monday)
-    XCTAssertEqual(progress.currentStreak(on: monday), 1)
-    XCTAssertEqual(progress.pagesRead(on: monday), 2)
-    XCTAssertEqual(progress.totalPages, 2)
-  }
-
-  func testConsecutiveDaysExtendAndPagesResetAtMidnight() {
-    var progress = ReadingProgress()
-    progress.recordPage(on: monday)
-    progress.recordPage(on: monday)
-    XCTAssertEqual(progress.pagesRead(on: day(1)), 0, "A new day starts at zero pages")
-    XCTAssertEqual(progress.currentStreak(on: day(1)), 1, "Yesterday's streak is still alive today")
-    progress.recordPage(on: day(1))
-    XCTAssertEqual(progress.currentStreak(on: day(1)), 2)
-    XCTAssertEqual(progress.pagesRead(on: day(1)), 1)
-  }
-
-  func testMissedDayEndsTheCountButKeepsEverythingElse() {
-    var progress = ReadingProgress()
-    for offset in 0..<4 { progress.recordPage(on: day(offset)) }
-    XCTAssertEqual(progress.currentStreak(on: day(5)), 0, "Two days on, there's no current streak")
-    progress.recordPage(on: day(9))
-    XCTAssertEqual(progress.currentStreak(on: day(9)), 1)
-    XCTAssertEqual(progress.bestStreak, 4)
-    XCTAssertEqual(progress.totalPages, 5)
-  }
-
-  func testNothingInTheCopyPunishesAMissedDay() {
-    var progress = ReadingProgress()
-    for offset in 0..<4 { progress.recordPage(on: day(offset)) }
-    let summary = progress.summary(on: day(30))
-    XCTAssertEqual(summary.streakText, "Read a page to start a streak")
-    XCTAssertEqual(summary.bestText, "Best: 4 days")
-    let copy = summary.spokenValue.lowercased()
-    for word in ["lost", "missed", "broke", "failed", "0-day", "again"] {
-      XCTAssertFalse(copy.contains(word), "Guilt copy: \(word) in \(copy)")
-    }
-  }
-
-  func testMonthAndYearBoundaries() {
-    var progress = ReadingProgress()
-    progress.recordPage(on: ReadingDay(year: 2026, month: 12, day: 31))
-    progress.recordPage(on: ReadingDay(year: 2027, month: 1, day: 1))
-    XCTAssertEqual(progress.currentStreak(on: ReadingDay(year: 2027, month: 1, day: 1)), 2)
-    var leap = ReadingProgress()
-    leap.recordPage(on: ReadingDay(year: 2028, month: 2, day: 28))
-    leap.recordPage(on: ReadingDay(year: 2028, month: 2, day: 29))
-    leap.recordPage(on: ReadingDay(year: 2028, month: 3, day: 1))
-    XCTAssertEqual(leap.currentStreak(on: ReadingDay(year: 2028, month: 3, day: 1)), 3)
-  }
-
-  func testDaylightSavingDayIsStillOneDay() throws {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
-    // Clocks went back on 1 November 2026, so that day has 25 hours: more than 24 hours can pass
-    // inside one day, and it still counts as one.
-    let early = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 0, minute: 5)))
-    let late = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 23, minute: 55)))
-    XCTAssertGreaterThan(late.timeIntervalSince(early), 24 * 3600)
-    XCTAssertEqual(ReadingDay(early, calendar: calendar), ReadingDay(late, calendar: calendar))
-    let next = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 2, hour: 0, minute: 5)))
-    XCTAssertEqual(ReadingDay(late, calendar: calendar).days(until: ReadingDay(next, calendar: calendar)), 1)
-  }
-
-  func testClockMovedBackLosesNothing() {
-    var progress = ReadingProgress()
-    for offset in 0..<3 { progress.recordPage(on: day(offset)) }
-    XCTAssertEqual(progress.currentStreak(on: day(-5)), 3, "A clock moved back doesn't end the streak")
-    XCTAssertNil(progress.recordPage(on: day(-5)))
-    XCTAssertEqual(progress.streak, 3)
-    XCTAssertEqual(progress.totalPages, 4)
-  }
-
-  func testMilestonesAreRare() {
-    var progress = ReadingProgress()
-    var spoken: [ReadingMilestone] = []
-    for offset in 0..<8 {
-      if let milestone = progress.recordPage(on: day(offset)) { spoken.append(milestone) }
-    }
-    XCTAssertEqual(spoken, [.streak(3), .streak(7)])
-    XCTAssertEqual(ReadingMilestone.streak(3).spokenLine, "That's a three-day streak.")
-  }
-
-  func testGoalIsSpokenOnceADayAndOnlyAtTheGoal() {
-    var progress = ReadingProgress()
-    XCTAssertNil(progress.recordPage(on: monday))
-    XCTAssertNil(progress.recordPage(on: monday))
-    XCTAssertEqual(progress.recordPage(on: monday), .dailyGoal(ReadingProgress.dailyGoal))
-    XCTAssertNil(progress.recordPage(on: monday), "Past the goal: nothing more")
-    XCTAssertEqual(progress.goalFraction(on: monday), 1, "Stays full past the goal")
-    XCTAssertEqual(ReadingMilestone.dailyGoal(3).spokenLine, "That's your three pages for today.")
-  }
-
-  func testAtMostOneMilestonePerPage() {
-    var progress = ReadingProgress()
-    progress.recordPage(on: day(0))
-    progress.recordPage(on: day(1))
-    XCTAssertEqual(progress.recordPage(on: day(2)), .streak(3), "The third day's first page")
-    XCTAssertNil(progress.recordPage(on: day(2)))
-    XCTAssertEqual(progress.recordPage(on: day(2)), .dailyGoal(3))
-  }
-
-  func testSummaryWords() {
-    var progress = ReadingProgress()
-    XCTAssertEqual(progress.summary(on: monday).spokenValue, "0 of 3 pages today. Read a page to start a streak.")
-    progress.recordPage(on: monday)
-    XCTAssertEqual(progress.summary(on: monday).spokenValue, "1 of 3 pages today. 1-day streak.")
-    progress.recordPage(on: monday)
-    progress.recordPage(on: monday)
-    XCTAssertEqual(progress.summary(on: monday).pagesText, "3 of 3 pages today. Goal reached!")
-  }
-}
-
-@MainActor
-final class ReadingProgressStoreTests: XCTestCase {
-  private var suiteName = ""
-  private var defaults = UserDefaults()
-
-  override func setUp() async throws {
-    try await super.setUp()
-    suiteName = "ReadingProgressStoreTests.\(UUID().uuidString)"
-    defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-  }
-
-  override func tearDown() async throws {
-    defaults.removePersistentDomain(forName: suiteName)
-    try await super.tearDown()
-  }
-
-  func testPersistsAcrossLaunches() {
-    let now = Date(timeIntervalSince1970: 1_800_000_000)
-    let store = ReadingProgressStore(defaults: defaults, now: { now })
-    store.recordPage()
-    store.recordPage()
-    let reopened = ReadingProgressStore(defaults: defaults, now: { now })
-    XCTAssertEqual(reopened.summary.pagesToday, 2)
-    XCTAssertEqual(reopened.summary.streak, 1)
-  }
-
-  func testFollowsTheClock() {
-    var now = Date(timeIntervalSince1970: 1_800_000_000)
-    let store = ReadingProgressStore(defaults: defaults, now: { now })
-    store.recordPage()
-    now = now.addingTimeInterval(24 * 3600)
-    XCTAssertEqual(store.summary.pagesToday, 0)
-    XCTAssertEqual(store.summary.streak, 1)
-    now = now.addingTimeInterval(24 * 3600)
-    XCTAssertEqual(store.summary.streak, 0)
-  }
-
-  func testCorruptSaveStartsFresh() {
-    defaults.set(Data([1, 2, 3]), forKey: "a11y.readingProgress")
-    XCTAssertEqual(ReadingProgressStore(defaults: defaults).summary.pagesToday, 0)
-  }
-}
-
 @MainActor
 final class VoiceIndicatorModelTests: XCTestCase {
   private func model(
     _ status: VoiceControl.Status, reason: String? = nil, listener: VoiceListenerKind? = .phone,
     mic: VoicePermission = .granted, speech: VoicePermission = .granted, speaking: Bool = false, heard: VoiceCommand? = nil,
-    inSetup: Bool = false, canPrompt: Bool = true
+    canPrompt: Bool = true
   ) -> VoiceIndicatorModel {
     VoiceIndicatorModel.make(
       status: status, reason: reason, listener: listener, micPermission: mic, speechPermission: speech, isSpeaking: speaking,
-      heard: heard, inSetup: inSetup, canPrompt: canPrompt)
+      heard: heard, canPrompt: canPrompt)
   }
 
   func testListeningSaysSoInWords() {
@@ -324,27 +148,20 @@ final class VoiceIndicatorModelTests: XCTestCase {
     XCTAssertEqual(model(.listening, speaking: true).signal, .speaking)
     XCTAssertEqual(model(.unavailable, reason: "Waiting").signal, .warning)
     XCTAssertEqual(model(.off).signal, .quiet)
-    XCTAssertEqual(model(.paused, reason: "A recording is running.").signal, .quiet)
+    XCTAssertEqual(model(.paused, reason: "Paused by a call or another app.").signal, .quiet)
   }
 
   func testOffOffersTurningItBackOn() {
     XCTAssertEqual(model(.off).fix, .turnOn)
   }
 
-  func testSetupAndTestsDontOfferAFixTheStepAlreadyGives() {
-    XCTAssertNil(model(.unavailable, reason: "Waiting", mic: .notDetermined, inSetup: true).fix)
-    XCTAssertNil(model(.off, inSetup: true).fix)
+  func testTestsDontOfferAPrompt() {
     XCTAssertNil(model(.unavailable, reason: "Waiting", mic: .notDetermined, canPrompt: false).fix)
   }
 
   func testPausedGivesTheReason() {
-    let paused = model(.paused, reason: "A recording is running.")
+    let paused = model(.paused, reason: "Paused by a call or another app.")
     XCTAssertEqual(paused.title, "Listening paused")
-    XCTAssertEqual(paused.spokenLabel, "Listening paused. A recording is running.")
-  }
-
-  func testSetupStepFractions() {
-    XCTAssertEqual(OnboardingStep.welcome.progressFraction, 0)
-    XCTAssertEqual(OnboardingStep.connect.progressFraction, 1)
+    XCTAssertEqual(paused.spokenLabel, "Listening paused. Paused by a call or another app.")
   }
 }

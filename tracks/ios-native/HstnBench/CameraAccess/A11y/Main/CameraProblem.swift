@@ -13,17 +13,16 @@ import MWDATCore
 /// The single next step offered with an error. The camera screen turns it into an alert button and
 /// performs it.
 enum CameraErrorAction: Equatable, Sendable {
-  case startSession
-  case startPreview
-  /// Re-runs the preview start, which checks permission and explains the Meta AI switch first.
+  /// Reads again, which starts the camera again on the way.
+  case tryAgain
+  /// Re-runs the camera start, which checks permission and explains the Meta AI switch first.
   case allowCamera
   case updateGlassesApp
   case openSettings
 
   var title: String {
     switch self {
-    case .startSession: "Start session"
-    case .startPreview: "Start preview"
+    case .tryAgain: "Try again"
     case .allowCamera: "Allow camera"
     case .updateGlassesApp: "Update in Meta AI"
     case .openSettings: "Open Settings"
@@ -40,17 +39,17 @@ struct CameraProblem: Equatable, Sendable {
   static func session(_ error: DeviceSessionError) -> CameraProblem {
     switch error {
     case .noEligibleDevice:
-      CameraProblem(title: "Glasses not connected", message: SpokenMessage.glassesNotConnected, action: .startSession)
+      CameraProblem(title: "Glasses not connected", message: SpokenMessage.glassesNotConnected, action: .tryAgain)
     case .thermalCritical, .thermalEmergency:
       CameraProblem(title: "Glasses too hot", message: SpokenMessage.glassesTooHot, action: nil)
     case .batteryCritical:
       CameraProblem(title: "Battery too low", message: SpokenMessage.glassesBatteryTooLow, action: nil)
     case .peakPowerShutdown:
-      CameraProblem(title: "Power limit", message: SpokenMessage.glassesPowerLimit, action: .startSession)
+      CameraProblem(title: "Power limit", message: SpokenMessage.glassesPowerLimit, action: .tryAgain)
     case .datAppOnTheGlassesUpdateRequired:
       CameraProblem(title: "Update required", message: SpokenMessage.glassesAppUpdateRequired, action: .updateGlassesApp)
     default:
-      CameraProblem(title: "Session problem", message: fallback(error.localizedDescription), action: .startSession)
+      CameraProblem(title: "Session problem", message: fallback(error.localizedDescription), action: .tryAgain)
     }
   }
 
@@ -67,15 +66,15 @@ struct CameraProblem: Equatable, Sendable {
     case .batteryLow:
       CameraProblem(title: "Battery too low", message: SpokenMessage.glassesBatteryTooLow, action: nil)
     case .peakPowerLimit:
-      CameraProblem(title: "Power limit", message: SpokenMessage.glassesPowerLimit, action: .startPreview)
+      CameraProblem(title: "Power limit", message: SpokenMessage.glassesPowerLimit, action: .tryAgain)
     case .timeout:
-      CameraProblem(title: "No response", message: SpokenMessage.cameraTimedOut, action: .startPreview)
+      CameraProblem(title: "No response", message: SpokenMessage.cameraTimedOut, action: .tryAgain)
     case .photoCaptureFailed:
-      CameraProblem(title: "Photo not taken", message: SpokenMessage.photoFailed, action: nil)
+      CameraProblem(title: "Photo not taken", message: SpokenMessage.photoFailed, action: .tryAgain)
     case .videoStreamingError, .audioStreamingError, .internalError:
-      CameraProblem(title: "Camera stopped", message: SpokenMessage.cameraStreamFailed, action: .startPreview)
+      CameraProblem(title: "Camera stopped", message: SpokenMessage.cameraStreamFailed, action: .tryAgain)
     @unknown default:
-      CameraProblem(title: "Camera problem", message: fallback(error.localizedDescription), action: .startPreview)
+      CameraProblem(title: "Camera problem", message: fallback(error.localizedDescription), action: .tryAgain)
     }
   }
 

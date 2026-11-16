@@ -134,9 +134,15 @@ class ToolHub(
   var phoneNow: PhoneSnapshot? = null
     private set
 
-  /** A short note is being spoken (sayAside); tools reading text wait for it. */
-  var isSpeakingAside = false
-    private set
+  /**
+   * A short note is being spoken or is queued (sayAside); tools reading text wait for it. Counted,
+   * not a flag: asides queue behind each other ("Connecting…" then the welcome), and the first one
+   * finishing mustn't report quiet while the next is still playing.
+   */
+  val isSpeakingAside: Boolean
+    get() = asidesPending > 0
+
+  private var asidesPending = 0
 
   /** The stream dropped while a tool was open and hasn't come back yet. */
   var streamLost = false
@@ -660,7 +666,7 @@ class ToolHub(
 
   /** Short spoken note (status, hint, reply). The tool's ToolHost.onAsideDone runs after it. */
   fun sayAside(text: String) {
-    isSpeakingAside = true
+    asidesPending++
     remember(text)
     speaker.speak(text, "aside")
   }
@@ -714,7 +720,7 @@ class ToolHub(
   /** Stops speech now, drops what's queued, and tells the echo guard it ended. */
   fun hush() {
     speaker.stop()
-    isSpeakingAside = false
+    asidesPending = 0 // stop() drops the queue, so none of them will report done
     echo.finished(SystemClock.elapsedRealtime())
   }
 
@@ -757,7 +763,7 @@ class ToolHub(
   override fun onSpoken(tag: String) {
     echo.finished(SystemClock.elapsedRealtime())
     if (tag == "aside") {
-      isSpeakingAside = false
+      asidesPending = (asidesPending - 1).coerceAtLeast(0)
       host?.onAsideDone()
     } else {
       host?.onSpoken(tag)

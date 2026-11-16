@@ -51,21 +51,21 @@ final class VoiceCoachScheduleTests: XCTestCase {
 
 final class VoiceCoachLinesTests: XCTestCase {
   private func line(
-    _ situation: CoachSituation, tip: Int = 0, isLast: Bool = false, wakeWord: Bool = false, verbosity: Verbosity = .normal,
-    pagesToday: Int = 0
+    _ situation: CoachSituation, tip: Int = 0, isLast: Bool = false, wakeWord: Bool = false, verbosity: Verbosity = .normal
   ) -> String {
-    VoiceCoachLines.line(for: situation, tip: tip, isLast: isLast, wakeWord: wakeWord, verbosity: verbosity, pagesToday: pagesToday)
+    VoiceCoachLines.line(for: situation, tip: tip, isLast: isLast, wakeWord: wakeWord, verbosity: verbosity)
   }
 
-  func testCameraTipsLeadWithReading() {
-    XCTAssertTrue(line(.cameraOff).contains("say read"))
-    XCTAssertTrue(line(.cameraOn).hasPrefix("The camera's on."))
-    XCTAssertEqual(line(.cameraOn, verbosity: .short), "Hold up some text and say read.")
+  func testMainScreenTipsLeadWithReading() {
+    XCTAssertTrue(line(.ready).contains("say read"))
+    XCTAssertFalse(line(.ready).contains("camera"), "No camera steps to take by hand")
+    XCTAssertEqual(line(.ready, verbosity: .short), "Hold up some text and say read.")
   }
 
   func testWakeWordGoesOnEveryCommand() {
-    let text = line(.setup(.welcome), wakeWord: true)
-    XCTAssertEqual(text, "To begin, say reader, continue for a guided setup, or say reader, skip to go straight to the app.")
+    let text = line(.welcome, wakeWord: true)
+    XCTAssertEqual(
+      text, "To connect your glasses, say reader, connect. I'll open the Meta AI app so you can approve it. Or say reader, not now.")
     XCTAssertTrue(line(.notLinked, isLast: true, wakeWord: true).hasSuffix("Say reader, help whenever you need me."))
   }
 
@@ -75,25 +75,16 @@ final class VoiceCoachLinesTests: XCTestCase {
     XCTAssertTrue(line(.notLinked, tip: 3, isLast: true).hasSuffix("I'll stop reminding you now. Say help whenever you need me."))
   }
 
-  func testGoalOnlyPartWayAndOnlyOnTheFirstTip() {
-    XCTAssertFalse(line(.cameraOn, pagesToday: 0).contains("goal"))
-    XCTAssertTrue(line(.cameraOn, pagesToday: 1).hasSuffix("Two more pages reach today's goal."))
-    XCTAssertTrue(line(.afterReading, pagesToday: 2).hasSuffix("One more page reaches today's goal."))
-    XCTAssertFalse(line(.cameraOn, pagesToday: ReadingProgress.dailyGoal).contains("goal"))
-    XCTAssertFalse(line(.cameraOn, tip: 1, pagesToday: 1).contains("goal"))
-    XCTAssertFalse(line(.cameraOn, verbosity: .short, pagesToday: 1).contains("goal"))
-    XCTAssertFalse(line(.notLinked, pagesToday: 1).contains("goal"))
-  }
-
   /// Every "say X" in a tip must be something the parser accepts on that screen, or the tip lies.
   func testEveryOfferedCommandWorksWhereItIsOffered() {
-    var cases: [(CoachSituation, VoiceContext)] = OnboardingStep.allCases.map { (.setup($0), VoiceContext(screen: .setup($0))) }
-    cases += [
+    let cases: [(CoachSituation, VoiceContext)] = [
+      (.welcome, VoiceContext(screen: .welcome)),
+      (.welcomeRetry, VoiceContext(screen: .welcome)),
+      (.welcomeConnected, VoiceContext(screen: .welcome)),
       (.notLinked, VoiceContext(screen: .home)),
       (.noGlasses, VoiceContext(screen: .camera)),
       (.glassesNotReady, VoiceContext(screen: .camera)),
-      (.cameraOff, VoiceContext(screen: .camera)),
-      (.cameraOn, VoiceContext(screen: .camera)),
+      (.ready, VoiceContext(screen: .camera)),
       (.afterReading, VoiceContext(screen: .camera, hasReadSentences: true)),
       (.paused, VoiceContext(screen: .camera)),
     ]
@@ -161,12 +152,12 @@ final class VoiceCoachDriverTests: XCTestCase {
 
   private var world = World()
   private var coach: VoiceCoach!
-  private var situation: CoachSituation? = .cameraOn
+  private var situation: CoachSituation? = .ready
 
   override func setUp() async throws {
     try await super.setUp()
     world = World()
-    situation = .cameraOn
+    situation = .ready
     let world = world
     coach = VoiceCoach(
       environment: VoiceCoach.Environment(
@@ -179,7 +170,6 @@ final class VoiceCoachDriverTests: XCTestCase {
         lastCommandAt: { world.lastCommandAt },
         needsWakeWord: { false },
         verbosity: { .short },
-        pagesToday: { 0 },
         timesHeard: { world.heard[$0] ?? 0 },
         noteHeard: { world.heard[$0, default: 0] += 1 },
         say: { text, onFinish in
@@ -207,7 +197,7 @@ final class VoiceCoachDriverTests: XCTestCase {
     XCTAssertTrue(world.spoken.isEmpty)
     pass(1)
     XCTAssertEqual(world.spoken, ["Hold up some text and say read."])
-    XCTAssertEqual(world.heard["cameraOn"], 1)
+    XCTAssertEqual(world.heard["ready"], 1)
   }
 
   func testNothingWhileSpeakingNotListeningOrSwitchedOff() {
@@ -233,7 +223,7 @@ final class VoiceCoachDriverTests: XCTestCase {
     XCTAssertTrue(world.spoken.isEmpty)
     // Another screen's provider doesn't count for this one.
     world.screen = .home
-    situation = .cameraOn
+    situation = .ready
     pass(300)
     XCTAssertTrue(world.spoken.isEmpty)
   }
@@ -263,15 +253,22 @@ final class VoiceCoachDriverTests: XCTestCase {
     XCTAssertEqual(world.spoken.last, "Say read for something new.")
   }
 
-  func testSetupNeedsNoProvider() {
-    world.screen = .setup(.connect)
+  func testFirstScreenTipsFollowItsState() {
+    situation = .welcome
+    coach.provide(for: .welcome) { [unowned self] in self.situation }
+    world.screen = .welcome
     coach.tick()
     pass(8)
-    XCTAssertEqual(world.spoken, ["Say connect, or say skip."])
+    XCTAssertEqual(world.spoken, ["Say connect, or say not now."])
+    // A connection that didn't finish is a new situation: the tips start over with "try again".
+    situation = .welcomeRetry
+    coach.tick()
+    pass(8)
+    XCTAssertEqual(world.spoken.last, "Say try again, or say not now.")
   }
 
   func testLearnedSituationsWaitLonger() {
-    world.heard["cameraOn"] = VoiceCoachSchedule.learnedAfter
+    world.heard["ready"] = VoiceCoachSchedule.learnedAfter
     coach.tick()
     pass(29)
     XCTAssertTrue(world.spoken.isEmpty)

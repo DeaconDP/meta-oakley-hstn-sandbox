@@ -60,7 +60,7 @@ final class VoiceControlUITests: XCTestCase {
     XCTAssertTrue(app.buttons["Connect my glasses"].waitForExistence(timeout: 15))
     say("please connect my glasses")
     waitForLastCommand("connect")
-    XCTAssertTrue(app.staticTexts["Waiting for an active device"].waitForExistence(timeout: 20), "Should reach the camera screen")
+    XCTAssertTrue(app.staticTexts["Put on your glasses"].waitForExistence(timeout: 20), "Should reach the camera screen")
   }
 
   func testConversationDoesNothing() {
@@ -71,43 +71,26 @@ final class VoiceControlUITests: XCTestCase {
     XCTAssertTrue(app.buttons["Connect my glasses"].exists)
   }
 
-  func testGuidedSetupByVoice() {
+  /// Setup is one screen: "connect" there goes straight to the main screen.
+  func testSetupByVoiceGoesStraightToTheMainScreen() {
     launch(["--onboarding"])
-    // Each step speaks as it appears, and while the app speaks only "reader, ..." counts.
+    // The screen speaks as it appears, and while the app speaks only "reader, ..." counts.
     waitForStep("welcome")
-    say("reader, yes")
-    waitForStep("voiceControl")
-    // Doesn't prompt under --ui-testing: it moves on.
-    say("reader, yes")
-    waitForStep("sounds")
-    say("reader, back")
-    waitForStep("voiceControl")
-    say("reader, skip")
-    waitForStep("sounds")
-    say("reader, next")
-    waitForStep("speakerTest")
-    say("reader, test the speaker")
-    waitForLastCommand("testSpeaker")
-    say("reader, no")
-    XCTAssertTrue(app.staticTexts["Things to check"].waitForExistence(timeout: 10), "\"no\" should show the fixes")
-    say("reader, continue")
-    waitForStep("verbosity")
+    say("reader, repeat")
+    waitForLastCommand("repeatLast")
+    say("reader, connect")
+    waitForLastCommand("connect")
+    XCTAssertTrue(app.staticTexts["Put on your glasses"].waitForExistence(timeout: 20), "Should reach the main screen")
     let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
     XCTAssertFalse(springboard.alerts.firstMatch.exists, "No permission dialog in a UI test")
   }
 
-  /// Not with --voice-inject's field: the audit should see what users see.
-  func testVoiceControlStepPassesAudit() throws {
-    app.launchArguments = ["--ui-testing", "--onboarding"]
-    app.launchEnvironment["MWDAT_TEST_SERVER_PORT_FILE"] = portFilePath
-    app.launch()
-    let guided = app.buttons["onboarding_guided_button"]
-    XCTAssertTrue(guided.waitForExistence(timeout: 15))
-    guided.tap()
-    XCTAssertTrue(app.buttons["voice_turn_on_button"].waitForExistence(timeout: 10))
-    try app.performAccessibilityAudit { issue in
-      issue.element?.identifier == "debug_menu_button"
-    }
+  func testNotNowByVoiceGoesToTheHomeScreen() {
+    launch(["--onboarding"])
+    waitForStep("welcome")
+    say("reader, not now")
+    waitForLastCommand("no")
+    XCTAssertTrue(app.buttons["Connect my glasses"].waitForExistence(timeout: 10), "Should land on the home screen")
   }
 
   func testSettingsShowsVoiceAndHasTheSwitches() {

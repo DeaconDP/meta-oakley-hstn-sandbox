@@ -29,7 +29,7 @@ protocol SpeechListener: AnyObject {
   var kind: VoiceListenerKind { get }
   var onEvent: (@MainActor (SpeechListenerEvent) -> Void)? { get set }
   func start()
-  /// Synchronous about giving back the mic: on return the session is free for a recording.
+  /// Synchronous about giving back the mic: on return the session is free.
   func stop()
 }
 
@@ -58,13 +58,11 @@ enum VoicePermission: Equatable, Sendable {
 }
 
 enum VoicePauseReason: String, Equatable, Sendable {
-  case recording
   case background
   case interrupted
 
   var text: String {
     switch self {
-    case .recording: "Paused while recording."
     case .background: "Paused while the app is in the background."
     case .interrupted: "Paused by a call or another app."
     }
@@ -86,7 +84,6 @@ enum VoiceListenerPolicy {
   struct Inputs: Equatable, Sendable {
     var enabled = true
     var inBackground = false
-    var recording = false
     var interrupted = false
     /// A device session is STARTED and Speech is allowed by the feature flag.
     var glassesAvailable = false
@@ -103,7 +100,6 @@ enum VoiceListenerPolicy {
   static func decide(_ inputs: Inputs) -> VoiceListenerDecision {
     guard inputs.enabled else { return .off }
     if inputs.inBackground { return .paused(.background) }
-    if inputs.recording { return .paused(.recording) }
     if inputs.interrupted { return .paused(.interrupted) }
     if inputs.glassesAvailable, inputs.glassesMicGranted, !inputs.glassesCoolingOff { return .glasses }
     if inputs.phoneMic == .denied || inputs.speechRecognition == .denied { return .denied }
