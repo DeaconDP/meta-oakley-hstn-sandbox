@@ -1,0 +1,12 @@
+// Base.xcconfig - build settings for the CameraAccess app target (Debug and Release)
+//
+// The OpenAI key for cloud reading (A11y/Cloud) is a secret, so it never lives in a tracked file.
+// Put it in Secrets.xcconfig next to this file (gitignored; copy Secrets.xcconfig.example). Without
+// it OPENAI_API_KEY stays empty, Info.plist's OpenAIAPIKey is empty, and the app reads on the
+// phone unless a key is pasted in Settings (stored in the Keychain).
+//
+// Note: in xcconfig files "//" starts a comment, so a value can't contain it.
+
+OPENAI_API_KEY =
+
+#include? "Secrets.xcconfig"

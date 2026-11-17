@@ -1,10 +1,10 @@
 /*
- * LaunchIntents - "Look", "Read", "Status" and "Repeat" as App Intents, so the app can be used
+ * LaunchIntents - "Read", "Status" and "Repeat" as App Intents, so the app can be used
  * without finding its icon: from Siri, the Shortcuts app, Back Tap (Settings > Accessibility >
  * Touch > Back Tap) or the Action Button (notes/a11y-onboarding.md, "Launch (every day)").
  *
  * Whether each one opens the app:
- * - Look and Read open it. The camera needs a foreground app: CameraViewModel ends the session
+ * - Read opens it. The camera needs a foreground app: CameraViewModel ends the session
  *   when the app goes to the background, and raw DAT frames stop there anyway (only hvc1 keeps
  *   coming). On a locked phone iOS asks to unlock first; that is the price of a working stream.
  * - Status and Repeat don't. Both are answered by Siri reading the dialog, which works with the
@@ -17,21 +17,6 @@
  */
 
 import AppIntents
-
-struct LookIntent: AppIntent {
-  static var title: LocalizedStringResource { "Look" }
-  static var description: IntentDescription {
-    IntentDescription("Takes a photo with your glasses and describes it.")
-  }
-  static var openAppWhenRun: Bool { true }
-
-  @MainActor
-  func perform() async throws -> some IntentResult & ProvidesDialog {
-    LaunchActionRouter.shared.request(.look)
-    // Immediate feedback while the app comes up and the glasses connect.
-    return .result(dialog: "\(SpokenMessage.launchLooking)")
-  }
-}
 
 struct ReadIntent: AppIntent {
   static var title: LocalizedStringResource { "Read" }
@@ -84,20 +69,9 @@ struct RepeatLastIntent: AppIntent {
 
 /// Phrases must include the app name (the bundle display name). Keep them short and natural;
 /// these are what people say to Siri and what Shortcuts lists for Back Tap and the Action Button.
-/// No phrase may fit two intents: anything with "read" goes to Read (word for word), "look" and
-/// "describe" to Look.
+/// No phrase may fit two intents.
 struct LaunchShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
-    AppShortcut(
-      intent: LookIntent(),
-      phrases: [
-        "Look with \(.applicationName)",
-        "Describe this with \(.applicationName)",
-        "\(.applicationName) look",
-      ],
-      shortTitle: "Look",
-      systemImageName: "eye"
-    )
     AppShortcut(
       intent: ReadIntent(),
       phrases: [

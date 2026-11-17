@@ -4,19 +4,17 @@
  *
  * An App Intent can run before any view exists (cold launch) or while the main screen is behind
  * onboarding, so it can't call the camera view model directly. It parks the action here; the main
- * screen observes `pending` and runs it once it can. One slot, latest wins: two quick "look"
- * requests mean one look, not two.
+ * screen observes `pending` and runs it once it can. One slot, latest wins: two quick "read"
+ * requests mean one read, not two.
  *
  * A request expires after `maxAge`, so an action that waited behind onboarding or a long connect
- * doesn't fire minutes later when the user has moved on (a surprise photo is worse than none).
+ * doesn't fire minutes later when the user has moved on.
  */
 
 import Foundation
 import Observation
 
 enum LaunchAction: String, Sendable, CaseIterable {
-  /// Take a photo and describe it with the current pipeline.
-  case look
   /// Read the text in view aloud, word for word (TextReader).
   case read
   /// Speak the one-line readiness status ("Ready.", "Glasses aren't connected...").

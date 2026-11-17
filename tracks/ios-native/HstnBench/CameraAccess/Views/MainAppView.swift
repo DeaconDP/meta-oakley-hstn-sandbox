@@ -9,13 +9,13 @@
 //
 // MainAppView.swift
 //
-// Central navigation hub that displays different views based on DAT SDK registration and device states.
-// When unregistered, shows the registration flow. When registered, shows the device selection screen
-// for choosing which Meta wearable device to stream from.
+// Central navigation hub that displays different views based on DAT SDK registration state.
+// When unregistered, shows the registration flow. When registered, shows the main reading screen.
 //
-// HstnBench: until onboarding is completed (or skipped), the guided setup comes first, before
-// registration. Resetting it (A11yPreferences.shared.resetOnboarding()) shows it again, which is
-// how "Replay setup" works. UI tests skip it unless launched with --onboarding.
+// HstnBench: until onboarding is completed, its one screen (OnboardingView) comes first. It
+// connects the glasses itself, so a first run goes from there straight to the main screen; Not now
+// lands on HomeScreenView. Resetting it (A11yPreferences.shared.resetOnboarding()) shows it again,
+// which is how "Replay setup" works. UI tests skip it unless launched with --onboarding.
 //
 
 import MWDATCore
@@ -50,8 +50,6 @@ struct MainAppView: View {
       guard !Task.isCancelled else { return }
       AppVoice.shared.offerDownloadIfNeeded()
     }
-    // On top of everything, ignoring touches and hidden from VoiceOver.
-    .overlay { CelebrationOverlay() }
     .preferredColorScheme(LaunchOptions.forcesDarkMode ? .dark : nil)
     #if DEBUG
     // An inset, not an overlay: it must not sit on top of a page's pinned buttons.
@@ -63,7 +61,7 @@ struct MainAppView: View {
 /// Launch arguments that change the first-run flow.
 enum LaunchOptions {
   /// The benchmark and UI tests launch with --ui-testing and expect the home screen straight away.
-  /// Adding --onboarding runs the guided setup from the start instead (see CameraAccessApp).
+  /// Adding --onboarding shows the first-run screen instead (see CameraAccessApp).
   static let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
   static let forcesOnboarding = ProcessInfo.processInfo.arguments.contains("--onboarding")
   static let skipsOnboarding = isUITesting && !forcesOnboarding
@@ -82,12 +80,4 @@ enum LaunchOptions {
   /// With --ui-testing, for the screenshot tour: shows "Listening" and the "Say ..." hints, which a
   /// UI test otherwise can't, since nothing listens. Display only: VoiceControl is unaffected.
   static let previewsListening = isUITesting && ProcessInfo.processInfo.arguments.contains("--preview-listening")
-  /// With --ui-testing: --progress-seed=streak,pages starts ReadingProgressStore there.
-  static let progressSeed: (streak: Int, pages: Int)? = {
-    guard isUITesting,
-      let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--progress-seed=") })
-    else { return nil }
-    let numbers = argument.dropFirst("--progress-seed=".count).split(separator: ",").compactMap { Int($0) }
-    return numbers.count == 2 ? (numbers[0], numbers[1]) : nil
-  }()
 }

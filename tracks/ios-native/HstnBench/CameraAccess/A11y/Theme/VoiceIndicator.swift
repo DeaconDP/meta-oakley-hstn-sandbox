@@ -69,7 +69,6 @@ struct VoiceIndicatorModel: Equatable {
     speechPermission: VoicePermission,
     isSpeaking: Bool,
     heard: VoiceCommand?,
-    inSetup: Bool,
     canPrompt: Bool
   ) -> VoiceIndicatorModel {
     switch status {
@@ -88,13 +87,13 @@ struct VoiceIndicatorModel: Equatable {
       return VoiceIndicatorModel(title: "Listening paused", detail: reason, mood: .idle, fix: nil)
     case .off:
       return VoiceIndicatorModel(
-        title: "Voice control is off", detail: "Every button still works.", mood: .idle, fix: inSetup ? nil : .turnOn)
+        title: "Voice control is off", detail: "Every button still works.", mood: .idle, fix: .turnOn)
     case .unavailable:
       let denied = micPermission == .denied || speechPermission == .denied
       var fix: Fix?
       if denied || reason == SpokenMessage.voiceNoOnDeviceRecognition {
         fix = .openSettings
-      } else if canPrompt, !inSetup, micPermission == .notDetermined || speechPermission == .notDetermined {
+      } else if canPrompt, micPermission == .notDetermined || speechPermission == .notDetermined {
         fix = .askPermission
       }
       return VoiceIndicatorModel(title: "Not listening", detail: reason, mood: .confused, fix: fix, signal: .warning)
@@ -122,7 +121,6 @@ struct VoiceIndicatorView: View {
       speechPermission: voice.speechPermission,
       isSpeaking: Announcer.shared.isSpeaking,
       heard: heard,
-      inSetup: { if case .setup = voice.screen { true } else { false } }(),
       canPrompt: !LaunchOptions.isAutomatedTest)
   }
 

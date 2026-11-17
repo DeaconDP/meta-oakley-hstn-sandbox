@@ -1,8 +1,13 @@
 /*
  * TextRecognizer - on-device OCR with Apple Vision, plus the cheap frame-quality measure
  *
- * Nothing leaves the phone: VNRecognizeTextRequest runs locally, and the frame is dropped once
- * the result is built (no frames stored, ROADMAP "Privacy").
+ * This is the on-phone path: VNRecognizeTextRequest runs locally, nothing leaves the phone, and
+ * the frame is dropped once the result is built (no frames stored, ROADMAP "Privacy"). It is used
+ * when no OpenAI key is set, when the user turns "Use natural voice" off, under test, and as the
+ * fallback for any cloud error.
+ * The other path, cloud reading (A11y/Cloud, see TextReader), sends the page photo to OpenAI to
+ * be transcribed and the text to OpenAI to be spoken; the app keeps neither (requests are sent
+ * with `store: false`, through an ephemeral URLSession).
  *
  * Settings:
  * - `.accurate`: the neural recognizer. `.fast` is the character-by-character one; it is quicker

@@ -37,6 +37,8 @@ xcuserdata/
 .env
 *.keystore
 *.jks
+# Local build secrets (copy Secrets.xcconfig.example)
+Secrets.xcconfig
 
 # Python / experiment outputs (regenerable; see each experiment's README)
 .venv/

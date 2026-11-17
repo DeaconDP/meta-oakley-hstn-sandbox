@@ -33,11 +33,9 @@ extension SpokenMessage {
 
   static let voiceControlTurnedOff = "Voice control off."
 
-  /// Before the system's microphone and speech recognition dialogs.
+  /// Before the system's microphone and speech recognition dialogs, on the first screen that's up.
   static let voiceControlExplanation =
     "You can run this app by speaking. It needs the microphone to hear you, and speech recognition to understand you. Both stay on your phone, and nothing you say is stored. You'll be asked to allow them next."
-
-  static let voiceControlKeepOff = "Voice control stays off. You can turn it on in the app's settings."
 
   static let voicePermissionDenied =
     "Voice control is off because the microphone or speech recognition isn't allowed. Every button still works. To fix it, open Settings, find SpeakUp, and turn both on."
@@ -54,7 +52,7 @@ extension SpokenMessage {
   static let voiceGlassesMicNeedsMetaAI =
     "To listen through your glasses, you'll switch to the Meta AI app to allow their microphone, then come back here."
 
-  static let voiceGlassesMicAllowed = "Glasses microphone allowed. Voice control will use it during a session."
+  static let voiceGlassesMicAllowed = "Glasses microphone allowed. Voice control will use it while the camera is on."
 
   static let voiceGlassesMicNotAllowed = "The glasses microphone wasn't allowed. Voice control keeps using the phone's microphone."
 

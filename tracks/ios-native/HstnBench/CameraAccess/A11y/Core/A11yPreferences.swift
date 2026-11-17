@@ -3,7 +3,8 @@
  *
  * Observable so settings and onboarding screens update live. Defaults: the app's own British
  * voice (AppVoice), including with VoiceOver running, unless the user opts to follow VoiceOver's;
- * voice control on; spoken tips on; earcons on; normal verbosity; and the system default speech rate.
+ * voice control on; spoken tips on; earcons on; normal verbosity; the system default speech rate; and
+ * the natural (OpenAI) reading voice whenever a key is set (CloudReading).
  */
 
 import AVFoundation
@@ -47,6 +48,7 @@ final class A11yPreferences {
     static let disclaimerHeard = "a11y.disclaimerHeard"
     static let voiceTipsEnabled = "a11y.voiceTipsEnabled"
     static let voiceTipsHeard = "a11y.voiceTipsHeard"
+    static let useNaturalVoice = "a11y.useNaturalVoice"
   }
 
   @ObservationIgnored private let defaults: UserDefaults
@@ -118,6 +120,12 @@ final class A11yPreferences {
     didSet { defaults.set(voiceTipsHeard, forKey: Key.voiceTipsHeard) }
   }
 
+  /// Read with the cloud path (OpenAI transcription and voice) when a key is set. On by default;
+  /// off forces on-phone recognition and the app's own voice.
+  var useNaturalVoice: Bool {
+    didSet { defaults.set(useNaturalVoice, forKey: Key.useNaturalVoice) }
+  }
+
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
     verbosity = defaults.string(forKey: Key.verbosity).flatMap(Verbosity.init(rawValue:)) ?? .normal
@@ -133,6 +141,7 @@ final class A11yPreferences {
     disclaimerHeard = defaults.bool(forKey: Key.disclaimerHeard)
     voiceTipsEnabled = defaults.object(forKey: Key.voiceTipsEnabled) as? Bool ?? true
     voiceTipsHeard = defaults.dictionary(forKey: Key.voiceTipsHeard) as? [String: Int] ?? [:]
+    useNaturalVoice = defaults.object(forKey: Key.useNaturalVoice) as? Bool ?? true
   }
 
   /// Starts onboarding over, e.g. "replay setup" in Settings. The disclaimer is part of

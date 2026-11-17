@@ -31,6 +31,9 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Cloud reading (A11y/Cloud/OpenAIKey.swift): filled from Config/Secrets.xcconfig at build time; empty means reading stays on the phone unless a key is pasted in Settings. -->
+	<key>OpenAIAPIKey</key>
+	<string>$(OPENAI_API_KEY)</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>SpeakUp. Your glasses, out loud. By deac online · Worldbuild.io</string>
 	<key>CFBundleVersion</key>

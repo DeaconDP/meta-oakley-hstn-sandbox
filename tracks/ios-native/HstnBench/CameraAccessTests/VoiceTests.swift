@@ -149,8 +149,6 @@ final class VoiceCommandParserTests: XCTestCase {
       ("stop", .stop), ("pause", .stop), ("quiet", .stop),
       ("repeat", .repeatLast), ("say that again", .repeatLast),
       ("status", .status), ("what's the status", .status),
-      ("connect", .connect), ("start", .connect),
-      ("take a photo", .takePhoto), ("Take a picture", .takePhoto),
       ("faster", .faster), ("slower", .slower), ("slow down", .slower),
       ("help", .help), ("what can I say", .help),
     ]
@@ -162,7 +160,7 @@ final class VoiceCommandParserTests: XCTestCase {
   func testFillerIsTolerated() {
     XCTAssertEqual(parse("please read this"), .command(.read))
     XCTAssertEqual(parse("Can you read this please"), .command(.read))
-    XCTAssertEqual(parse("could you take a photo for me"), .command(.takePhoto))
+    XCTAssertEqual(parse("could you read this for me"), .command(.read))
     XCTAssertEqual(parse("um stop"), .command(.stop))
     XCTAssertEqual(parse("stop thank you"), .command(.stop))
   }
@@ -213,23 +211,23 @@ final class VoiceCommandParserTests: XCTestCase {
   }
 
   func testCommandsDependOnTheScreen() {
-    let welcome = VoiceContext(screen: .setup(.welcome))
+    let welcome = VoiceContext(screen: .welcome)
+    XCTAssertEqual(parse("connect", welcome), .command(.connect))
     XCTAssertEqual(parse("yes", welcome), .command(.yes))
-    XCTAssertEqual(parse("skip", welcome), .command(.skip))
-    XCTAssertEqual(parse("take a photo", welcome), .ignored(.unavailableHere))
-    XCTAssertEqual(parse("reader take a photo", welcome), .notUnderstood)
+    XCTAssertEqual(parse("try again", welcome), .command(.tryAgain))
+    XCTAssertEqual(parse("continue", welcome), .command(.continueOn))
+    XCTAssertEqual(parse("take a photo", welcome), .ignored(.unrecognized))
+    XCTAssertEqual(parse("read", welcome), .ignored(.unavailableHere))
+    XCTAssertEqual(parse("reader read", welcome), .notUnderstood)
 
-    let speaker = VoiceContext(screen: .setup(.speakerTest))
-    XCTAssertEqual(parse("test the speaker", speaker), .command(.testSpeaker))
-    XCTAssertEqual(parse("no", speaker), .command(.no))
-    XCTAssertEqual(parse("yes", speaker), .command(.yes))
-    XCTAssertEqual(parse("back", speaker), .command(.back))
-    XCTAssertEqual(parse("next", speaker), .command(.continueOn))
-
-    XCTAssertEqual(parse("test the speaker", camera), .ignored(.unavailableHere))
     XCTAssertEqual(parse("yes", camera), .ignored(.unavailableHere))
+    XCTAssertEqual(parse("not now", camera), .ignored(.unavailableHere))
+    XCTAssertEqual(parse("try again", VoiceContext(screen: .home)), .command(.tryAgain))
     XCTAssertEqual(parse("read", VoiceContext(screen: .home)), .ignored(.unavailableHere))
     XCTAssertEqual(parse("connect", VoiceContext(screen: .home)), .command(.connect))
+    // The main screen has no camera steps: reading starts the camera, and photos are gone.
+    XCTAssertEqual(parse("connect", camera), .ignored(.unavailableHere))
+    XCTAssertEqual(parse("take a photo", camera), .ignored(.unrecognized))
 
     XCTAssertEqual(parse("next", camera), .ignored(.unavailableHere))
     XCTAssertEqual(parse("next", VoiceContext(screen: .camera, hasReadSentences: true)), .command(.continueOn))
@@ -237,20 +235,30 @@ final class VoiceCommandParserTests: XCTestCase {
 
   func testHelpListsOnlyWhatIsValidNow() {
     let cameraHelp = VoiceCommandParser.helpLine(context: camera)
-    XCTAssertTrue(cameraHelp.contains("take a photo"))
-    XCTAssertFalse(cameraHelp.contains("test the speaker"))
-    let setupHelp = VoiceCommandParser.helpLine(context: VoiceContext(screen: .setup(.speakerTest)))
-    XCTAssertTrue(setupHelp.contains("test the speaker"))
-    XCTAssertFalse(setupHelp.contains("take a photo"))
+    XCTAssertTrue(cameraHelp.contains("read"))
+    XCTAssertFalse(cameraHelp.contains("connect"))
+    XCTAssertFalse(cameraHelp.contains("not now"))
+    let welcomeHelp = VoiceCommandParser.helpLine(context: VoiceContext(screen: .welcome))
+    XCTAssertTrue(welcomeHelp.contains("connect"))
+    XCTAssertTrue(welcomeHelp.contains("not now"))
+    XCTAssertFalse(welcomeHelp.contains("read,"))
     XCTAssertTrue(VoiceCommandParser.helpLine(context: VoiceContext(screen: .home, requiresWakeWord: true)).hasPrefix("Say reader first"))
   }
 
-  func testEveryStepHasHelpStopAndAWayForward() {
-    for step in OnboardingStep.allCases {
-      let available = VoiceCommandParser.availableCommands(context: VoiceContext(screen: .setup(step)))
-      XCTAssertTrue(available.contains(.help), step.rawValue)
-      XCTAssertTrue(available.contains(.stop), step.rawValue)
-      XCTAssertTrue(available.contains(.continueOn), step.rawValue)
+  /// "Not now" ends in a word that is otherwise filler ("now"), so it has to survive stripping.
+  func testNotNowAndSkipAreUnderstoodOnTheFirstScreen() {
+    let welcome = VoiceContext(screen: .welcome)
+    for phrase in ["not now", "not now please", "please not now", "no thanks", "skip", "skip for now", "maybe later"] {
+      XCTAssertEqual(parse(phrase, welcome), .command(.no), phrase)
+    }
+    XCTAssertEqual(parse("please try again", welcome), .command(.tryAgain))
+    XCTAssertEqual(parse("can you connect my glasses please", welcome), .command(.connect))
+  }
+
+  func testFirstScreenHasHelpStopRepeatAndBothWaysOut() {
+    let available = VoiceCommandParser.availableCommands(context: VoiceContext(screen: .welcome))
+    for command in [VoiceCommand.help, .stop, .repeatLast, .connect, .tryAgain, .no] {
+      XCTAssertTrue(available.contains(command), command.rawValue)
     }
   }
 }
@@ -281,9 +289,6 @@ final class VoiceListenerRuleTests: XCTestCase {
 
   func testPausesAndOffWin() {
     var inputs = allowed
-    inputs.recording = true
-    XCTAssertEqual(VoiceListenerPolicy.decide(inputs), .paused(.recording))
-    inputs = allowed
     inputs.inBackground = true
     XCTAssertEqual(VoiceListenerPolicy.decide(inputs), .paused(.background))
     inputs = allowed
@@ -559,8 +564,8 @@ final class VoiceControlTests: XCTestCase {
     harness.lines = []
     control.inject(transcript: "help")
     XCTAssertEqual(harness.lines.count, 1)
-    XCTAssertTrue(harness.lines[0].contains("take a photo"))
-    XCTAssertEqual(control.availableCommands.contains(.takePhoto), true)
+    XCTAssertTrue(harness.lines[0].contains("read"))
+    XCTAssertEqual(control.availableCommands.contains(.read), true)
   }
 
   func testFasterAndSlowerChangeTheRateWithinLimits() {
@@ -572,23 +577,6 @@ final class VoiceControlTests: XCTestCase {
     harness.lines = []
     control.inject(transcript: "faster")
     XCTAssertEqual(harness.lines, [SpokenMessage.voiceFastest])
-  }
-
-  func testYieldsToRecordingAndComesBackWithACue() {
-    let listener = beginListening()
-    harness.earcons = []
-    control.recordingWillStart()
-    XCTAssertEqual(listener.stops, 1, "must be off before the recorder takes the session")
-    XCTAssertEqual(control.status, .paused)
-    XCTAssertEqual(control.reason, VoicePauseReason.recording.text)
-    XCTAssertNil(control.activeListener)
-
-    control.recordingDidEnd()
-    let resumed = harness.phoneListeners.last!
-    XCTAssertFalse(resumed === listener)
-    resumed.onEvent?(.started)
-    XCTAssertEqual(control.status, .listening)
-    XCTAssertEqual(harness.earcons, [.listening])
   }
 
   func testInterruptionPausesAndResumes() {
@@ -672,14 +660,15 @@ final class VoiceControlTests: XCTestCase {
     XCTAssertEqual(harness.lines, [SpokenMessage.voiceNoOnDeviceRecognition])
   }
 
-  func testSetupDoesNotPromptByItself() {
+  /// The first screen is where "say connect" is first offered, so it explains and asks there too.
+  func testFirstScreenExplainsThenAsks() async {
     harness.phoneMic = .notDetermined
     harness.speech = .notDetermined
     control.begin()
-    control.setScreen(.setup(.welcome)) { _ in false }
-    XCTAssertEqual(harness.requested, 0)
-    XCTAssertEqual(harness.lines, [])
-    XCTAssertEqual(control.status, .unavailable)
+    control.setScreen(.welcome) { _ in false }
+    await settle()
+    XCTAssertEqual(harness.lines.first, SpokenMessage.voiceControlExplanation)
+    XCTAssertEqual(harness.requested, 1)
   }
 
   func testMainScreenExplainsThenAsksThenListens() async {

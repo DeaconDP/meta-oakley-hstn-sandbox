@@ -63,7 +63,7 @@ struct CameraAccessApp: App {
     }
     #endif
 
-    // A test that asks for onboarding gets it from the first step, whatever an earlier run saved.
+    // A test that asks for onboarding gets the first-run screen, whatever an earlier run saved.
     if LaunchOptions.isUITesting, LaunchOptions.forcesOnboarding {
       A11yPreferences.shared.resetOnboarding()
     }

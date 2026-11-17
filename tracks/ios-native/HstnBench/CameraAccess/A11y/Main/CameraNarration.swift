@@ -1,6 +1,6 @@
 /*
- * CameraNarration - wires CameraView's state changes to CameraNarrator, plus the quick actions
- * every camera-screen element offers to VoiceOver
+ * CameraNarration - wires the main screen's state changes to CameraNarrator, plus the quick actions
+ * every main-screen element offers to VoiceOver
  *
  * Kept out of CameraView so the view stays about layout, and so the many onChange handlers don't
  * sit on one long modifier chain.
@@ -26,15 +26,6 @@ struct CameraNarration: ViewModifier {
       }
       .onChange(of: viewModel.batteryLevel) { old, new in
         narrator.batteryChanged(from: old, to: new)
-      }
-      .onChange(of: viewModel.isRecording) { _, new in
-        narrator.recordingChanged(to: new)
-      }
-      .onChange(of: viewModel.includeAudioInStream) { _, new in
-        narrator.micChanged(to: new, isRecording: viewModel.isRecording)
-      }
-      .onChange(of: viewModel.activePreview?.id) { old, _ in
-        narrator.previewChanged(hadPreview: old != nil, to: viewModel.activePreview)
       }
       .onChange(of: viewModel.showError) { _, shown in
         if shown { narrator.errorShown(viewModel) }

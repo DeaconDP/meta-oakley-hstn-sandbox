@@ -120,7 +120,7 @@ final class WearablesViewModel {
   private(set) var connectionNotice: String?
   /// A registration Meta AI started, waiting for the user's Continue or Not now.
   var pendingRegistrationRequest: PendingRegistrationRequest?
-  /// Appended to the next "Connected to …" line, e.g. onboarding's "Setup finished.". One line
+  /// Appended to the next "Connected to …" line, e.g. onboarding's "Hold up a page and say read.". One line
   /// instead of two, so nothing can be spoken out of order or cut between them.
   @ObservationIgnored var connectedFollowUp: String?
 

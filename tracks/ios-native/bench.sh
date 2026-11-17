@@ -1,18 +1,14 @@
 #!/usr/bin/env sh
-# Step-2 benchmark: runs the mock pair -> session -> stream -> photo -> TTS flow N times in the iOS
-# Simulator and prints the HstnBench timing lines. Run on the Mac, from this directory.
+# Step-2 benchmark: runs the mock pair -> Read (session -> stream -> OCR -> speech) flow N times in
+# the iOS Simulator and prints the HstnBench timing lines: session_start, stream_to_first_frame,
+# trigger_to_first_word, ocr, frame_age and read_photo. Run on the Mac, from this directory.
 # Usage: ./bench.sh [runs]
-#        BENCH_READ=1 ./bench.sh [runs]   also runs the "Read it aloud" test each run, adding
-#                                        trigger_to_first_word, ocr, frame_age and read_photo.
 # It uses its own simulator ("HstnBench iPhone 17") so it never touches other booted simulators.
 set -e
 RUNS="${1:-5}"
 SIM_NAME="${SIM_NAME:-HstnBench iPhone 17}"
 DERIVED="${DERIVED:-$HOME/Library/Developer/HstnBench/DerivedData}"
-TESTS="-only-testing:CameraAccessUITests/CameraAccessUITests/testPhotoCaptureAndDismiss"
-if [ "${BENCH_READ:-0}" = "1" ]; then
-  TESTS="$TESTS -only-testing:CameraAccessUITests/ReadAloudUITests/testReadAloud"
-fi
+TESTS="-only-testing:CameraAccessUITests/ReadAloudUITests/testReadAloud"
 FAILS=0
 cd "$(dirname "$0")/HstnBench"
 
@@ -29,7 +25,7 @@ xcodebuild build-for-testing -project CameraAccess.xcodeproj -scheme CameraAcces
 
 SINCE=$(date '+%Y-%m-%d %H:%M:%S')
 # Diagnostics collection (a sysdiagnose) adds about 10 minutes per run, so it's off.
-# Parallel testing runs on throwaway simulator clones, where the photo step fails, so run serially.
+# Parallel testing runs on throwaway simulator clones, where the mock camera fails, so run serially.
 # xcodebuild can leave the simulator shut down, so boot it before every run.
 for i in $(seq 1 "$RUNS"); do
   xcrun simctl bootstatus "$UDID" -b >/dev/null
