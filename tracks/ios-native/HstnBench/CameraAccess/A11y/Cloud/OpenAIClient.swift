@@ -21,6 +21,7 @@
  * The model names and the voice are constants here so they are easy to change.
  */
 
+import AVFoundation
 import Foundation
 
 enum OpenAIError: Error, Equatable, Sendable {
@@ -28,6 +29,8 @@ enum OpenAIError: Error, Equatable, Sendable {
   case unauthorized
   case network
   case rateLimited
+  /// insufficient_quota: the account has no credit. Its own spoken line (readCloudQuota).
+  case quota
   case server
 
   /// For the log. Never includes the key or the response body.
@@ -37,6 +40,7 @@ enum OpenAIError: Error, Equatable, Sendable {
     case .unauthorized: "unauthorized"
     case .network: "network"
     case .rateLimited: "rate_limited"
+    case .quota: "quota"
     case .server: "server"
     }
   }
@@ -53,7 +57,8 @@ enum OpenAIError: Error, Equatable, Sendable {
   static func from(code: String?) -> OpenAIError {
     switch code {
     case "invalid_api_key": .unauthorized
-    case "rate_limit_exceeded", "insufficient_quota": .rateLimited
+    case "rate_limit_exceeded": .rateLimited
+    case "insufficient_quota": .quota
     default: .server
     }
   }
@@ -184,14 +189,43 @@ struct OpenAIClient: Sendable {
     ]
   }
 
-  static func speechBody(text: String) -> [String: Any] {
+  static func speechBody(text: String, speed: Double = 1) -> [String: Any] {
     [
       "model": speechModel,
       "voice": voice,
       "input": text,
       "instructions": speechInstructions,
       "response_format": "pcm",
+      "speed": speed,
     ]
+  }
+
+  /// The speech endpoint's accepted `speed` range.
+  static let speedRange: ClosedRange<Double> = 0.25...4.0
+  /// What "faster" and "slower" reach on the cloud voice: half to double speed.
+  static let slowestSpeed = 0.5
+  static let fastestSpeed = 2.0
+
+  /// The cloud voice's `speed` for the saved AVSpeechUtterance rate, so faster and slower change both
+  /// voices. The default rate is 1.0; the slowest rate is half speed and the fastest double, each
+  /// side linear, so a "faster" step (0.05 of rate) is a tenth faster.
+  static func speechSpeed(
+    forRate rate: Float, defaultRate: Float = AVSpeechUtteranceDefaultSpeechRate,
+    minimumRate: Float = AVSpeechUtteranceMinimumSpeechRate, maximumRate: Float = AVSpeechUtteranceMaximumSpeechRate
+  ) -> Double {
+    let rate = Double(min(max(rate, minimumRate), maximumRate))
+    let base = Double(defaultRate)
+    let speed: Double
+    if rate <= base {
+      let span = base - Double(minimumRate)
+      speed = span > 0 ? slowestSpeed + (1 - slowestSpeed) * (rate - Double(minimumRate)) / span : 1
+    } else {
+      let span = Double(maximumRate) - base
+      speed = span > 0 ? 1 + (fastestSpeed - 1) * (rate - base) / span : 1
+    }
+    let clamped = min(max(speed, speedRange.lowerBound), speedRange.upperBound)
+    // Two decimals: the request body stays readable and equal rates give equal bodies.
+    return (clamped * 100).rounded() / 100
   }
 
   func transcriptionRequest(jpeg: Data) throws -> URLRequest {
@@ -200,8 +234,8 @@ struct OpenAIClient: Sendable {
     return request
   }
 
-  func speechRequest(text: String) throws -> URLRequest {
-    try request(Self.speechURL, body: Self.speechBody(text: text))
+  func speechRequest(text: String, speed: Double = 1) throws -> URLRequest {
+    try request(Self.speechURL, body: Self.speechBody(text: text, speed: speed))
   }
 
   private func request(_ url: URL, body: [String: Any]) throws -> URLRequest {
@@ -258,10 +292,10 @@ struct OpenAIClient: Sendable {
 
   /// Raw PCM (24 kHz, Int16 LE, mono) for `text`, in chunks of about `speechChunkBytes`. A chunk
   /// may end half way through a sample; PCM16Decoder carries the odd byte.
-  func speechPCM(text: String) -> AsyncThrowingStream<Data, any Error> {
+  func speechPCM(text: String, speed: Double = 1) -> AsyncThrowingStream<Data, any Error> {
     let request: URLRequest
     do {
-      request = try speechRequest(text: text)
+      request = try speechRequest(text: text, speed: speed)
     } catch {
       return AsyncThrowingStream { $0.finish(throwing: OpenAIError.mapped(error)) }
     }

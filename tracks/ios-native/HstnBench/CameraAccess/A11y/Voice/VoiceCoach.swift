@@ -305,7 +305,8 @@ extension VoiceCoach.Environment {
     now: { Date() },
     tipsEnabled: { A11yPreferences.shared.voiceTipsEnabled },
     isListening: { VoiceControl.shared.status == .listening },
-    isBusy: { Announcer.shared.isSpeaking || TextReader.shared.isActive },
+    // An alert or question waiting for its answer counts as busy: no tip over it.
+    isBusy: { Announcer.shared.isSpeaking || TextReader.shared.isActive || VoiceControl.shared.activePrompt != nil },
     screen: { VoiceControl.shared.screen },
     lastCommandAt: { VoiceControl.shared.lastCommandAt },
     needsWakeWord: { VoiceControl.shared.needsWakeWord },

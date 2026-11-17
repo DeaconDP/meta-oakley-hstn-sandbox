@@ -28,6 +28,15 @@ enum CameraErrorAction: Equatable, Sendable {
     case .openSettings: "Open Settings"
     }
   }
+
+  /// The spoken answers that take this action while its alert is up ("try again", "yes", ...).
+  /// "OK" and "no" close the alert; "read" closes it and reads.
+  var voiceCommands: [VoiceCommand] {
+    switch self {
+    case .tryAgain, .allowCamera, .openSettings: [.yes, .tryAgain]
+    case .updateGlassesApp: [.yes, .update]
+    }
+  }
 }
 
 struct CameraProblem: Equatable, Sendable {
@@ -84,6 +93,23 @@ struct CameraProblem: Equatable, Sendable {
       return CameraProblem(title: "Meta AI needed", message: SpokenMessage.metaAINotInstalled, action: nil)
     }
     return CameraProblem(title: "Camera access problem", message: fallback(error.localizedDescription), action: .allowCamera)
+  }
+
+  /// Every answer the alert takes by voice: its action's words, plus OK, no and read.
+  static func voiceCommands(for action: CameraErrorAction?) -> [VoiceCommand] {
+    (action?.voiceCommands ?? [.yes, .tryAgain]) + [.ok, .no, .read]
+  }
+
+  /// The alert's sentence with what to say next, for speaking (the alert itself shows the sentence).
+  static func spokenWithHint(message: String, action: CameraErrorAction?) -> String {
+    let hint: String =
+      switch action {
+      case .tryAgain?, .allowCamera?: SpokenMessage.alertSayTryAgain
+      case .openSettings?: SpokenMessage.alertSayYes
+      case .updateGlassesApp?: SpokenMessage.alertSayUpdate
+      case nil: SpokenMessage.alertSayOK
+      }
+    return "\(message) \(hint)"
   }
 
   /// A plain message from the view model (no SDK error), offered with "try again" where useful.

@@ -60,11 +60,14 @@ enum VoicePermission: Equatable, Sendable {
 enum VoicePauseReason: String, Equatable, Sendable {
   case background
   case interrupted
+  /// "Goodbye" was said.
+  case asleep
 
   var text: String {
     switch self {
     case .background: "Paused while the app is in the background."
     case .interrupted: "Paused by a call or another app."
+    case .asleep: SpokenMessage.voiceAsleep
     }
   }
 }
@@ -83,6 +86,8 @@ enum VoiceListenerDecision: Equatable, Sendable {
 enum VoiceListenerPolicy {
   struct Inputs: Equatable, Sendable {
     var enabled = true
+    /// "Goodbye" was said; listening waits for VoiceControl.wake().
+    var asleep = false
     var inBackground = false
     var interrupted = false
     /// A device session is STARTED and Speech is allowed by the feature flag.
@@ -99,6 +104,7 @@ enum VoiceListenerPolicy {
 
   static func decide(_ inputs: Inputs) -> VoiceListenerDecision {
     guard inputs.enabled else { return .off }
+    if inputs.asleep { return .paused(.asleep) }
     if inputs.inBackground { return .paused(.background) }
     if inputs.interrupted { return .paused(.interrupted) }
     if inputs.glassesAvailable, inputs.glassesMicGranted, !inputs.glassesCoolingOff { return .glasses }

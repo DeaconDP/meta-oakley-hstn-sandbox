@@ -17,14 +17,15 @@ enum SpokenMessage {
   /// The core of `disclaimer`, short enough to say on the first screen.
   static let safetyNote = "I can make mistakes, so don't rely on me for medicine doses, money or finding your way."
 
+  /// Voice first: every spoken line leads with what to say. The buttons are on screen for VoiceOver.
   static let welcomeConnect =
-    "First, let's connect your glasses. I'll open the Meta AI app: choose Connect there, then come back. Say connect, or tap Connect glasses."
+    "First, let's connect your glasses. Say connect, and I'll open the Meta AI app. Choose Connect there, then come back."
 
   /// Replay setup with the glasses already connected.
-  static let welcomeAlreadyConnected = "Your glasses are already connected. Say continue, or tap Start reading."
+  static let welcomeAlreadyConnected = "Your glasses are already connected. Say continue to start reading."
 
   /// After the reason a connection didn't finish (WearablesViewModel says that part).
-  static let welcomeRetry = "Your glasses aren't connected yet. Say try again, or tap Try again."
+  static let welcomeRetry = "Your glasses aren't connected yet. Say try again, or not now."
 
   /// Added to "Connected to …" when connecting finishes setup.
   static let connectedNext = "Hold up a page and say read."
@@ -78,9 +79,24 @@ enum SpokenMessage {
 
   /// Meta AI started registration itself and handed it to us (handleUrl(_:onRegistrationRequest:)).
   static let metaAIRegistrationRequest =
-    "Meta AI wants to connect your glasses to this app. Choose Continue to go back to Meta AI and finish, or Not now."
+    "Meta AI wants to connect your glasses to this app. Say yes to finish connecting, or not now."
 
   static let metaAIRegistrationDeclined = "Not connected. You can connect later from this app."
+
+  static let disconnectConfirm = "Disconnect your glasses? Say yes or no."
+
+  static let disconnectKept = "OK, your glasses stay connected."
+
+  static let disconnectNothing = "Your glasses aren't connected to this app, so there's nothing to disconnect."
+
+  // MARK: Alerts by voice
+
+  /// Said after an alert's sentence, so it can be answered without finding its buttons.
+  static let alertSayTryAgain = "Say try again, or OK."
+  static let alertSayYes = "Say yes, or OK."
+  static let alertSayUpdate = "Say update, or not now."
+  static let alertSayConnect = "Say try again, or not now."
+  static let alertSayOK = "Say OK to close this."
 
   // MARK: Updates
 
@@ -92,11 +108,11 @@ enum SpokenMessage {
     "Meta AI needs to update this app on your glasses. This opens the Meta AI app."
 
   static func firmwareUpdateNeeded(deviceName: String) -> String {
-    "\(deviceName) needs an update to work with this app. Update opens the Meta AI app."
+    "\(deviceName) needs an update to work with this app. Say update to open the Meta AI app."
   }
 
   static let glassesAppUpdateNeeded =
-    "Meta AI needs to update this app on your glasses. Update opens the Meta AI app."
+    "Meta AI needs to update this app on your glasses. Say update to open the Meta AI app."
 
   /// Compatibility.sdkUpdateRequired: the toolkit inside this app is too old for the glasses.
   static let appUpdateRequired = "This app needs an update to work with your glasses."
@@ -144,7 +160,7 @@ enum SpokenMessage {
 
   static let stopping = "Stopping."
 
-  static let firmwareUpdateNeeded = "Your glasses need an update. Use Update firmware to open the Meta AI app."
+  static let firmwareUpdateNeeded = "Your glasses need an update. Say update to open the Meta AI app."
 
   static let cameraOn = "Camera on. Ready to read."
 
@@ -157,6 +173,12 @@ enum SpokenMessage {
   /// Spoken (or shown) before the app sends the user to Meta AI for camera access.
   static let cameraPermissionBeforeRedirect =
     "To use the glasses camera, you'll switch to the Meta AI app to allow it, then come back here. Choose Allow always, otherwise you'll be sent to Meta AI each time."
+
+  /// Spoken after cameraPermissionBeforeRedirect while the prompt is up (the alert shows only that).
+  static let cameraPermissionSayYes = "Say yes to go on, or not now."
+
+  /// A read was asked for while the camera prompt is still up.
+  static let cameraPermissionWaiting = "Camera access is still waiting for you. Say yes to allow it in Meta AI, or not now."
 
   static let cameraPermissionGranted = "Camera access allowed."
 

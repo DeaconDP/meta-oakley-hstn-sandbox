@@ -9,7 +9,7 @@ import SwiftUI
 
 extension View {
   /// A big soft card with an outline that reaches 3:1 against the page.
-  func themeCard(padding: CGFloat = 16) -> some View {
+  func themeCard(padding: CGFloat = Theme.Space.lg) -> some View {
     modifier(ThemeCard(padding: padding))
   }
 }
@@ -25,7 +25,7 @@ private struct ThemeCard: ViewModifier {
       .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
       .overlay {
         RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-          .strokeBorder(Theme.stroke, lineWidth: contrast == .increased ? 3 : 2)
+          .strokeBorder(Theme.stroke, lineWidth: contrast == .increased ? Theme.outlineWidthIncreased : Theme.outlineWidth)
       }
   }
 }
@@ -44,17 +44,25 @@ struct MascotSays<Content: View>: View {
 
   var body: some View {
     let stacked = dynamicTypeSize.isAccessibilitySize
-    let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(alignment: .top, spacing: 2))
+    let layout = stacked
+      ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Space.xs))
+      : AnyLayout(HStackLayout(alignment: .top, spacing: Theme.Space.xxs))
     layout {
-      Mascot(mood: mood)
-        .frame(width: mascotSize, height: mascotSize)
-      VStack(alignment: .leading, spacing: 8) { content }
-        .padding(14)
+      // A mood change crossfades with the shared state-change motion (none under Reduce Motion).
+      ZStack {
+        Mascot(mood: mood)
+          .id(mood)
+          .transition(.opacity)
+      }
+      .frame(width: mascotSize, height: mascotSize)
+      .stateAnimation(value: mood)
+      VStack(alignment: .leading, spacing: Theme.Space.xs) { content }
+        .padding(Theme.Space.md)
         // The tail takes this much of the shape's width.
-        .padding(.leading, stacked ? 0 : 12)
+        .padding(.leading, stacked ? 0 : SpeechBubbleShape.tailWidth)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { SpeechBubbleShape(tail: !stacked).fill(Theme.surface) }
-        .overlay { SpeechBubbleShape(tail: !stacked).stroke(Theme.stroke, lineWidth: contrast == .increased ? 3 : 2) }
+        .overlay { SpeechBubbleShape(tail: !stacked).stroke(Theme.stroke, lineWidth: contrast == .increased ? Theme.outlineWidthIncreased : Theme.outlineWidth) }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
@@ -70,9 +78,11 @@ extension MascotSays where Content == A11yNote {
 struct SpeechBubbleShape: Shape {
   var tail = true
 
+  static let tailWidth: CGFloat = Theme.Space.sm
+
   func path(in rect: CGRect) -> Path {
-    let radius: CGFloat = 20
-    let tailWidth: CGFloat = tail ? 12 : 0
+    let radius = Theme.Radius.lg
+    let tailWidth: CGFloat = tail ? Self.tailWidth : 0
     let body = CGRect(x: rect.minX + tailWidth, y: rect.minY, width: rect.width - tailWidth, height: rect.height)
     var path = Path(roundedRect: body, cornerRadius: radius, style: .continuous)
     if tail {
@@ -103,28 +113,29 @@ struct LessonPage<Content: View, Footer: View>: View {
     // Above the footer, not under it: nothing is ever hidden behind a pinned button.
     VStack(spacing: 0) {
       ScrollView {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: Theme.Space.lg) {
           content
           if !pinsFooter {
-            VStack(spacing: 12) { footer }
+            VStack(spacing: Theme.Space.sm) { footer }
           }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(maxWidth: 700, alignment: .leading)
+        .padding(.horizontal, Theme.Space.lg)
+        .padding(.top, Theme.Space.lg)
+        .padding(.bottom, Theme.Space.xl)
+        .frame(maxWidth: Theme.maxContentWidth, alignment: .leading)
         .frame(maxWidth: .infinity)
       }
       .scrollBounceBehavior(.basedOnSize)
       if pinsFooter {
         Rectangle()
           .fill(Theme.stroke)
-          .frame(height: contrast == .increased ? 3 : 2)
+          .frame(height: contrast == .increased ? Theme.outlineWidthIncreased : Theme.outlineWidth)
           .accessibilityHidden(true)
-        VStack(spacing: 10) { footer }
-          .padding(.horizontal, 20)
-          .padding(.top, 12)
-          .padding(.bottom, 8)
-          .frame(maxWidth: 700)
+        VStack(spacing: Theme.Space.sm) { footer }
+          .padding(.horizontal, Theme.Space.lg)
+          .padding(.top, Theme.Space.md)
+          .padding(.bottom, Theme.Space.xs)
+          .frame(maxWidth: Theme.maxContentWidth)
           .frame(maxWidth: .infinity)
       }
     }
@@ -152,7 +163,9 @@ struct PathTileLabel: View {
   var body: some View {
     let stacked = dynamicTypeSize.isAccessibilitySize
     let size = min(coinSize * (isBig ? 1.35 : 1), 96)
-    let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 14))
+    let layout = stacked
+      ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Space.xs))
+      : AnyLayout(HStackLayout(spacing: Theme.Space.md))
     layout {
       TileCoin(icon: isEnabled ? icon : "lock.fill", tone: isEnabled ? coin : .neutral, size: size)
       VStack(alignment: .leading, spacing: 2) {
@@ -180,7 +193,7 @@ struct PathTileLabel: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .padding(.vertical, isBig ? 6 : 2)
+    .padding(.vertical, isBig ? Theme.Space.xs : Theme.Space.xxs)
     .frame(maxWidth: .infinity, alignment: .leading)
     // The button it's in has the name, hint and value. This adds no second element inside it.
     .accessibilityHidden(true)

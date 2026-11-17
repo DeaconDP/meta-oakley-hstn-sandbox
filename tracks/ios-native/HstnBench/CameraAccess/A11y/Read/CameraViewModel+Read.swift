@@ -10,7 +10,9 @@
 extension CameraViewModel: ReadFrameSource {
   func prepareStreamForReading() -> ReadStreamReadiness {
     if isStreaming { return .ready }
-    if showError || showCameraPermissionRedirectConfirm { return .blocked }
+    // The question is still open: ask it again rather than end the read in silence.
+    if showCameraPermissionRedirectConfirm { return .blocked(SpokenMessage.cameraPermissionWaiting) }
+    if showError { return .blocked(CameraProblem.spokenWithHint(message: errorMessage, action: errorAction)) }
     if isPaused { return .unavailable(statusLine()) }
     if isBusy || isStreamStartInFlight { return .starting }
     if isSessionActive, !hasStream {

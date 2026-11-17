@@ -5,6 +5,9 @@
  * voice (AppVoice), including with VoiceOver running, unless the user opts to follow VoiceOver's;
  * voice control on; spoken tips on; earcons on; normal verbosity; the system default speech rate; and
  * the natural (OpenAI) reading voice whenever a key is set (CloudReading).
+ *
+ * Verbosity is changed by voice ("shorter", "more detail", see SpokenSettings) and shapes reading
+ * guidance, the end-of-text line and the spoken tips.
  */
 
 import AVFoundation
@@ -22,6 +25,24 @@ enum Verbosity: String, CaseIterable, Identifiable, Sendable {
     case .short: "Short"
     case .normal: "Normal"
     case .detailed: "Detailed"
+    }
+  }
+
+  /// One step less detail ("shorter"), nil at the shortest.
+  var shorter: Verbosity? {
+    switch self {
+    case .short: nil
+    case .normal: .short
+    case .detailed: .normal
+    }
+  }
+
+  /// One step more detail ("more detail"), nil at the most.
+  var longer: Verbosity? {
+    switch self {
+    case .short: .normal
+    case .normal: .detailed
+    case .detailed: nil
     }
   }
 }
@@ -49,6 +70,8 @@ final class A11yPreferences {
     static let voiceTipsEnabled = "a11y.voiceTipsEnabled"
     static let voiceTipsHeard = "a11y.voiceTipsHeard"
     static let useNaturalVoice = "a11y.useNaturalVoice"
+    static let interruptTipHeard = "a11y.interruptTipHeard"
+    static let glassesMicOffered = "a11y.glassesMicOffered"
   }
 
   @ObservationIgnored private let defaults: UserDefaults
@@ -126,6 +149,16 @@ final class A11yPreferences {
     didSet { defaults.set(useNaturalVoice, forKey: Key.useNaturalVoice) }
   }
 
+  /// "To interrupt me, say reader, stop." has been heard to the end, before the first read ever.
+  var interruptTipHeard: Bool {
+    didSet { defaults.set(interruptTipHeard, forKey: Key.interruptTipHeard) }
+  }
+
+  /// The first camera session's "Want me to listen through your glasses?" has been asked.
+  var glassesMicOffered: Bool {
+    didSet { defaults.set(glassesMicOffered, forKey: Key.glassesMicOffered) }
+  }
+
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
     verbosity = defaults.string(forKey: Key.verbosity).flatMap(Verbosity.init(rawValue:)) ?? .normal
@@ -142,6 +175,8 @@ final class A11yPreferences {
     voiceTipsEnabled = defaults.object(forKey: Key.voiceTipsEnabled) as? Bool ?? true
     voiceTipsHeard = defaults.dictionary(forKey: Key.voiceTipsHeard) as? [String: Int] ?? [:]
     useNaturalVoice = defaults.object(forKey: Key.useNaturalVoice) as? Bool ?? true
+    interruptTipHeard = defaults.bool(forKey: Key.interruptTipHeard)
+    glassesMicOffered = defaults.bool(forKey: Key.glassesMicOffered)
   }
 
   /// Starts onboarding over, e.g. "replay setup" in Settings. The disclaimer is part of

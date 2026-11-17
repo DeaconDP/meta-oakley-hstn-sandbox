@@ -136,11 +136,13 @@ final class CameraNarrator {
 
   func errorShown(_ viewModel: CameraViewModel) {
     earcons.stopWorkingTick(owner: Self.tickOwner)
-    speakUnlessVoiceOver(viewModel.errorMessage, earcon: .error)
+    // With what to say next: the alert can be answered by voice (CameraVoicePrompts).
+    speakUnlessVoiceOver(CameraProblem.spokenWithHint(message: viewModel.errorMessage, action: viewModel.errorAction), earcon: .error)
   }
 
   func cameraPermissionPromptShown() {
-    speakUnlessVoiceOver(SpokenMessage.cameraPermissionBeforeRedirect, earcon: .attention)
+    speakUnlessVoiceOver(
+      "\(SpokenMessage.cameraPermissionBeforeRedirect) \(SpokenMessage.cameraPermissionSayYes)", earcon: .attention)
   }
 
   func cameraPermissionPromptCancelled() {

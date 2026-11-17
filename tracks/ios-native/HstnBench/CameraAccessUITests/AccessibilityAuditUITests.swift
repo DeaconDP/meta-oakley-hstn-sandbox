@@ -183,7 +183,9 @@ final class AccessibilityAuditUITests: XCTestCase {
 
   private func launch(extraArguments: [String] = []) {
     // --ui-testing swaps in the mock device kit, so no real glasses or Meta AI are involved.
-    app.launchArguments = ["--ui-testing"] + extraArguments
+    // The app is dark-first, so the tests without --dark-mode ask for light to keep both covered.
+    let theme = extraArguments.contains("--dark-mode") ? [] : ["--light-mode"]
+    app.launchArguments = ["--ui-testing"] + theme + extraArguments
     app.launchEnvironment["MWDAT_TEST_SERVER_PORT_FILE"] = portFilePath
     app.launch()
     XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), "App should reach the foreground")

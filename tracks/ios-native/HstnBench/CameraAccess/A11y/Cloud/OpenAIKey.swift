@@ -102,6 +102,9 @@ final class CloudReading {
   private(set) var hasStoredKey = false
   /// Some key is usable, stored or bundled.
   private(set) var hasKey = false
+  /// OpenAI refused the key this session, so reading stays on the phone (no failure per page)
+  /// until a new key is saved or the app restarts.
+  private(set) var keyRefused = false
 
   @ObservationIgnored private let store: any OpenAIKeyStore
   @ObservationIgnored private let infoDictionary: [String: Any]?
@@ -125,22 +128,29 @@ final class CloudReading {
     hasKey && preferences.useNaturalVoice && !LaunchOptions.isAutomatedTest
   }
 
-  /// A client for this read, or nil when the cloud path is off.
+  /// A client for this read, or nil when the cloud path is off or the key was refused.
   func client() -> OpenAIClient? {
-    guard isEnabled, let key else { return nil }
+    guard isEnabled, !keyRefused, let key else { return nil }
     return OpenAIClient(apiKey: key)
+  }
+
+  /// The service answered "unauthorized": don't try the cloud again this session.
+  func noteKeyRefused() {
+    keyRefused = true
   }
 
   /// Saves a pasted key. False if it was empty or the Keychain refused it.
   @discardableResult
   func saveKey(_ raw: String) -> Bool {
     guard let key = OpenAIKey.normalized(raw), store.saveKey(key) else { return false }
+    keyRefused = false
     reload()
     return true
   }
 
   func removeKey() {
     store.deleteKey()
+    keyRefused = false
     reload()
   }
 

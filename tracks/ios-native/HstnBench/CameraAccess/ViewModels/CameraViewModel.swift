@@ -213,11 +213,16 @@ final class CameraViewModel {
 
   /// Confirmed from the permission prompt: requests camera access — this opens the
   /// Meta AI app and resumes when the user returns — then starts the stream if
-  /// access was granted. `then` runs once "Camera access allowed" has been heard to the end
-  /// (the main screen reads, so the Read that asked for permission carries on by itself).
+  /// access was granted. `then` runs once "Camera access allowed" has ended (the main screen
+  /// reads, so the Read that asked for permission carries on by itself). Heard to the end or cut
+  /// short, it runs either way: a cut line (the Local Network dialog, a route change) used to drop
+  /// the read silently while the stream started anyway.
   func confirmCameraPermissionRedirect(then: (@MainActor () -> Void)? = nil) async {
     showCameraPermissionRedirectConfirm = false
-    guard let session = deviceSession, session.state == .started, camera == nil else { return }
+    guard let session = deviceSession, session.state == .started, camera == nil else {
+      benchClock.note("camera permission confirm skipped: no started session, or a camera already")
+      return
+    }
     do {
       let status = try await wearables.requestPermission(.camera)
       cameraPermission = status
@@ -230,8 +235,9 @@ final class CameraViewModel {
       return
     }
     // Back from Meta AI: say the result before the camera's own "starting" lines.
-    Announcer.shared.announce(SpokenMessage.cameraPermissionGranted, earcon: .done) { finished in
-      if finished { then?() }
+    Announcer.shared.announce(SpokenMessage.cameraPermissionGranted, earcon: .done) { [benchClock] finished in
+      benchClock.note("camera permission granted, line finished=\(finished)")
+      then?()
     }
     beginStream(on: session)
   }
@@ -420,6 +426,7 @@ final class CameraViewModel {
   }
 
   private func handleSessionStateChange(_ state: DeviceSessionState) {
+    benchClock.note("camera session state=\(state)")
     sessionState = state
     if state == .started {
       benchClock.end("session_start")
@@ -483,6 +490,7 @@ final class CameraViewModel {
   }
 
   private func handleStreamStateChange(_ state: StreamState) {
+    benchClock.note("camera stream state=\(state)")
     streamState = state
     if state == .stopped {
       // Terminal: covers both a stop we asked for and SDK auto-stop (disconnect, error, session end).
@@ -533,6 +541,7 @@ final class CameraViewModel {
   }
 
   private func showError(_ problem: CameraProblem) {
+    benchClock.note("camera error title=\(problem.title)")
     errorTitle = problem.title
     errorMessage = problem.message
     errorAction = problem.action

@@ -5,7 +5,8 @@
  * Device Kit. Attachments are kept in the result bundle: `xcrun xcresulttool export attachments`.
  * It also proves the whole path can be walked in each of those: every tap below has to land.
  *
- * Launch flags, all only with --ui-testing: --dark-mode forces dark, --preview-listening shows "Listening" and the "Say ..."
+ * Launch flags, all only with --ui-testing: --dark-mode forces dark and --light-mode light (the app is
+ * dark-first otherwise), --preview-listening shows "Listening" and the "Say ..."
  * hints (nothing listens in a UI test), and --high-contrast draws the Increase Contrast palette.
  */
 
@@ -43,7 +44,7 @@ final class ThemeTourUITests: XCTestCase {
   // MARK: - Tours
 
   func testTourLight() async throws {
-    try await tour("light", extra: [])
+    try await tour("light", extra: ["--light-mode"])
   }
 
   func testTourDark() async throws {
@@ -51,11 +52,11 @@ final class ThemeTourUITests: XCTestCase {
   }
 
   func testTourIncreaseContrastPalette() async throws {
-    try await tour("contrast", extra: ["--high-contrast"])
+    try await tour("contrast", extra: ["--light-mode", "--high-contrast"])
   }
 
   func testTourLargestText() async throws {
-    try await tour("ax", extra: Self.largestText)
+    try await tour("ax", extra: ["--light-mode"] + Self.largestText)
   }
 
   func testTourDarkLargestText() async throws {
@@ -87,9 +88,14 @@ final class ThemeTourUITests: XCTestCase {
 
     tap("settings_button", before: nil)
     XCTAssertTrue(app.buttons["voice_control_toggle"].waitForExistence(timeout: 5))
-    shot("04-settings", scrolled: true)
-    scrollToTop()
-    tap("settings_button", before: nil)
+    // Not `scrolled:`: its swipes back to the top would pull the sheet down.
+    shot("04-settings")
+    app.swipeUp(velocity: .slow)
+    shot("04-settings-scrolled", settle: 0.5)
+    app.swipeUp(velocity: .slow)
+    shot("04-settings-scrolled2", settle: 0.5)
+    // Settings is a sheet over the main screen: Done closes it.
+    tap("settings_done_button", before: nil)
 
     let paired = await client.pairDevice()
     let deviceId = try XCTUnwrap(paired)
@@ -110,8 +116,10 @@ final class ThemeTourUITests: XCTestCase {
     if allow.waitForExistence(timeout: 15) { allow.tap() }
     let springboardAllow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow"]
     if springboardAllow.waitForExistence(timeout: 5) { springboardAllow.tap() }
-    XCTAssertTrue(app.staticTexts["read_sentence"].waitForExistence(timeout: 25))
+    // The card is worth seeing even when the read falls back to guidance, so the shot comes first.
+    let sentenceShown = app.staticTexts["read_sentence"].waitForExistence(timeout: 25)
     attach("06-reading")
+    XCTAssertTrue(sentenceShown)
 
     let status = app.staticTexts["read_status"]
     let deadline = Date().addingTimeInterval(90)
