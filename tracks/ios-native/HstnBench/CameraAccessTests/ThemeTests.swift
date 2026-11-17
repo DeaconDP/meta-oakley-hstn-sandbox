@@ -40,6 +40,40 @@ final class ThemePaletteTests: XCTestCase {
     XCTAssertEqual(ThemePalette.dark.surface, ThemeRGB(0x1E1A3D), "Dusk")
     XCTAssertEqual(ThemePalette.dark.listen, ThemeRGB(0x3DD9EB), "Listen Cyan")
     XCTAssertEqual(ThemePalette.dark.speak, ThemeRGB(0xFF6B5B), "Voice Coral")
+    // tokens.json role.light.outline / role.dark.outline: Night in light, Paper in dark.
+    XCTAssertEqual(ThemePalette.light.stroke, ThemeRGB(0x0B0B1A), "Outline is Night in light mode")
+    XCTAssertEqual(ThemePalette.dark.stroke, ThemeRGB(0xFFF8E7), "Outline is Paper in dark mode")
+  }
+
+  func testTypeScaleFollowsTheBrand() {
+    // tokens.json type.scale: body and label 20, caption 18 (the minimum), body large 22.
+    XCTAssertEqual(BrandFont.baseSize(.body), 20)
+    XCTAssertEqual(BrandFont.baseSize(.headline), 20)
+    XCTAssertEqual(BrandFont.baseSize(.callout), 20)
+    XCTAssertEqual(BrandFont.baseSize(.title2), 22)
+    XCTAssertEqual(BrandFont.baseSize(.title), 26)
+    XCTAssertEqual(BrandFont.baseSize(.largeTitle), 34)
+    for style in [Font.TextStyle.subheadline, .footnote, .caption, .caption2] {
+      XCTAssertEqual(BrandFont.baseSize(style), 18, "Nothing below the 18 pt caption")
+    }
+  }
+
+  func testLayoutTokensMatchTheBrand() {
+    XCTAssertEqual(
+      [Theme.Space.xxs, Theme.Space.xs, Theme.Space.sm, Theme.Space.md, Theme.Space.lg, Theme.Space.xl], [4, 8, 12, 16, 24, 32])
+    XCTAssertEqual([Theme.Radius.sm, Theme.Radius.md, Theme.Radius.lg, Theme.Radius.xl], [8, 16, 24, 32])
+    XCTAssertEqual(Theme.primaryButtonHeight, 72)
+  }
+
+  func testRibbonColoursReachThreeToOne() {
+    // The ribbon is decoration (the words carry the state) but still meets the non-text minimum.
+    for palette in ThemePalette.all {
+      let idle = palette.isDark ? palette.yellow.face : palette.yellow.lip
+      for background in [palette.page, palette.surface] {
+        assertContrast(idle, background, atLeast: 3, "idle ribbon", in: palette)
+        assertContrast(palette.ink, background, atLeast: 3, "working ribbon", in: palette)
+      }
+    }
   }
 
   func testTextMeetsItsMinimumInEveryVariant() {
@@ -149,6 +183,23 @@ final class VoiceIndicatorModelTests: XCTestCase {
     XCTAssertEqual(model(.unavailable, reason: "Waiting").signal, .warning)
     XCTAssertEqual(model(.off).signal, .quiet)
     XCTAssertEqual(model(.paused, reason: "Paused by a call or another app.").signal, .quiet)
+  }
+
+  func testReaderWorkShowsWorkingNotListening() {
+    let working = VoiceIndicatorModel.make(
+      status: .listening, reason: nil, listener: .phone, micPermission: .granted, speechPermission: .granted,
+      isSpeaking: false, heard: nil, canPrompt: true, isWorking: true, workDetail: "Finding text")
+    XCTAssertEqual(working.title, "Working on it")
+    XCTAssertEqual(working.detail, "Finding text")
+    XCTAssertEqual(working.signal, .working)
+    XCTAssertEqual(working.ribbon, .thinking)
+  }
+
+  func testRibbonStates() {
+    XCTAssertEqual(model(.listening).ribbon, .listening)
+    XCTAssertEqual(model(.listening, speaking: true).ribbon, .speaking)
+    XCTAssertEqual(model(.unavailable, reason: "Waiting").ribbon, .error)
+    XCTAssertEqual(model(.off).ribbon, .idle)
   }
 
   func testOffOffersTurningItBackOn() {

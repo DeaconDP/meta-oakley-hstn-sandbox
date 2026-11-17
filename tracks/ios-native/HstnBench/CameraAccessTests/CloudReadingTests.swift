@@ -6,6 +6,7 @@
  * No network: requests are built and inspected, never sent.
  */
 
+import AVFoundation
 @testable import CameraAccess
 import Foundation
 // ast-grep-ignore: swift-testing/swift/no-new-xctest
@@ -296,6 +297,34 @@ final class OpenAIRequestTests: XCTestCase {
     XCTAssertFalse((body["instructions"] as? String ?? "").isEmpty)
   }
 
+  func testSpeechRequestSendsTheSpeed() throws {
+    let body = try json(OpenAIClient(apiKey: "test-key").speechRequest(text: "Hi.", speed: 1.3).httpBody)
+    XCTAssertEqual(body["speed"] as? Double, 1.3)
+    let plain = try json(OpenAIClient(apiKey: "test-key").speechRequest(text: "Hi.").httpBody)
+    XCTAssertEqual(plain["speed"] as? Double, 1.0)
+  }
+
+  /// Faster and slower move the cloud voice too: the default rate is 1.0, the ends are half and
+  /// double speed, always inside what OpenAI accepts.
+  func testSpeedFollowsTheSavedRate() {
+    let base = AVSpeechUtteranceDefaultSpeechRate
+    XCTAssertEqual(OpenAIClient.speechSpeed(forRate: base), 1.0)
+    XCTAssertEqual(OpenAIClient.speechSpeed(forRate: AVSpeechUtteranceMinimumSpeechRate), 0.5)
+    XCTAssertEqual(OpenAIClient.speechSpeed(forRate: AVSpeechUtteranceMaximumSpeechRate), 2.0)
+    XCTAssertEqual(OpenAIClient.speechSpeed(forRate: base + 0.05), 1.1, accuracy: 0.001)
+    XCTAssertEqual(OpenAIClient.speechSpeed(forRate: base - 0.05), 0.95, accuracy: 0.001)
+    // Out of range is clamped, and the order is kept.
+    XCTAssertEqual(OpenAIClient.speechSpeed(forRate: -1), 0.5)
+    XCTAssertEqual(OpenAIClient.speechSpeed(forRate: 5), 2.0)
+    var last = 0.0
+    for step in 0...20 {
+      let speed = OpenAIClient.speechSpeed(forRate: Float(step) / 20)
+      XCTAssertGreaterThanOrEqual(speed, last)
+      XCTAssertTrue(OpenAIClient.speedRange.contains(speed))
+      last = speed
+    }
+  }
+
   func testEmptyKeyIsRefused() {
     XCTAssertThrowsError(try OpenAIClient(apiKey: " ").speechRequest(text: "Hi")) { error in
       XCTAssertEqual(error as? OpenAIError, .noKey)
@@ -304,7 +333,11 @@ final class OpenAIRequestTests: XCTestCase {
 
   func testStatusAndErrorMapping() {
     XCTAssertEqual(OpenAIError.from(status: 401), .unauthorized)
-    XCTAssertEqual(OpenAIError.from(status: 403), .unauthorized)
+    // 403 alone is not a refused key (a region or model not allowed); with invalid_api_key it is.
+    XCTAssertEqual(OpenAIError.from(status: 403), .server)
+    XCTAssertEqual(OpenAIError.from(status: 403, code: "invalid_api_key"), .unauthorized)
+    XCTAssertEqual(OpenAIError.from(status: 403, code: nil), .server)
+    XCTAssertEqual(OpenAIError.from(status: 429, code: "insufficient_quota"), .quota)
     XCTAssertEqual(OpenAIError.from(status: 429), .rateLimited)
     XCTAssertEqual(OpenAIError.from(status: 500), .server)
     XCTAssertEqual(OpenAIError.from(status: 400), .server)
@@ -312,6 +345,76 @@ final class OpenAIRequestTests: XCTestCase {
     XCTAssertEqual(OpenAIError.mapped(URLError(.notConnectedToInternet)) as? OpenAIError, .network)
     XCTAssertTrue(OpenAIError.mapped(URLError(.cancelled)) is CancellationError)
     XCTAssertTrue(OpenAIError.mapped(CancellationError()) is CancellationError)
+    XCTAssertEqual(OpenAIError.from(code: "insufficient_quota"), .quota)
+    XCTAssertEqual(OpenAIError.from(code: "rate_limit_exceeded"), .rateLimited)
+    XCTAssertEqual(OpenAIError.from(code: "invalid_api_key"), .unauthorized)
+  }
+
+  /// Each failure says what happened; only "couldn't reach" is the general line.
+  func testEachCloudFailureHasItsLine() {
+    XCTAssertEqual(
+      SpokenMessage.readCloudFallback(for: .unauthorized),
+      "The reading service didn't accept the key. Reading on the phone for now; set a new key in Settings.")
+    XCTAssertEqual(SpokenMessage.readCloudFallback(for: .quota), SpokenMessage.readCloudQuota)
+    XCTAssertEqual(SpokenMessage.readCloudFallback(for: .rateLimited), SpokenMessage.readCloudBusy)
+    XCTAssertEqual(SpokenMessage.readCloudFallback(for: .network), SpokenMessage.readCloudFallback)
+    XCTAssertEqual(SpokenMessage.readCloudFallback(for: .server), SpokenMessage.readCloudFallback)
+    XCTAssertEqual(SpokenMessage.readCloudFallback(for: nil), SpokenMessage.readCloudFallback)
+    let lines = Set([OpenAIError.unauthorized, .quota, .rateLimited, .network].map { SpokenMessage.readCloudFallback(for: $0) })
+    XCTAssertEqual(lines.count, 4)
+  }
+}
+
+@MainActor
+final class CloudKeyRefusalTests: XCTestCase {
+  private func reading(_ key: String = "sk-pasted") throws -> (CloudReading, () -> Void) {
+    let suiteName = "CloudKeyRefusal.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    let reading = CloudReading(store: MemoryKeyStore(key), infoDictionary: [:], preferences: A11yPreferences(defaults: defaults))
+    return (reading, { defaults.removePersistentDomain(forName: suiteName) })
+  }
+
+  /// A refused key stops the cloud for the session; a new key starts it again.
+  func testARefusedKeyIsNotTriedAgainUntilANewOneIsSaved() throws {
+    let (reading, cleanUp) = try reading()
+    defer { cleanUp() }
+    XCTAssertFalse(reading.keyRefused)
+    TextReader.noteCloudFailure(.network, cloud: reading)
+    TextReader.noteCloudFailure(.quota, cloud: reading)
+    XCTAssertFalse(reading.keyRefused, "only a refused key stops the cloud")
+    TextReader.noteCloudFailure(.unauthorized, cloud: reading)
+    XCTAssertTrue(reading.keyRefused)
+    XCTAssertNil(reading.client())
+    XCTAssertTrue(reading.saveKey("sk-new"))
+    XCTAssertFalse(reading.keyRefused)
+  }
+
+  func testRemovingTheKeyClearsTheRefusal() throws {
+    let (reading, cleanUp) = try reading()
+    defer { cleanUp() }
+    reading.noteKeyRefused()
+    reading.removeKey()
+    XCTAssertFalse(reading.keyRefused)
+  }
+}
+
+/// After stop, "continue" starts the stopped sentence again instead of skipping it; "resume" carries
+/// on; neither does anything odd at the end or with nothing read.
+@MainActor
+final class ReadResumeTests: XCTestCase {
+  func testContinueAfterStopRestartsTheSentence() {
+    XCTAssertEqual(TextReader.continueStep(phase: .stopped, hasSentences: true), .restartCurrent)
+    XCTAssertEqual(TextReader.continueStep(phase: .reading, hasSentences: true), .next)
+    XCTAssertEqual(TextReader.continueStep(phase: .finished, hasSentences: true), .next)
+    XCTAssertEqual(TextReader.continueStep(phase: .idle, hasSentences: false), .sayNothingRead)
+  }
+
+  func testResume() {
+    XCTAssertEqual(TextReader.resumeStep(phase: .stopped, hasSentences: true), .restartCurrent)
+    XCTAssertEqual(TextReader.resumeStep(phase: .reading, hasSentences: true), .keepGoing)
+    XCTAssertEqual(TextReader.resumeStep(phase: .preparing, hasSentences: true), .keepGoing)
+    XCTAssertEqual(TextReader.resumeStep(phase: .finished, hasSentences: true), .sayAtEnd)
+    XCTAssertEqual(TextReader.resumeStep(phase: .stopped, hasSentences: false), .sayNothingRead)
   }
 }
 

@@ -30,6 +30,8 @@ import os
 @MainActor
 final class CloudSpeechClip {
   let text: String
+  /// The `speed` it was fetched at (OpenAIClient.speechSpeed), so a rate change fetches it again.
+  let speed: Double
   private(set) var chunks: [[Float]] = []
   private(set) var sampleCount = 0
   private(set) var isComplete = false
@@ -40,9 +42,10 @@ final class CloudSpeechClip {
   private var decoder = PCM16Decoder()
   private var task: Task<Void, Never>?
 
-  init(text: String, client: OpenAIClient) {
+  init(text: String, client: OpenAIClient, speed: Double = 1) {
     self.text = text
-    let stream = client.speechPCM(text: text)
+    self.speed = speed
+    let stream = client.speechPCM(text: text, speed: speed)
     task = Task { [weak self] in
       do {
         for try await data in stream {

@@ -51,8 +51,9 @@ enum ReadStreamReadiness: Equatable {
   case ready
   /// A start is in flight (or was just requested); keep waiting.
   case starting
-  /// An error or a prompt is up; the camera screen is already saying it.
-  case blocked
+  /// An error or a prompt is up. The line says it again (a read asked for behind it would otherwise
+  /// end in silence); nil if the screen is already saying it.
+  case blocked(String?)
   /// Can't start from here; the reason is the spoken status line.
   case unavailable(String)
 }
@@ -134,6 +135,16 @@ final class TextReader {
   // Cloud reading. `generation` changes with every navigation, but the transcription keeps
   // streaming across next/previous, so it checks `readID` (bumped by read() and stop()) instead.
   @ObservationIgnored private var readID = 0
+
+  /// Changes with every read() and stop(). A deferred "carry on reading" (after the camera
+  /// permission line) checks it hasn't changed, so it never follows a stop or another read.
+  var readToken: Int { readID }
+
+  /// "Stop" with nothing being read: a read still waiting to carry on (behind the camera
+  /// permission line) mustn't start afterwards.
+  func cancelPendingRead() {
+    readID += 1
+  }
   /// Non-nil while the current sentences are spoken with the cloud voice.
   @ObservationIgnored private var cloudClient: OpenAIClient?
   /// Each sentence's cloud audio, fetched once: the next one ahead of time, kept for repeats.
@@ -177,12 +188,17 @@ final class TextReader {
   /// Read what the glasses see. Interrupts any reading in progress.
   func read() {
     let triggerAt = BenchClock.uptimeNanoseconds()
+    // Cut what's being said first: its completions run now, before this read's counters exist, so
+    // one of them starting a read can't nest inside this one and leave it orphaned.
+    announcer.stop()
+    task?.cancel()
     generation += 1
     let myGeneration = generation
-    task?.cancel()
-    announcer.stop()
     readID += 1
     let myRead = readID
+    // A read after "goodbye" (Siri's "SpeakUp read", the button) means the user is back.
+    VoiceControl.shared.wake()
+    speakInterruptTipIfNeeded()
     resetCloud()
     earcons.play(.working)
     earcons.startWorkingTick(owner: Self.tickOwner)
@@ -211,6 +227,52 @@ final class TextReader {
       generation += 1
       phase = .finished
       announcer.say(SpokenMessage.readLastSentence, kind: .reply)
+    }
+  }
+
+  /// "Continue", "go on", "carry on": after a stop (or a cut), the stopped sentence again from its
+  /// start, so nothing is skipped; while reading, the next sentence.
+  func continueReading() {
+    perform(Self.continueStep(phase: phase, hasSentences: hasSentences))
+  }
+
+  /// "Resume", "keep reading", "play": carries on from the stopped sentence. Already reading: no
+  /// change. At the end: says so.
+  func resume() {
+    perform(Self.resumeStep(phase: phase, hasSentences: hasSentences))
+  }
+
+  /// What continue or resume does, decided from the reader's state alone (unit tested).
+  enum NavigationStep: Equatable {
+    /// The current sentence again, from its start.
+    case restartCurrent
+    case next
+    case sayAtEnd
+    case sayNothingRead
+    case keepGoing
+  }
+
+  static func continueStep(phase: Phase, hasSentences: Bool) -> NavigationStep {
+    guard hasSentences else { return .sayNothingRead }
+    return phase == .stopped ? .restartCurrent : .next
+  }
+
+  static func resumeStep(phase: Phase, hasSentences: Bool) -> NavigationStep {
+    guard hasSentences else { return .sayNothingRead }
+    switch phase {
+    case .reading, .preparing, .recognizing: return .keepGoing
+    case .finished: return .sayAtEnd
+    case .stopped, .idle, .guided: return .restartCurrent
+    }
+  }
+
+  private func perform(_ step: NavigationStep) {
+    switch step {
+    case .restartCurrent: startSpeaking(at: index)
+    case .next: next()
+    case .sayAtEnd: announcer.say(SpokenMessage.readLastSentence, kind: .reply)
+    case .sayNothingRead: speakNothingToNavigate()
+    case .keepGoing: break
     }
   }
 
@@ -244,6 +306,16 @@ final class TextReader {
 
   private func speakNothingToNavigate() {
     announcer.say(SpokenMessage.readNothingToNavigate, kind: .reply)
+  }
+
+  /// Once ever, before the first read: how to cut in. Queued ahead of the read's own lines; marked
+  /// heard only when it was spoken to the end. Not in tests, which time the first word.
+  private func speakInterruptTipIfNeeded() {
+    let preferences = A11yPreferences.shared
+    guard !preferences.interruptTipHeard, !LaunchOptions.isAutomatedTest else { return }
+    announcer.say(SpokenMessage.voiceInterruptTip, kind: .reply, interrupt: false) { finished in
+      if finished { A11yPreferences.shared.interruptTipHeard = true }
+    }
   }
 
   // MARK: Pipeline
@@ -310,8 +382,11 @@ final class TextReader {
   private func ensureStream(_ source: any ReadFrameSource, _ myGeneration: Int) async -> Bool {
     let deadline = ContinuousClock.now + Self.streamWait
     var announced = false
+    var firstCheck = true
     while isCurrent(myGeneration) {
-      switch source.prepareStreamForReading() {
+      let readiness = source.prepareStreamForReading()
+      defer { firstCheck = false }
+      switch readiness {
       case .ready:
         return true
       case .starting:
@@ -319,21 +394,34 @@ final class TextReader {
           announced = true
           speakInterim(SpokenMessage.readStartingCamera, first: "starting_camera", myGeneration)
         }
-      case .blocked:
-        // An alert or permission prompt is up and the camera screen says it; just stop waiting.
+      case .blocked(let reprompt):
+        clock.note("read blocked by a prompt or alert")
         endQuietly(myGeneration)
+        // An alert that was already up gets said again, so this read doesn't end in silence. One
+        // this read raised itself (camera permission, a stream error) is being said right now.
+        if let line = Self.repromptLine(reprompt, alreadyUpWhenReadStarted: firstCheck) {
+          announcer.announce(line, earcon: .attention, kind: .reply, interrupt: false)
+        }
         return false
       case .unavailable(let reason):
+        clock.note("read unavailable: \(reason)")
         finish(guidance: reason, earcon: .attention, myGeneration)
         return false
       }
       if ContinuousClock.now >= deadline {
+        clock.note("read camera start timed out")
         finish(guidance: SpokenMessage.readCameraTimedOut, earcon: .error, myGeneration)
         return false
       }
       try? await Task.sleep(for: .milliseconds(100))
     }
     return false
+  }
+
+  /// What a read blocked by an alert says: the alert's line again only if the alert was up before
+  /// this read began (blocked on its first check); otherwise the screen is saying it already.
+  static func repromptLine(_ line: String?, alreadyUpWhenReadStarted: Bool) -> String? {
+    alreadyUpWhenReadStarted ? line : nil
   }
 
   private func recentFrame(_ source: any ReadFrameSource, _ myGeneration: Int) async -> ReadFrame? {
@@ -501,7 +589,7 @@ final class TextReader {
     let jpeg = await Task.detached(priority: .userInitiated) { CloudImage.jpeg(image) }.value
     guard isCurrent(myGeneration) else { return }
     guard let jpeg else {
-      return await readOnPhoneInstead(image, fromPhoto: fromPhoto, source: source, reason: "jpeg")
+      return await readOnPhoneInstead(image, fromPhoto: fromPhoto, source: source, error: nil)
     }
 
     cloudClient = client
@@ -523,8 +611,7 @@ final class TextReader {
       for sentence in splitter.finish() { addCloudSentence(sentence) }
     } catch {
       guard isCurrentRead(myRead), !(error is CancellationError) else { return }
-      let reason = (error as? OpenAIError)?.logName ?? "unknown"
-      return await readOnPhoneInstead(image, fromPhoto: fromPhoto, source: source, reason: reason)
+      return await readOnPhoneInstead(image, fromPhoto: fromPhoto, source: source, error: error as? OpenAIError)
     }
     isTranscribing = false
     transcriptionFinished(note: splitter.note)
@@ -566,10 +653,12 @@ final class TextReader {
     announcer.announce(SpokenMessage.readEnd(verbosity: preferences.verbosity), earcon: .done, kind: .reply, interrupt: false)
   }
 
-  /// Any transcription error: one short line, then the on-phone path for the same picture. If the
-  /// stream broke part way, the phone reads the page from the start.
-  private func readOnPhoneInstead(_ image: UIImage, fromPhoto: Bool, source: any ReadFrameSource, reason: String) async {
-    clock.note("read cloud failed reason=\(reason), reading on the phone")
+  /// Any transcription error: one short line saying what went wrong (a refused key, no credit, or
+  /// just "couldn't reach"), then the on-phone path for the same picture. If the stream broke part
+  /// way, the phone reads the page from the start.
+  private func readOnPhoneInstead(_ image: UIImage, fromPhoto: Bool, source: any ReadFrameSource, error: OpenAIError?) async {
+    clock.note("read cloud failed reason=\(error?.logName ?? "jpeg"), reading on the phone")
+    Self.noteCloudFailure(error)
     if !sentences.isEmpty {
       generation += 1
       announcer.stop()
@@ -581,8 +670,13 @@ final class TextReader {
     let myGeneration = generation
     pendingFirstWord?.source = "cloud_fallback"
     earcons.startWorkingTick(owner: Self.tickOwner)
-    speakInterim(SpokenMessage.readCloudFallback, first: "cloud_fallback", myGeneration)
+    speakInterim(SpokenMessage.readCloudFallback(for: error), first: "cloud_fallback", myGeneration)
     await recognizeAndRespond(image, fromPhoto: fromPhoto, source: source, myGeneration)
+  }
+
+  /// A refused key won't start working by itself: no more cloud tries this session.
+  static func noteCloudFailure(_ error: OpenAIError?, cloud: CloudReading = .shared) {
+    if error == .unauthorized { cloud.noteKeyRefused() }
   }
 
   /// Plays sentence `at` with the cloud voice once the Announcer is quiet (a progress line may
@@ -617,21 +711,26 @@ final class TextReader {
   /// The cloud voice failed on a sentence: one short line, then the phone's voice from there on
   /// (the transcription, if still streaming, carries on).
   private func cloudVoiceFailed(at sentenceIndex: Int, _ myGeneration: Int) {
-    clock.note("read cloud voice failed at sentence \(sentenceIndex + 1), using the phone voice")
+    let failure = clips[sentenceIndex]?.failure
+    clock.note("read cloud voice failed at sentence \(sentenceIndex + 1) reason=\(failure?.logName ?? "engine"), using the phone voice")
+    Self.noteCloudFailure(failure)
     cloudClient = nil
     for clip in clips.values { clip.cancel() }
     clips = [:]
     pendingFirstWord?.source = "cloud_fallback"
     announcer.say(
-      SpokenMessage.readCloudFallback, kind: .reply, interrupt: false,
+      SpokenMessage.readCloudFallback(for: failure), kind: .reply, interrupt: false,
       onStart: firstWordHandler(myGeneration, first: "cloud_fallback"))
     speak(at: sentenceIndex, interrupt: false, myGeneration)
   }
 
-  /// The sentence's cloud audio: kept from before, or fetched now. A failed fetch is retried.
+  /// The sentence's cloud audio: kept from before, or fetched now. A failed fetch is retried, and so
+  /// is one fetched at another speed (the user said faster or slower since).
   private func clip(at sentenceIndex: Int, client: OpenAIClient) -> CloudSpeechClip {
-    if let clip = clips[sentenceIndex], clip.failure == nil { return clip }
-    let clip = CloudSpeechClip(text: CloudSentence.speechText(sentences[sentenceIndex]), client: client)
+    let speed = OpenAIClient.speechSpeed(forRate: A11yPreferences.shared.speechRate)
+    if let clip = clips[sentenceIndex], clip.failure == nil, clip.speed == speed { return clip }
+    clips[sentenceIndex]?.cancel()
+    let clip = CloudSpeechClip(text: CloudSentence.speechText(sentences[sentenceIndex]), client: client, speed: speed)
     clips[sentenceIndex] = clip
     return clip
   }
