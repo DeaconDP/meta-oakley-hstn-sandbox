@@ -25,6 +25,7 @@ import android.widget.MediaController
 import android.widget.VideoView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,17 +34,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -74,14 +76,17 @@ fun CapturePreviewScreen(
       onDismissRequest = onDismiss,
       properties = DialogProperties(usePlatformDefaultWidth = false),
   ) {
-    Box(modifier = modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.92f))) {
+    Box(modifier = modifier.fillMaxSize().background(SpeakUpColors.Night.copy(alpha = 0.96f))) {
       Column(
           modifier = Modifier.fillMaxSize().padding(24.dp),
           horizontalAlignment = Alignment.CenterHorizontally,
           verticalArrangement = Arrangement.Center,
       ) {
         Box(
-            modifier = Modifier.fillMaxWidth().height(460.dp).clip(RoundedCornerShape(12.dp)),
+            modifier = Modifier.fillMaxWidth()
+                .height(460.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .border(2.dp, SpeakUpColors.DuskLine, RoundedCornerShape(20.dp)),
             contentAlignment = Alignment.Center,
         ) {
           when (preview) {
@@ -103,15 +108,20 @@ fun CapturePreviewScreen(
         ) {
           CircleButton(
               onClick = { shareCapture(context, preview) },
-              modifier = Modifier.size(64.dp).testTag("share_button"),
+              modifier = Modifier.size(72.dp).testTag("share_button"),
           ) {
             Icon(
                 imageVector = Icons.Filled.Share,
                 contentDescription = stringResource(R.string.share),
-                tint = Color.Black,
+                tint = SpeakUpColors.OnAccent,
+                modifier = Modifier.size(32.dp),
             )
           }
-          Text(text = stringResource(R.string.share), color = Color.White)
+          Text(
+              text = stringResource(R.string.share),
+              color = SpeakUpColors.Paper,
+              style = MaterialTheme.typography.labelLarge,
+          )
         }
       }
 
@@ -120,13 +130,15 @@ fun CapturePreviewScreen(
           modifier =
               Modifier.align(Alignment.TopEnd)
                   .padding(20.dp)
-                  .size(44.dp)
+                  .statusBarsPadding()
+                  .size(SpeakUpDimens.MinTouchTarget)
                   .testTag("close_preview_button"),
       ) {
         Icon(
             imageVector = Icons.Filled.Close,
             contentDescription = stringResource(R.string.close_preview),
-            tint = Color.Black,
+            tint = SpeakUpColors.OnAccent,
+            modifier = Modifier.size(30.dp),
         )
       }
     }

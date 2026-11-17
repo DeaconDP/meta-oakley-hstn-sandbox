@@ -12,6 +12,9 @@
 // Welcome screen that guides users through the DAT SDK registration process.
 // This view is displayed when the app is not yet registered.
 //
+// HstnBench: first run uses OnboardingView instead. This is where the user lands after choosing
+// Not now there, or after the glasses are disconnected later.
+//
 // HstnBench: made usable with VoiceOver and low vision (notes/a11y-onboarding.md): icons are
 // decorative, text uses Dynamic Type styles, the page scrolls instead of truncating at large sizes,
 // the button is 60 pt tall, and the Meta AI handoff is explained before it happens. Outcomes of
@@ -26,14 +29,21 @@ struct HomeScreenView: View {
 
   var body: some View {
     content
-      .onAppear { VoiceControl.shared.setScreen(.home, handler: handleVoice) }
-      .onDisappear { VoiceControl.shared.clearScreen { $0 == .home } }
+      .onAppear {
+        VoiceControl.shared.setScreen(.home, handler: handleVoice)
+        // Spoken tips after a quiet spell: "say connect". Not while Meta AI is being opened.
+        VoiceCoach.shared.provide(for: .home) { [viewModel] in viewModel.isConnecting ? nil : .notLinked }
+      }
+      .onDisappear {
+        VoiceControl.shared.clearScreen { $0 == .home }
+        VoiceCoach.shared.stopProviding(for: .home)
+      }
   }
 
   /// Help, stop, repeat, faster and slower are VoiceControl's own.
   private func handleVoice(_ command: VoiceCommand) -> Bool {
     switch command {
-    case .connect: viewModel.connectGlasses()
+    case .connect, .tryAgain: viewModel.connectGlasses()
     case .status: Announcer.shared.announce(SpokenMessage.voiceHomeStatus, earcon: .attention)
     default: return false
     }
@@ -47,34 +57,24 @@ struct HomeScreenView: View {
         FlowingVoiceIndicator()
 
         // The name VoiceOver reads for the app icon, so the user knows where they are.
-        Text("HSTN Reader")
-          .font(.rounded(.largeTitle, weight: .black))
+        VStack(alignment: .leading, spacing: 2) {
+          Text("SpeakUp")
+            .font(.rounded(.largeTitle, weight: .black))
+            .foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+          Text("Your glasses, out loud.")
+            .font(.rounded(.title3, weight: .bold))
+            .foregroundStyle(Theme.inkSoft)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        Text("Connect your glasses once. Then hold up a page, a letter or a label, and SpeakUp reads it to you.")
+          .font(.rounded(.body, weight: .medium))
           .foregroundStyle(Theme.ink)
           .fixedSize(horizontal: false, vertical: true)
-          .accessibilityAddTraits(.isHeader)
-
-        VStack(alignment: .leading, spacing: 0) {
-          HomeTipRow(
-            systemImage: "eyeglasses",
-            tone: .green,
-            title: "Start a session",
-            text: "Connect to your glasses to get started."
-          )
-          HomeTipDots()
-          HomeTipRow(
-            systemImage: "video.fill",
-            tone: .blue,
-            title: "Start preview",
-            text: "See the live camera feed from your glasses."
-          )
-          HomeTipDots()
-          HomeTipRow(
-            systemImage: "hand.tap.fill",
-            tone: .purple,
-            title: "Capture",
-            text: "Take photos and record video with audio from your glasses' microphone."
-          )
-        }
+          .frame(maxWidth: .infinity, alignment: .leading)
 
         MascotSays(mood: viewModel.connectionNotice == nil ? .happy : .confused, text: SpokenMessage.beforeMetaAIHandoff)
 
@@ -97,57 +97,6 @@ struct HomeScreenView: View {
     // "Connecting…" otherwise only changes visually.
     .a11yAnnounce(onChangeOf: viewModel.isConnecting) { connecting in
       connecting ? "Connecting." : nil
-    }
-  }
-}
-
-/// One step of what's ahead, drawn like a lesson on the path. Not a button: it explains.
-private struct HomeTipRow: View {
-  let systemImage: String
-  let tone: Tone
-  let title: String
-  let text: String
-
-  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-  @ScaledMetric(relativeTo: .title3) private var coinSize: CGFloat = 52
-
-  var body: some View {
-    let stacked = dynamicTypeSize.isAccessibilitySize
-    let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(alignment: .top, spacing: 14))
-    layout {
-      TileCoin(icon: systemImage, tone: tone, size: min(coinSize, 96))
-      VStack(alignment: .leading, spacing: 2) {
-        Text(title)
-          .font(.rounded(.title3, weight: .heavy))
-          .foregroundStyle(Theme.ink)
-          .fixedSize(horizontal: false, vertical: true)
-          .accessibilityAddTraits(.isHeader)
-        Text(text)
-          .font(.rounded(.body, weight: .medium))
-          .foregroundStyle(Theme.inkSoft)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-}
-
-/// The dots joining the tips, under the coins.
-private struct HomeTipDots: View {
-  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-  var body: some View {
-    if dynamicTypeSize.isAccessibilitySize {
-      Color.clear.frame(height: 16).accessibilityHidden(true)
-    } else {
-      VStack(spacing: 3) {
-        ForEach(0..<2, id: \.self) { _ in
-          Circle().fill(Theme.stroke).frame(width: 7, height: 7)
-        }
-      }
-      .frame(width: 52)
-      .padding(.vertical, 3)
-      .accessibilityHidden(true)
     }
   }
 }

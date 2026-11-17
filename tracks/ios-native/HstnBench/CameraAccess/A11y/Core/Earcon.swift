@@ -24,23 +24,6 @@ enum Earcon: String, CaseIterable, Sendable {
   /// Voice control understood a command. Distinct from `listening`, which means it started.
   case heard
 
-  /// What the "learn the sounds" tutorial says after playing the earcon.
-  var spokenMeaning: String {
-    switch self {
-    case .ready: "This sound means the app is ready."
-    case .connected: "This sound means the glasses connected."
-    case .disconnected: "This sound means the glasses disconnected."
-    case .listening: "This sound means the app is listening to you."
-    case .capturing: "This sound means the glasses took a photo."
-    case .working: "This sound means the app is working on it. While you wait, you'll hear a soft tick about every second."
-    case .done: "This sound means the answer is ready."
-    case .error: "This sound means something went wrong. You'll hear what happened next."
-    case .uncertain: "This sound means the app isn't sure. Treat what follows with care."
-    case .attention: "This sound means the app needs you to do something."
-    case .heard: "This sound means the app understood what you said."
-    }
-  }
-
   /// Total length, including the gaps between notes. Used to start speech after the tone ends.
   var duration: TimeInterval {
     notes.reduce(0) { $0 + $1.duration + $1.gap }

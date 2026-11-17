@@ -17,6 +17,10 @@
 //   switching  "read my mail" in any tool: the old tool's onLeaving (the book saves its bookmark),
 //              "Mail reader.", the new tool attaches. The DAT session, stream and mic stay up.
 //   ask        GlobalCommand.Ask -> AskAboutText with the tool's RecentText -> spoken answer.
+//   home       the home voice menu: with home=true, voice runs for the whole camera screen, not just
+//              while a tool is open. With no tool open, transcripts go to GlobalGrammar.parseHome
+//              ("read my mail" opens it, "what can I say", "close the app" leaves). "Main menu" in
+//              any tool comes back here. See notes/tools-layer.md > Home voice menu.
 //
 // The UI decides which tool screen shows from [activeTool]; each tool screen attaches its
 // ViewModel (ToolScreenEffects). Main thread only, except where noted.
@@ -85,6 +89,16 @@ class ToolHub(
     private const val SPOKEN_LOG_SIZE = 50
     const val MIN_RATE = 0.5f
     const val MAX_RATE = 3f
+
+    /** Intent extra: `--ez home_voice false` keeps the camera screen touch-only (benchmarking). */
+    const val EXTRA_HOME_VOICE = "home_voice"
+
+    /**
+     * The home voice menu on the camera screen. On by default; the touch-driven bench tests
+     * (InstrumentationTest, BookReaderTest's tap cases) turn it off so the session doesn't start
+     * by itself under their taps.
+     */
+    @Volatile @JvmStatic var homeMenuEnabled: Boolean = true
   }
 
   private val prefs = application.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -132,6 +146,20 @@ class ToolHub(
   var sharedRate: Float = prefs.getFloat(KEY_RATE, 1f)
     private set
 
+  private val _homeHeard = MutableStateFlow("")
+  /** The last thing heard in the home menu (for the camera screen). */
+  val homeHeard: StateFlow<String> = _homeHeard.asStateFlow()
+
+  private val _homeStatus = MutableStateFlow("")
+  /** The last thing said in the home menu (for the camera screen). */
+  val homeStatus: StateFlow<String> = _homeStatus.asStateFlow()
+
+  /**
+   * Set by the camera screen: end the glasses session and step aside (moveTaskToBack). Called after
+   * voice has stopped, so the goodbye still plays.
+   */
+  var onExitApp: (() -> Unit)? = null
+
   // MARK: - State
 
   private var host: ToolHost? = null
@@ -148,6 +176,10 @@ class ToolHub(
   private var welcomed = false
   private var reconnectJob: Job? = null
   private var reconnectLoop: Job? = null
+  /** Voice runs for the whole camera screen with a home menu (openVoice(home = true)). */
+  private var homeMenu = false
+  /** The open tool was launched straight into (alias, deep link, extra) and nothing else since. */
+  private var launchedStraightIn = false
   private var requestPermission: (suspend (Permission) -> PermissionStatus)? = null
   private var phoneAllowed: (suspend () -> Boolean)? = null
 
@@ -156,7 +188,7 @@ class ToolHub(
     viewModelScope.launch {
       camera.isStreaming.drop(1).collect { streaming ->
         val h = host
-        if (!streaming && h != null && h.onStreamLost()) onStreamLost()
+        if (!streaming && (h?.onStreamLost() ?: isHome)) onStreamLost()
         if (streaming && streamLost) onStreamBack()
       }
     }
@@ -171,8 +203,9 @@ class ToolHub(
       host?.takeIf { it.toolId == request.tool }?.onRequest(request)
       return
     }
-    host?.onLeaving()
+    if (_activeTool.value != null) host?.onLeaving()
     pendingReason = if (voiceFirst) OpenReason.LAUNCHED else OpenReason.TAPPED
+    launchedStraightIn = voiceFirst
     _activeTool.value = request
   }
 
@@ -189,26 +222,98 @@ class ToolHub(
     }
     Log.i(TAG, "switch ${current?.tool?.id} -> ${request.tool.id} mode=${request.mode} arg=${request.argument}")
     earcons.play(Earcon.SWITCH)
-    host?.onLeaving()
+    if (current != null) host?.onLeaving()
     hush()
     pendingReason = OpenReason.SWITCHED
+    launchedStraightIn = false
     _activeTool.value = request
     sayAside(getApplication<Application>().getString(R.string.tool_switched, toolName(request.tool)))
   }
 
-  /** Back to the camera screen (close button, back, or "close"). */
-  fun closeTool() {
-    host?.onLeaving()
+  /**
+   * Closing the open tool leaves the app: true for a tool launched straight into (launcher alias,
+   * deep link, extra) that the user hasn't navigated away from, and always without the home menu
+   * (the old behaviour). False when closing goes back to the home menu. A tool that says its own
+   * goodbye checks this first.
+   */
+  val closeLeavesApp: Boolean
+    get() = !homeMenu || launchedStraightIn
+
+  /**
+   * Back from the tool (close button, back, or the tool's own "close", which already said goodbye).
+   * With the home menu: back to it ("Main menu."), or, for a tool launched straight into, out of
+   * the app. Without it: back to the camera screen.
+   */
+  fun closeTool() = leaveTool(sayGoodbye = false)
+
+  /** "close" by voice in a tool that doesn't handle it: as [closeTool], saying goodbye if leaving. */
+  fun closeByVoice() = leaveTool(sayGoodbye = true)
+
+  private fun leaveTool(sayGoodbye: Boolean) {
+    val h = host
+    if (_activeTool.value == null) return
+    if (homeMenu && !launchedStraightIn) {
+      Log.i(TAG, "close ${_activeTool.value?.tool?.id} -> home menu")
+      h?.onLeaving()
+      _activeTool.value = null
+      backToMenu(cutOff = false)
+      return
+    }
+    h?.onLeaving()
+    if (sayGoodbye) sayAside(h?.texts()?.goodbye ?: str(R.string.tool_goodbye))
     _activeTool.value = null
+    if (homeMenu) exitApp(sayGoodbye = false)
   }
 
-  /** "close" by voice in a tool that doesn't handle it: leave, saying goodbye. */
-  fun closeByVoice() {
-    val h = host
-    h?.onLeaving()
-    sayAside(h?.texts()?.goodbye ?: str(R.string.tool_goodbye))
+  /** "Main menu" in a tool: leave it (saving its state) and go back to the home menu. */
+  fun goHome() {
+    val current = _activeTool.value
+    if (current == null) {
+      homeReply(homePrompt())
+      return
+    }
+    Log.i(TAG, "main menu from ${current.tool.id}")
+    earcons.play(Earcon.SWITCH)
+    host?.onLeaving()
     _activeTool.value = null
+    backToMenu(cutOff = true)
   }
+
+  /** Arrived in the home menu from a tool: say so, briefly. */
+  private fun backToMenu(cutOff: Boolean) {
+    launchedStraightIn = false
+    nudge.userActed(SystemClock.elapsedRealtime())
+    if (!isVoiceOpen) return
+    if (cutOff) hush()
+    _homeHeard.value = ""
+    homeSay(str(R.string.home_back))
+  }
+
+  /**
+   * "Close the app" (or "close" in the menu): leave the open tool, say goodbye, stop listening, and
+   * let the screen end the glasses session and step aside ([onExitApp]).
+   */
+  fun exitApp(sayGoodbye: Boolean = true) {
+    val tool = _activeTool.value
+    Log.i(TAG, "exit app from ${tool?.tool?.id ?: "home"}")
+    if (tool != null) host?.onLeaving()
+    if (sayGoodbye) {
+      hush()
+      sayAside((if (tool != null) host?.texts()?.goodbye else null) ?: str(R.string.tool_goodbye))
+    }
+    _activeTool.value = null
+    launchedStraightIn = false
+    closeVoice()
+    onExitApp?.invoke()
+  }
+
+  /** Voice is running with a home menu to go back to ("main menu" works). */
+  val hasHomeMenu: Boolean
+    get() = homeMenu && isVoiceOpen
+
+  /** In the home voice menu: listening, with no tool open. */
+  val isHome: Boolean
+    get() = homeMenu && isVoiceOpen && _activeTool.value == null
 
   /** The tool's spoken name ("Mail reader"). */
   fun toolName(id: ToolId): String = getApplication<Application>().getString(ToolRegistry.spec(id).nameRes)
@@ -250,14 +355,18 @@ class ToolHub(
   /**
    * Starts listening while any tool is open (the UI calls it once, not per tool, so switching keeps
    * the mic). [voiceFirst]: launched straight into a tool, so bring the link up without dialogs and
-   * narrate each step.
+   * narrate each step. [home]: the home voice menu; voice runs for the whole camera screen (until
+   * [closeVoice]) and, if no tool is open, the link comes up the voice-first way and the menu
+   * welcomes the user.
    */
   fun openVoice(
       voiceFirst: Boolean,
       requestWearablesPermission: suspend (Permission) -> PermissionStatus,
       requestRecordAudio: suspend () -> Boolean,
+      home: Boolean = false,
   ) {
     if (voiceJob?.isActive == true) return
+    homeMenu = home
     requestPermission = requestWearablesPermission
     phoneAllowed = requestRecordAudio
     voiceJob = viewModelScope.launch {
@@ -287,13 +396,34 @@ class ToolHub(
           }
         }
       }
-      val first = attached.filterNotNull().first()
-      if (voiceFirst && !camera.isStreaming.value) {
-        bringUpLink(requestWearablesPermission, first)
+      if (home && _activeTool.value == null) {
+        // The home menu: connect the voice-first way (no dialogs, narrated), then welcome.
+        nudge.userActed(SystemClock.elapsedRealtime())
+        if (!camera.isStreaming.value) {
+          bringUpLink(
+              requestWearablesPermission,
+              connecting = { str(R.string.tool_reconnecting) },
+              ready = { host?.texts()?.ready ?: str(R.string.home_welcome) },
+              onReady = { text -> if (host == null) homeSay(text) else sayAside(text) },
+          )
+        } else {
+          homeSay(str(R.string.home_welcome))
+        }
+        // A tool tapped open while the link came up hasn't been told to start yet.
+        host?.let { h -> hostRequest?.let { h.onOpened(it, pendingReason) } }
       } else {
-        sayAside(first.texts().welcome)
+        val first = attached.filterNotNull().first()
+        if (voiceFirst && !camera.isStreaming.value) {
+          bringUpLink(
+              requestWearablesPermission,
+              connecting = { first.texts().connecting },
+              ready = { (host ?: first).texts().ready },
+          )
+        } else {
+          sayAside(first.texts().welcome)
+        }
+        host?.let { h -> hostRequest?.let { h.onOpened(it, pendingReason) } }
       }
-      host?.let { h -> hostRequest?.let { h.onOpened(it, pendingReason) } }
       welcomed = true
       // Glasses speech rides the session, so wait (briefly) for one before choosing a mic.
       withTimeoutOrNull(LINK_WAIT_MS) { camera.link.first { it >= CameraLink.CONNECTED } }
@@ -318,6 +448,7 @@ class ToolHub(
     voiceJob?.cancel()
     voiceJob = null
     welcomed = false
+    homeMenu = false
     reconnectJob?.cancel()
     reconnectLoop?.cancel()
     requestPermission = null
@@ -330,11 +461,13 @@ class ToolHub(
 
   private suspend fun bringUpLink(
       requestPermission: suspend (Permission) -> PermissionStatus,
-      tool: ToolHost,
+      connecting: () -> String,
+      ready: () -> String,
+      onReady: (String) -> Unit = { sayAside(it) },
   ) {
     val narration = viewModelScope.launch {
       camera.link.collect { link ->
-        if (link == CameraLink.CONNECTING) sayAside(tool.texts().connecting)
+        if (link == CameraLink.CONNECTING) sayAside(connecting())
       }
     }
     camera.connectAndStream(requestPermission)
@@ -342,13 +475,14 @@ class ToolHub(
     narration.cancel()
     if (up == true) {
       earcons.play(Earcon.PAGE_DONE)
-      sayAside(tool.texts().ready)
+      onReady(ready())
     } else {
       explainNoGlasses()
-      // Keep waiting quietly; welcome the user when the glasses turn up.
+      // Keep waiting quietly; welcome the user when the glasses turn up (unless they left).
+      val listening = voiceJob
       viewModelScope.launch {
         camera.isStreaming.first { it }
-        sayAside((host ?: tool).texts().ready)
+        if (listening == null || listening.isActive) onReady(ready())
       }
     }
   }
@@ -378,6 +512,10 @@ class ToolHub(
     val now = SystemClock.elapsedRealtime()
     if (echo.isEcho(text, now)) {
       if (isFinal) Log.i(TAG, "voice echo ignored: \"$text\"")
+      return
+    }
+    if (isHome) {
+      onHomeUtterance(text, isFinal, now)
       return
     }
     val h = host ?: return
@@ -420,11 +558,62 @@ class ToolHub(
       is GlobalCommand.Faster -> changeSharedRate(sharedRate + command.step)
       is GlobalCommand.Slower -> changeSharedRate(sharedRate - command.step)
       is GlobalCommand.SetRate -> changeSharedRate(command.rate)
-      GlobalCommand.Help -> reply(h.texts().help)
+      GlobalCommand.Help ->
+          reply(if (hasHomeMenu) h.texts().help + " " + str(R.string.home_help_in_tool) else h.texts().help)
       GlobalCommand.Battery -> reply(batteryReport())
       GlobalCommand.Close -> closeByVoice()
+      GlobalCommand.Home -> goHome()
+      GlobalCommand.ExitApp -> exitApp()
     }
   }
+
+  // MARK: - Home voice menu
+
+  /** A transcript with no tool open: GlobalGrammar.parseHome, then the menu's own handling. */
+  private fun onHomeUtterance(text: String, isFinal: Boolean, now: Long) {
+    if (!isFinal) {
+      if (GlobalGrammar.isBargeIn(text)) hush()
+      return
+    }
+    nudge.userActed(now)
+    _homeHeard.value = text
+    val command = GlobalGrammar.parseHome(text)
+    Log.i(TAG, "voice heard=\"$text\" tool=home global=$command")
+    when (command) {
+      null -> sayNotUnderstood(text, busy = false)
+      // As if switched to from another tool: earcon, the tool's name, then the tool talks.
+      is GlobalCommand.Open -> switchTo(command.request)
+      is GlobalCommand.Ask -> ask(command)
+      GlobalCommand.Pause -> hush()
+      GlobalCommand.Resume, GlobalCommand.Home -> homeReply(homePrompt())
+      GlobalCommand.Repeat -> homeReply(lastSaid ?: homePrompt())
+      is GlobalCommand.Faster -> changeSharedRate(sharedRate + command.step)
+      is GlobalCommand.Slower -> changeSharedRate(sharedRate - command.step)
+      is GlobalCommand.SetRate -> changeSharedRate(command.rate)
+      GlobalCommand.Help -> homeReply(str(R.string.home_help))
+      GlobalCommand.Battery -> homeReply(batteryReport())
+      // Nothing above the menu: "close", "goodbye", "quit" leave the app.
+      GlobalCommand.Close, GlobalCommand.ExitApp -> exitApp()
+    }
+  }
+
+  /** "Main menu. Say read my book, ..." */
+  private fun homePrompt(): String = str(R.string.home_prompt)
+
+  /** The menu's spoken line, also shown on the camera screen. */
+  private fun homeSay(text: String) {
+    _homeStatus.value = text
+    sayAside(text)
+  }
+
+  private fun homeReply(text: String) {
+    _homeStatus.value = text
+    reply(text)
+  }
+
+  /** Silence reminders in the menu: the options again, then quiet. */
+  private fun homeReminder(last: Boolean): String =
+      if (last) str(R.string.home_reminder_last) else homePrompt()
 
   /** "Sorry, I didn't get that", but not while [busy] (reading: probably the room), not for long
    * speech, and at most every 8 s. */
@@ -507,14 +696,19 @@ class ToolHub(
   /** A problem: error earcon, status line, then interrupt and say it. */
   fun warn(text: String) {
     earcons.play(Earcon.ERROR)
-    host?.onStatus(text)
+    showStatus(text)
     reply(text)
   }
 
   /** Status line plus a spoken note. */
   fun say(text: String) {
-    host?.onStatus(text)
+    showStatus(text)
     sayAside(text)
+  }
+
+  private fun showStatus(text: String) {
+    val h = host
+    if (h != null) h.onStatus(text) else if (isHome) _homeStatus.value = text
   }
 
   /** Stops speech now, drops what's queued, and tells the echo guard it ended. */
@@ -585,12 +779,16 @@ class ToolHub(
       delay(NUDGE_CHECK_MS)
       val now = SystemClock.elapsedRealtime()
       val h = host
-      if (h == null || !quiet() || !h.isWaitingForUser()) {
+      val home = isHome
+      val waiting = if (home) true else h?.isWaitingForUser() == true
+      if ((!home && h == null) || !quiet() || !waiting) {
         nudge.busy(now)
         continue
       }
       val reminder = nudge.due(now) ?: continue
-      val text = h.reminder(reminder, nudge.isLast(reminder)) ?: continue
+      val text =
+          (if (home) homeReminder(nudge.isLast(reminder))
+          else h?.reminder(reminder, nudge.isLast(reminder))) ?: continue
       Log.i(TAG, "nudge reminder=$reminder text=$text")
       sayAside(text)
     }
@@ -612,11 +810,12 @@ class ToolHub(
       // a moment to arrive and only speak the generic line if nothing did.
       delay(STREAM_LOST_SAY_DELAY_MS)
       if (camera.isStreaming.value) return@launch
-      val texts = host?.texts() ?: return@launch
+      val texts = host?.texts()
+      if (texts == null && !isHome) return@launch
       val now = SystemClock.elapsedRealtime()
       when {
-        pausedByGlasses -> sayAside(texts.pausedByGlasses)
-        now - lastAlertMs > ALERT_EXPLAINS_MS -> sayAside(texts.streamLost)
+        pausedByGlasses -> sayAside(texts?.pausedByGlasses ?: str(R.string.tool_paused_by_glasses))
+        now - lastAlertMs > ALERT_EXPLAINS_MS -> sayAside(texts?.streamLost ?: str(R.string.tool_stream_lost))
       }
     }
   }

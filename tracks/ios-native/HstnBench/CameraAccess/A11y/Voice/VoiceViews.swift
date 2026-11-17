@@ -28,6 +28,15 @@ struct VoiceSettingsRows: View {
     .accessibilityHint("Runs the app by speaking. Buttons always work.")
     .accessibilityIdentifier("voice_control_toggle")
     CustomButton(
+      title: preferences.voiceTipsEnabled ? "Turn spoken tips off" : "Turn spoken tips on", style: .secondary,
+      isDisabled: !voice.isEnabled
+    ) {
+      preferences.voiceTipsEnabled.toggle()
+      Announcer.shared.say(preferences.voiceTipsEnabled ? SpokenMessage.voiceTipsOn : SpokenMessage.voiceTipsOff)
+    }
+    .accessibilityHint("After a quiet spell, says what you can say next. Needs voice control.")
+    .accessibilityIdentifier("voice_tips_toggle")
+    CustomButton(
       title: preferences.useVoiceOverVoice ? "Use the British voice" : "Use VoiceOver's voice", style: .secondary,
       isDisabled: false
     ) {
@@ -95,88 +104,6 @@ struct VoiceDownloadNoticeBanner: View {
         .accessibilityIdentifier("voice_download_notice_ok")
     }
     .padding(16)
-  }
-}
-
-// MARK: - Setup step
-
-/// Says why the mic and speech recognition are needed, then asks. A denial gets the fix in words
-/// and a way to Settings, and setup carries on: every button works without voice control.
-struct VoiceControlStep: View {
-  var speak: OnboardingSpeak
-  var onContinue: () -> Void
-  var onSkip: () -> Void
-  var onExit: () -> Void
-
-  private var voice: VoiceControl { VoiceControl.shared }
-  private let preferences = A11yPreferences.shared
-
-  private var isDenied: Bool { voice.phoneMicPermission == .denied || voice.speechPermission == .denied }
-  private var isGranted: Bool { voice.phoneMicPermission == .granted && voice.speechPermission == .granted }
-
-  var body: some View {
-    LessonPage {
-      MascotSays(
-        mood: isDenied ? .confused : .listening,
-        text: isDenied ? SpokenMessage.voicePermissionDenied : SpokenMessage.voiceControlExplanation)
-    } footer: {
-      if isDenied {
-        Button("Open Settings") {
-          if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-        }
-        .buttonStyle(.a11yPrimary)
-        .accessibilityHint("Turn on Microphone and Speech Recognition for HSTN Reader.")
-        .accessibilityIdentifier("voice_open_settings_button")
-        Button("Continue", action: onContinue)
-          .buttonStyle(.a11ySecondary)
-          .sayHint(.continueOn)
-          .accessibilityIdentifier("onboarding_continue_button")
-      } else {
-        Button(isGranted ? "Continue" : "Turn on voice control", action: turnOn)
-          .buttonStyle(.a11yPrimary)
-          .sayHint(.yes)
-          .accessibilityHint(isGranted ? "" : "Asks to use the microphone and speech recognition.")
-          .accessibilityIdentifier("voice_turn_on_button")
-        Button("Keep voice control off", action: keepOff)
-          .buttonStyle(.a11ySecondary)
-          .sayHint(.no)
-          .accessibilityHint("Every button still works. You can turn it on later in settings.")
-          .accessibilityIdentifier("voice_keep_off_button")
-      }
-      OnboardingSkipButtons(onSkip: onSkip, onExit: onExit)
-    }
-    .onAppear {
-      speak(isDenied ? SpokenMessage.voicePermissionDenied : SpokenMessage.voiceControlExplanation, .status)
-      voice.stepHandler = { command in
-        switch command {
-        case .yes, .continueOn:
-          // Denied can't be fixed from here by voice; "continue" still moves on.
-          if isDenied { onContinue() } else { turnOn() }
-        case .no: keepOff()
-        default: return false
-        }
-        return true
-      }
-    }
-  }
-
-  private func turnOn() {
-    voice.setEnabled(true)
-    guard !isGranted, !LaunchOptions.isAutomatedTest else {
-      onContinue()
-      return
-    }
-    Task {
-      await voice.requestPermissions()
-      if isGranted { onContinue() }
-    }
-  }
-
-  private func keepOff() {
-    voice.setEnabled(false)
-    // After going on, which stops speech: the next step's key line queues behind this.
-    onContinue()
-    Announcer.shared.say(SpokenMessage.voiceControlKeepOff, interrupt: false)
   }
 }
 

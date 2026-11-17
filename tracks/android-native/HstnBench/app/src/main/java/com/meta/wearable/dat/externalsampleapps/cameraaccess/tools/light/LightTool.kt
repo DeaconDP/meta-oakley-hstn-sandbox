@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpColors
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpButton
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.AttachTool
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolAccent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolScaffold
@@ -68,7 +70,7 @@ fun LightScreen(ctx: ToolScreenContext) {
   ToolScaffold(toolId = ToolId.LIGHT, title = stringResource(R.string.light_name), ui = ui, onClose = ctx.onClose) {
     Text(
         text = stringResource(if (s.mode == LightMode.COLOUR) R.string.light_mode_colour_label else R.string.light_mode_probe_label),
-        color = Color.White,
+        color = SpeakUpColors.Paper,
         fontSize = 22.sp,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.testTag("light_mode"),
@@ -84,7 +86,7 @@ fun LightScreen(ctx: ToolScreenContext) {
       s.level?.let { level ->
         Text(
             text = stringResource(levelRes(level)),
-            color = Color.White,
+            color = SpeakUpColors.Paper,
             fontSize = 28.sp,
             modifier = Modifier.testTag("light_level"),
         )
@@ -105,14 +107,14 @@ fun LightScreen(ctx: ToolScreenContext) {
           modifier =
               Modifier.fillMaxWidth()
                   .height(180.dp)
-                  .border(3.dp, Color.White, RoundedCornerShape(12.dp))
-                  .background(s.swatch?.let { Color(it) } ?: Color.DarkGray, RoundedCornerShape(12.dp))
+                  .border(3.dp, SpeakUpColors.Paper, RoundedCornerShape(20.dp))
+                  .background(s.swatch?.let { Color(it) } ?: SpeakUpColors.Dusk, RoundedCornerShape(20.dp))
                   .testTag("light_swatch")
                   .semantics { contentDescription = swatchLabel },
       )
       Text(
           text = description,
-          color = Color.White,
+          color = SpeakUpColors.Paper,
           fontSize = 28.sp,
           fontWeight = FontWeight.Bold,
           modifier = Modifier.testTag("light_colour_name").semantics { liveRegion = LiveRegionMode.Polite },
@@ -140,13 +142,7 @@ fun LightScreen(ctx: ToolScreenContext) {
 
 @Composable
 private fun BigButton(label: String, tag: String, modifier: Modifier, onClick: () -> Unit) {
-  Button(
-      onClick = onClick,
-      colors = ButtonDefaults.buttonColors(containerColor = ToolAccent, contentColor = Color.Black),
-      modifier = modifier.heightIn(min = 64.dp).testTag(tag),
-  ) {
-    Text(text = label, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-  }
+  SpeakUpButton(label = label, onClick = onClick, minHeight = 64.dp, modifier = modifier.testTag(tag))
 }
 
 private fun levelRes(level: LightLevel): Int =

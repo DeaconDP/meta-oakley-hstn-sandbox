@@ -54,15 +54,15 @@ final class AccessibilityAuditUITests: XCTestCase {
     try audit(screen: "camera screen at AX XXXL")
   }
 
-  /// Every step of setup, including with the "Say ..." hints showing.
-  func testEverySetupStepPassesAudit() throws {
-    launch(extraArguments: ["--onboarding", "--preview-listening", "--progress-seed=3,2"])
-    try auditEverySetupStep(size: "default")
+  /// The one setup screen, with the "Say ..." hints showing.
+  func testSetupScreenPassesAudit() throws {
+    launch(extraArguments: ["--onboarding", "--preview-listening"])
+    try auditSetupScreen(size: "default")
   }
 
-  func testEverySetupStepPassesAuditAtLargestTextSize() throws {
+  func testSetupScreenPassesAuditAtLargestTextSize() throws {
     launch(extraArguments: ["--onboarding", "--preview-listening"] + Self.largestText)
-    try auditEverySetupStep(size: "AX XXXL")
+    try auditSetupScreen(size: "AX XXXL")
   }
 
   func testHomeScreenPassesAudit() throws {
@@ -89,18 +89,18 @@ final class AccessibilityAuditUITests: XCTestCase {
     try openSettingsAndAudit(screen: "settings at AX XXXL")
   }
 
-  /// The path with the camera on, the reading card and the capture preview.
-  func testStreamingReadingAndPreviewPassAudit() async throws {
+  /// Ready to read, then the reading card.
+  func testReadingPassesAudit() async throws {
     try await auditStreamingScreens(extraArguments: ["--preview-listening"], size: "default")
   }
 
-  func testStreamingReadingAndPreviewPassAuditAtLargestTextSize() async throws {
+  func testReadingPassesAuditAtLargestTextSize() async throws {
     try await auditStreamingScreens(extraArguments: ["--preview-listening"] + Self.largestText, size: "AX XXXL")
   }
 
-  func testEverySetupStepPassesAuditInDarkMode() throws {
+  func testSetupScreenPassesAuditInDarkMode() throws {
     launch(extraArguments: ["--onboarding", "--preview-listening", "--dark-mode"])
-    try auditEverySetupStep(size: "dark")
+    try auditSetupScreen(size: "dark")
   }
 
   func testHomeScreenPassesAuditInDarkMode() throws {
@@ -109,7 +109,7 @@ final class AccessibilityAuditUITests: XCTestCase {
     try audit(screen: "home screen, dark")
   }
 
-  func testStreamingReadingAndPreviewPassAuditInDarkMode() async throws {
+  func testReadingPassesAuditInDarkMode() async throws {
     try await auditStreamingScreens(extraArguments: ["--preview-listening", "--dark-mode"], size: "dark")
   }
 
@@ -117,23 +117,12 @@ final class AccessibilityAuditUITests: XCTestCase {
 
   private static let largestText = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
 
-  private func auditEverySetupStep(size: String) throws {
-    func step(_ name: String, next id: String) throws {
-      XCTAssertTrue(app.descendants(matching: .any)["onboarding_\(name)"].waitForExistence(timeout: 10), "Expected step \(name)")
-      let button = app.buttons[id]
-      XCTAssertTrue(button.waitForExistence(timeout: 10), "\(id) should exist on \(name)")
-      try audit(screen: "setup \(name) at \(size)")
-      reveal(button)
-      button.tap()
-    }
-    try step("welcome", next: "onboarding_guided_button")
-    try step("voiceControl", next: "voice_turn_on_button")
-    try step("sounds", next: "onboarding_continue_button")
-    try step("speakerTest", next: "onboarding_heard_yes_button")
-    try step("verbosity", next: "onboarding_continue_button")
-    try step("disclaimer", next: "onboarding_continue_button")
-    XCTAssertTrue(app.descendants(matching: .any)["onboarding_connect"].waitForExistence(timeout: 10))
-    try audit(screen: "setup connect at \(size)")
+  /// Setup is one screen: the welcome, with Connect glasses and Not now.
+  private func auditSetupScreen(size: String) throws {
+    XCTAssertTrue(app.descendants(matching: .any)["onboarding_welcome"].waitForExistence(timeout: 10), "Expected the setup screen")
+    XCTAssertTrue(app.buttons["connect_glasses_button"].waitForExistence(timeout: 10))
+    XCTAssertTrue(app.buttons["onboarding_not_now_button"].exists)
+    try audit(screen: "setup at \(size)")
   }
 
   private func openSettingsAndAudit(screen: String) throws {
@@ -156,26 +145,19 @@ final class AccessibilityAuditUITests: XCTestCase {
     _ = await client.setCameraFeed(deviceId: deviceId, resourceName: "read_page", ext: "mp4")
     _ = await client.setCapturedImage(deviceId: deviceId, resourceName: "read_page", ext: "png")
 
-    let start = app.buttons["start_session_button"]
-    XCTAssertTrue(start.waitForExistence(timeout: 15))
-    try audit(screen: "camera ready at \(size)")
-    reveal(start)
-    start.tap()
-    let startPreview = app.buttons["start_preview_button"]
-    XCTAssertTrue(startPreview.waitForExistence(timeout: 20))
-    try audit(screen: "session started at \(size)")
-    reveal(startPreview)
-    startPreview.tap()
-    let allow = app.alerts.buttons["Continue"]
-    if allow.waitForExistence(timeout: 10) { allow.tap() }
-    let springboardAllow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow"]
-    if springboardAllow.waitForExistence(timeout: 5) { springboardAllow.tap() }
-    XCTAssertTrue(app.buttons["stop_preview_button"].waitForExistence(timeout: 20))
-    try audit(screen: "streaming at \(size)")
+    let title = app.staticTexts["status_title"]
+    let readyPredicate = NSPredicate(format: "label == %@", "Ready to read")
+    _ = await XCTWaiter.fulfillment(of: [XCTNSPredicateExpectation(predicate: readyPredicate, object: title)], timeout: 15)
+    try audit(screen: "ready to read at \(size)")
 
     let read = app.buttons["read_button"]
     reveal(read)
     read.tap()
+    let allow = app.alerts.buttons["Continue"]
+    if allow.waitForExistence(timeout: 15) { allow.tap() }
+    let springboardAllow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow"]
+    if springboardAllow.waitForExistence(timeout: 5) { springboardAllow.tap() }
+    // The read carries on by itself after the permission prompts.
     XCTAssertTrue(app.staticTexts["read_sentence"].waitForExistence(timeout: 25))
     let stop = app.buttons["read_stop_button"]
     if stop.waitForExistence(timeout: 2) {
@@ -183,14 +165,6 @@ final class AccessibilityAuditUITests: XCTestCase {
       stop.tap()
     }
     try audit(screen: "read panel at \(size)")
-
-    let capture = app.buttons["capture_button"]
-    reveal(capture)
-    capture.tap()
-    let close = app.buttons["close_preview_button"]
-    XCTAssertTrue(close.waitForExistence(timeout: 15))
-    try audit(screen: "capture preview at \(size)")
-    close.tap()
     _ = await client.unpairDevice(deviceId: deviceId)
   }
 
@@ -225,7 +199,7 @@ final class AccessibilityAuditUITests: XCTestCase {
       throw XCTSkip("Home screen's Connect button isn't the first screen; camera screen not reachable here")
     }
     connectButton.tap()
-    let waitingText = app.staticTexts["Waiting for an active device"]
+    let waitingText = app.staticTexts["Put on your glasses"]
     XCTAssertTrue(waitingText.waitForExistence(timeout: 15), "Camera screen should show the waiting state")
   }
 

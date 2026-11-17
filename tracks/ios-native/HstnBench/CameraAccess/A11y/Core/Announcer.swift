@@ -13,8 +13,13 @@
  * next line only once this one has finished (synthesizer callback, or VoiceOver's
  * announcement-did-finish notification). `interrupt: true` drops everything queued or playing.
  *
- * The synthesizer shares A11yAudioSession with the earcons (separate from TtsReply's), so speech
+ * The synthesizer shares A11yAudioSession with the earcons, so speech
  * ducks other audio and the session is released once nothing is speaking.
+ *
+ * Speech played outside the synthesizer (CloudVoicePlayer, the natural reading voice) registers
+ * here with externalSpeechStarted/Ended: it counts towards isSpeaking and textBeingSpoken, so voice
+ * control's echo and barge-in rules treat it like our own voice, and stop() or an interrupting
+ * line cuts it too.
  */
 
 import AVFoundation
@@ -88,6 +93,8 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   @ObservationIgnored private var currentAnnouncement: String?
   @ObservationIgnored private var currentOnStart: StartHandler?
   @ObservationIgnored private var nextTag = 0
+  /// Speech playing outside the synthesizer, and how to cut it. See externalSpeechStarted.
+  @ObservationIgnored private var external: (text: String, stop: @MainActor () -> Void)?
   /// Whether this class holds A11yAudioSession's speech hold (balanced begin/end).
   @ObservationIgnored private var holdsSession = false
   /// Lines that ended in the last `echoWindow`, so voice control can tell its own speech from a
@@ -156,8 +163,24 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   /// check. Empty when nothing has been said lately.
   func textBeingSpoken(now: Date = Date()) -> String {
     recentLines.removeAll { now.timeIntervalSince($0.endedAt) > Self.echoWindow }
-    let lines = recentLines.map(\.text) + (current.map { [$0.text] } ?? []) + queue.map(\.text)
+    let lines = recentLines.map(\.text) + (current.map { [$0.text] } ?? []) + (external.map { [$0.text] } ?? []) + queue.map(\.text)
     return lines.joined(separator: " ")
+  }
+
+  /// Another player (CloudVoicePlayer) started speaking `text`. Until externalSpeechEnded() it
+  /// counts as the app speaking; stop() and interrupting lines call `stop`. The caller holds its
+  /// own audio session hold and waits for this queue to be idle before starting.
+  func externalSpeechStarted(_ text: String, stop: @escaping @MainActor () -> Void) {
+    external = (text, stop)
+    lastSpoken = text
+    updateIsSpeaking()
+  }
+
+  func externalSpeechEnded() {
+    guard let external else { return }
+    self.external = nil
+    recentLines.append((external.text, Date()))
+    updateIsSpeaking()
   }
 
   /// Where speech will be heard: "glasses", "headphones" or "phone speaker".
@@ -292,6 +315,11 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
       synthesizer.stopSpeaking(at: .immediate)
     }
     finishCurrent(false)
+    if let external {
+      self.external = nil
+      recentLines.append((external.text, Date()))
+      external.stop()
+    }
     updateIsSpeaking()
     for line in dropped { line.onFinish?(false) }
   }
@@ -307,7 +335,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   }
 
   private func updateIsSpeaking() {
-    let speaking = runner != nil || current != nil || !queue.isEmpty
+    let speaking = runner != nil || current != nil || !queue.isEmpty || external != nil
     if speaking != isSpeaking { isSpeaking = speaking }
   }
 

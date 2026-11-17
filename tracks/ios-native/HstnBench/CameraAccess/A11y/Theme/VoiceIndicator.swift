@@ -2,7 +2,8 @@
  * VoiceIndicator - voice is the default input, so the screen always says how it's doing
  *
  * VoiceIndicatorModel is pure: VoiceControl's state in, words, a mascot mood and at most one fix out.
- * The view only binds to it. It adds nothing to speech: VoiceControl already says what changes, so
+ * The view only binds to it. A bar beside the mascot is Listen Cyan while listening and Voice Coral
+ * while the app talks or can't listen; the words always say the same thing. It adds nothing to speech: VoiceControl already says what changes, so
  * this is a plain element VoiceOver reaches by swiping, with no live region.
  *
  * SayHint is the "Say ..." line on buttons. It appears only for a command valid on this screen right
@@ -35,10 +36,23 @@ struct VoiceIndicatorModel: Equatable {
     }
   }
 
+  /// The colour cue beside the mascot. Only a cue: the title always says the same in words.
+  enum Signal: Equatable {
+    /// Listen Cyan.
+    case listening
+    /// Voice Coral: the app is talking.
+    case speaking
+    /// Voice Coral: not listening because something needs fixing.
+    case warning
+    /// The plain outline colour.
+    case quiet
+  }
+
   var title: String
   var detail: String?
   var mood: MascotMood
   var fix: Fix?
+  var signal: Signal = .quiet
 
   /// Short enough to stay pinned at the top. A long reason scrolls with the page instead.
   var isCompact: Bool { (detail?.count ?? 0) <= 60 }
@@ -55,33 +69,34 @@ struct VoiceIndicatorModel: Equatable {
     speechPermission: VoicePermission,
     isSpeaking: Bool,
     heard: VoiceCommand?,
-    inSetup: Bool,
     canPrompt: Bool
   ) -> VoiceIndicatorModel {
     switch status {
     case .listening:
       if let heard {
-        return VoiceIndicatorModel(title: "Heard \u{201C}\(heard.phrase)\u{201D}", detail: nil, mood: .happy, fix: nil)
+        return VoiceIndicatorModel(
+          title: "Heard \u{201C}\(heard.phrase)\u{201D}", detail: nil, mood: .happy, fix: nil, signal: .listening)
       }
       let source = listener == .glasses ? "Listening through your glasses" : "Listening"
       let tip = isSpeaking ? "While I talk, start with \u{201C}reader\u{201D}." : "Say \u{201C}help\u{201D} any time."
-      return VoiceIndicatorModel(title: source, detail: tip, mood: .listening, fix: nil)
+      return VoiceIndicatorModel(
+        title: source, detail: tip, mood: .listening, fix: nil, signal: isSpeaking ? .speaking : .listening)
     case .starting:
       return VoiceIndicatorModel(title: "Starting to listen", detail: nil, mood: .idle, fix: nil)
     case .paused:
       return VoiceIndicatorModel(title: "Listening paused", detail: reason, mood: .idle, fix: nil)
     case .off:
       return VoiceIndicatorModel(
-        title: "Voice control is off", detail: "Every button still works.", mood: .idle, fix: inSetup ? nil : .turnOn)
+        title: "Voice control is off", detail: "Every button still works.", mood: .idle, fix: .turnOn)
     case .unavailable:
       let denied = micPermission == .denied || speechPermission == .denied
       var fix: Fix?
       if denied || reason == SpokenMessage.voiceNoOnDeviceRecognition {
         fix = .openSettings
-      } else if canPrompt, !inSetup, micPermission == .notDetermined || speechPermission == .notDetermined {
+      } else if canPrompt, micPermission == .notDetermined || speechPermission == .notDetermined {
         fix = .askPermission
       }
-      return VoiceIndicatorModel(title: "Not listening", detail: reason, mood: .confused, fix: fix)
+      return VoiceIndicatorModel(title: "Not listening", detail: reason, mood: .confused, fix: fix, signal: .warning)
     }
   }
 }
@@ -93,6 +108,7 @@ struct VoiceIndicatorView: View {
   /// The last command shows for a moment, so a sighted helper can see what was understood.
   @State private var heard: VoiceCommand?
   @ScaledMetric(relativeTo: .headline) private var mascotSize: CGFloat = 40
+  @Environment(\.colorSchemeContrast) private var contrast
 
   /// VoiceControl's state right now, in the indicator's words.
   static func currentModel(heard: VoiceCommand? = nil) -> VoiceIndicatorModel {
@@ -105,7 +121,6 @@ struct VoiceIndicatorView: View {
       speechPermission: voice.speechPermission,
       isSpeaking: Announcer.shared.isSpeaking,
       heard: heard,
-      inSetup: { if case .setup = voice.screen { true } else { false } }(),
       canPrompt: !LaunchOptions.isAutomatedTest)
   }
 
@@ -113,6 +128,9 @@ struct VoiceIndicatorView: View {
     let model = Self.currentModel(heard: heard)
     HStack(spacing: 10) {
       HStack(spacing: 10) {
+        Capsule()
+          .fill(Self.color(for: model.signal))
+          .frame(width: contrast == .increased ? 8 : 6, height: min(mascotSize, 72))
         Mascot(mood: model.mood)
           .frame(width: min(mascotSize, 72), height: min(mascotSize, 72))
         VStack(alignment: .leading, spacing: 0) {
@@ -149,6 +167,16 @@ struct VoiceIndicatorView: View {
       try? await Task.sleep(for: .seconds(3))
       guard !Task.isCancelled else { return }
       heard = nil
+    }
+  }
+
+  /// Listen Cyan while listening, Voice Coral while talking or stuck. Each is at least 3:1 on the
+  /// page and on cards (ThemePaletteTests).
+  static func color(for signal: VoiceIndicatorModel.Signal) -> Color {
+    switch signal {
+    case .listening: Theme.listen
+    case .speaking, .warning: Theme.speak
+    case .quiet: Theme.stroke
     }
   }
 

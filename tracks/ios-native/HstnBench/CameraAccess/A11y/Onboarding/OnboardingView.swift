@@ -1,224 +1,221 @@
 /*
- * OnboardingView - the guided first-run setup (notes/a11y-onboarding.md, stages 2-6)
+ * OnboardingView - the one screen before the app (notes/a11y-onboarding.md, "One screen", 2026-11-17)
  *
- * One focused screen per step: welcome, voice control, learn the sounds, speaker test, verbosity,
- * safety and privacy, connect. Practice, not a tour. Each step's key line is spoken when it appears, and
- * VoiceOver focus moves to its title. The current step is saved, so leaving the app (or Meta AI
- * taking over) resumes where the user was. Every step can be skipped, and the whole setup can be
- * left at any point.
+ * The mascot says what SpeakUp does, one safety sentence, and what happens next. One big Connect
+ * glasses button starts registration with Meta AI straight away. Not now goes to the app.
  *
- * Entry points:
- * - MainAppView shows it in place of the app while A11yPreferences.onboardingCompleted is false.
- *   "Replay setup" is therefore just `A11yPreferences.shared.resetOnboarding()`.
- * - Or present `OnboardingView(wearablesViewModel:onFinish:)` yourself (sheet or cover); it marks
- *   onboarding completed and calls onFinish when the user finishes or leaves.
+ * Coming back from Meta AI: WearablesViewModel says "Connected to …. Hold up a page and say read."
+ * and this screen hands over to the main screen. If it didn't finish, the view model says why, the
+ * screen shows it, and the button becomes Try again. Every action works by voice ("connect", "try
+ * again", "not now", "repeat"), by button, and with VoiceOver.
+ *
+ * Nothing else is asked. The audio route is detected, not tested: after connecting, a tip if sound
+ * is still on the phone speaker. Verbosity and speech rate keep their defaults and live in
+ * Settings. Voice control asks for the microphone and speech recognition here, after one spoken
+ * sentence (VoiceControl.promptForPermissions), queued behind the welcome line.
+ *
+ * MainAppView shows it while A11yPreferences.onboardingCompleted is false, so "Replay setup" is
+ * `A11yPreferences.shared.resetOnboarding()`. Reaching the main screen, or Not now, marks it done.
  */
 
+import MWDATCore
 import SwiftUI
-
-enum OnboardingStep: String, CaseIterable {
-  case welcome
-  case voiceControl
-  case sounds
-  case speakerTest
-  case verbosity
-  case disclaimer
-  case connect
-
-  var title: String {
-    switch self {
-    case .welcome: "Welcome"
-    case .voiceControl: "Voice control"
-    case .sounds: "Learn the sounds"
-    case .speakerTest: "Speaker test"
-    case .verbosity: "How much detail"
-    case .disclaimer: "Safety and privacy"
-    case .connect: "Connect your glasses"
-    }
-  }
-
-  var next: OnboardingStep? {
-    let all = Self.allCases
-    guard let index = all.firstIndex(of: self), index + 1 < all.count else { return nil }
-    return all[index + 1]
-  }
-
-  var previous: OnboardingStep? {
-    let all = Self.allCases
-    guard let index = all.firstIndex(of: self), index > 0 else { return nil }
-    return all[index - 1]
-  }
-
-  /// "Step 2 of 6". Welcome isn't counted: it is the question about doing the setup at all.
-  var progress: String? {
-    guard self != .welcome, let index = Self.allCases.firstIndex(of: self) else { return nil }
-    return "Step \(index) of \(Self.allCases.count - 1)"
-  }
-
-  /// How far along the bar is. Welcome is the empty bar.
-  var progressFraction: Double {
-    guard let index = Self.allCases.firstIndex(of: self) else { return 0 }
-    return Double(index) / Double(Self.allCases.count - 1)
-  }
-}
 
 struct OnboardingView: View {
   var wearablesViewModel: WearablesViewModel
-  var onFinish: () -> Void
 
-  @State private var step: OnboardingStep
-  /// Set when opened part way through, so the first key line says setup is continuing.
-  @State private var isResuming: Bool
   @AccessibilityFocusState private var titleFocused: Bool
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   private let preferences = A11yPreferences.shared
 
-  init(wearablesViewModel: WearablesViewModel, onFinish: @escaping () -> Void = {}) {
-    self.wearablesViewModel = wearablesViewModel
-    self.onFinish = onFinish
-    let saved = A11yPreferences.shared.onboardingStep.flatMap(OnboardingStep.init(rawValue:))
-    _step = State(initialValue: saved ?? .welcome)
-    _isResuming = State(initialValue: saved != nil && saved != .welcome)
-  }
+  /// Kept in A11yPreferences.onboardingStep while Meta AI has the user. If the app is relaunched
+  /// and finds itself registered, it goes straight on instead of offering to connect again.
+  static let connectingMarker = "connecting"
+
+  private var isRegistered: Bool { wearablesViewModel.registrationState == .registered }
+
+  /// Why the last attempt didn't connect. Not shown once registered.
+  private var notice: String? { isRegistered ? nil : wearablesViewModel.connectionNotice }
 
   var body: some View {
     VStack(spacing: 0) {
-      // The step number is part of the title for VoiceOver, so the bar itself is hidden.
-      ChunkyProgressBar(fraction: step.progressFraction)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
       PinnedVoiceIndicator()
-      content
-        // A new page per step, so each one starts at the top.
-        .id(step)
-        .transition(reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing), removal: .opacity))
+      LessonPage {
+        content
+      } footer: {
+        footer
+      }
     }
     .background(Theme.page.ignoresSafeArea())
-    .environment(\.lessonHeader, AnyView(header))
-    .onAppear {
-      preferences.onboardingStep = step.rawValue
-      focusTitle()
-      VoiceControl.shared.setScreen(.setup(step), handler: handleVoice)
+    .onAppear { appeared() }
+    .onDisappear {
+      // Leaving without connecting: a later connection shouldn't get setup's follow-up.
+      wearablesViewModel.connectedFollowUp = nil
+      VoiceControl.shared.clearScreen { $0 == .welcome }
+      VoiceCoach.shared.stopProviding(for: .welcome)
     }
-    .onChange(of: step) { _, newStep in
-      preferences.onboardingStep = newStep.rawValue
-      focusTitle()
-      VoiceControl.shared.setScreen(.setup(newStep), handler: handleVoice)
+    .onChange(of: wearablesViewModel.registrationState) { _, state in
+      // WearablesViewModel has said "Connected to …" with connectedFollowUp as one line.
+      if state == .registered { finishConnected(alreadySpoken: true) }
     }
-    .onDisappear { VoiceControl.shared.clearScreen { if case .setup = $0 { true } else { false } } }
+    .onChange(of: wearablesViewModel.connectionNotice) { _, newNotice in
+      // Queued behind the reason, which the view model has just said.
+      if newNotice != nil, !isRegistered { speakKeyLine(SpokenMessage.welcomeRetry) }
+    }
+    // "Connecting…" otherwise only changes visually.
+    .a11yAnnounce(onChangeOf: wearablesViewModel.isConnecting) { connecting in
+      connecting ? "Connecting." : nil
+    }
     // A container, so the identifier stays on the screen and doesn't land on what's inside it.
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("onboarding_\(step.rawValue)")
+    .accessibilityIdentifier("onboarding_welcome")
   }
 
-  private var header: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      FlowingVoiceIndicator()
-      if let progress = step.progress {
-        Text(progress)
-          .font(.rounded(.subheadline, weight: .heavy))
-          .foregroundStyle(Theme.inkSoft)
-          // Read as part of the title, so a swipe doesn't stop on "Step 2 of 5" alone.
-          .accessibilityHidden(true)
-      }
-      Text(step.title)
-        .font(.rounded(.largeTitle, weight: .black))
-        .foregroundStyle(Theme.ink)
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityLabel(step.progress.map { "\(step.title). \($0)" } ?? step.title)
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityFocused($titleFocused)
-    }
-  }
+  // MARK: Content
 
   @ViewBuilder
   private var content: some View {
-    switch step {
-    case .welcome:
-      WelcomeStep(speak: speakKeyLine, onGuided: { go(to: .voiceControl) }, onSkip: { finish(skipped: true) })
-    case .voiceControl:
-      VoiceControlStep(speak: speakKeyLine, onContinue: advance, onSkip: advance, onExit: exit)
-    case .sounds:
-      LearnSoundsStep(speak: speakKeyLine, onContinue: advance, onSkip: advance, onExit: exit)
-    case .speakerTest:
-      SpeakerTestStep(speak: speakKeyLine, onContinue: advance, onSkip: advance, onExit: exit)
-    case .verbosity:
-      VerbosityStep(speak: speakKeyLine, onContinue: advance, onSkip: advance, onExit: exit)
-    case .disclaimer:
-      DisclaimerStep(speak: speakKeyLine, onContinue: advance, onSkip: advance, onExit: exit)
-    case .connect:
-      ConnectStep(
-        viewModel: wearablesViewModel, speak: speakKeyLine,
-        onConnected: { finish(skipped: false, alreadySpoken: true) },
-        onFinish: { finish(skipped: false) },
-        onSkip: { finish(skipped: true) })
+    FlowingVoiceIndicator()
+    Text("Welcome to SpeakUp")
+      .font(.rounded(.largeTitle, weight: .black))
+      .foregroundStyle(Theme.ink)
+      .fixedSize(horizontal: false, vertical: true)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .accessibilityAddTraits(.isHeader)
+      .accessibilityFocused($titleFocused)
+    MascotSays(mood: notice == nil ? .happy : .confused, mascotSize: 96) {
+      A11yNote(text: SpokenMessage.welcomeIntro)
+      A11yNote(text: nextStepLine)
     }
+    if let notice {
+      ConnectionNoticeView(text: notice)
+    }
+    A11yNote(text: SpokenMessage.safetyNote)
+      .themeCard()
+      .accessibilityIdentifier("onboarding_safety_note")
   }
 
-  // MARK: Navigation
-
-  private func go(to newStep: OnboardingStep) {
-    Announcer.shared.stop()
-    VoiceControl.shared.stepHandler = nil
-    if reduceMotion {
-      step = newStep
+  @ViewBuilder
+  private var footer: some View {
+    if isRegistered {
+      Button("Start reading", action: startReading)
+        .buttonStyle(.a11yPrimary)
+        .sayHint(.continueOn)
+        .accessibilityHint("Goes to the main screen.")
+        .accessibilityIdentifier("onboarding_start_button")
     } else {
-      withAnimation(.easeInOut(duration: 0.25)) { step = newStep }
+      // Identifier shared with the home screen's button, so tests find either the same way.
+      Button(connectTitle, action: connect)
+        .buttonStyle(.a11yPrimary)
+        .sayHint(notice == nil ? .connect : .tryAgain)
+        .disabled(wearablesViewModel.isConnecting)
+        .accessibilityHint(
+          wearablesViewModel.isConnecting ? "" : "Opens the Meta AI app. Choose Connect there, then come back.")
+        .accessibilityIdentifier("connect_glasses_button")
+      Button("Not now", action: notNow)
+        .buttonStyle(.a11ySecondary)
+        .sayHint(.no)
+        .accessibilityHint("Goes to the app without connecting. You can connect from there.")
+        .accessibilityIdentifier("onboarding_not_now_button")
     }
   }
 
-  private func advance() {
-    if let next = step.next { go(to: next) } else { finish(skipped: false) }
+  private var connectTitle: String {
+    if wearablesViewModel.isConnecting { return "Connecting…" }
+    return notice == nil ? "Connect glasses" : "Try again"
   }
 
-  private func exit() {
-    finish(skipped: true)
+  /// The second half of the bubble: what to do now.
+  private var nextStepLine: String {
+    if isRegistered { return SpokenMessage.welcomeAlreadyConnected }
+    return notice == nil ? SpokenMessage.welcomeConnect : SpokenMessage.welcomeRetry
   }
 
-  /// Marks onboarding done either way: leaving is a choice, and it can be replayed.
-  /// `alreadySpoken`: connecting finished it, and WearablesViewModel has said "Connected to ….
-  /// Setup finished." as one line (ConnectStep sets connectedFollowUp).
-  private func finish(skipped: Bool, alreadySpoken: Bool = false) {
-    if skipped {
-      Announcer.shared.say(SpokenMessage.setupSkipped)
-    } else if !alreadySpoken {
-      Announcer.shared.say(SpokenMessage.setupFinished, interrupt: false)
+  /// Everything the screen says when it appears, safety sentence included.
+  private var welcomeLine: String {
+    let next = isRegistered ? SpokenMessage.welcomeAlreadyConnected : SpokenMessage.welcomeConnect
+    return "\(SpokenMessage.welcomeIntro) \(SpokenMessage.safetyNote) \(next)"
+  }
+
+  // MARK: Actions
+
+  private func appeared() {
+    // Back after Meta AI finished while the app wasn't running: nothing left to ask.
+    if isRegistered, preferences.onboardingStep == Self.connectingMarker {
+      finishConnected(alreadySpoken: false)
+      return
     }
-    if !skipped { Celebrations.shared.setupFinished() }
-    preferences.onboardingCompleted = true
+    wearablesViewModel.connectedFollowUp = SpokenMessage.connectedNext
+    focusTitle()
+    // Before setScreen: if voice control still needs permission, its one-sentence explanation and
+    // the system dialogs queue behind this line instead of cutting it off.
+    speakKeyLine(welcomeLine)
+    VoiceControl.shared.setScreen(.welcome, handler: handleVoice)
+    VoiceCoach.shared.provide(for: .welcome) { [wearablesViewModel] in
+      // Nothing to suggest while Meta AI is being opened or waited for.
+      if wearablesViewModel.isConnecting { return nil }
+      if wearablesViewModel.registrationState == .registered { return .welcomeConnected }
+      return wearablesViewModel.connectionNotice == nil ? .welcome : .welcomeRetry
+    }
+  }
+
+  private func connect() {
+    // The failure alert, if it is still up, would sit over Meta AI's return.
+    wearablesViewModel.dismissError()
+    preferences.onboardingStep = Self.connectingMarker
+    wearablesViewModel.connectGlasses()
+  }
+
+  /// Replay setup with the glasses already connected.
+  private func startReading() {
+    finishConnected(alreadySpoken: false)
+  }
+
+  private func notNow() {
+    wearablesViewModel.dismissError()
+    Announcer.shared.say(SpokenMessage.setupNotNow)
+    complete()
+  }
+
+  /// `alreadySpoken`: WearablesViewModel has just said "Connected to …. Hold up a page and say read."
+  private func finishConnected(alreadySpoken: Bool) {
+    if !alreadySpoken {
+      Announcer.shared.announce(SpokenMessage.setupConnected, earcon: .connected, interrupt: false)
+    }
+    // Detect, don't test: say so only when the sound isn't reaching the glasses.
+    if Announcer.shared.currentOutputDescription() == "phone speaker" {
+      Announcer.shared.say(SpokenMessage.soundOnPhoneSpeaker, interrupt: false)
+    }
+    complete()
+  }
+
+  /// Done either way: reaching the app is the end of setup, and it can be replayed. The safety
+  /// sentence was on this screen, so the main screen doesn't repeat the long disclaimer.
+  private func complete() {
+    preferences.disclaimerHeard = true
     preferences.onboardingStep = nil
-    onFinish()
+    preferences.onboardingCompleted = true
   }
 
-  /// A voice command for this step. Commands that only make sense inside a step's own state (the
-  /// speaker test's answer) went to its stepHandler first; everything else maps to the same calls
-  /// the step's buttons make. VoiceCommandParser only lets through what's valid for the step.
+  /// The same calls the buttons make. VoiceCommandParser only lets through what's valid here;
+  /// help, stop, faster and slower are VoiceControl's own.
   private func handleVoice(_ command: VoiceCommand) -> Bool {
-    switch (step, command) {
-    case (.welcome, .continueOn), (.welcome, .yes): go(to: .voiceControl)
-    case (.welcome, .skip), (.welcome, .no): finish(skipped: true)
-    case (.disclaimer, .continueOn):
-      preferences.disclaimerHeard = true
-      advance()
-    case (.connect, .connect), (.connect, .continueOn), (.connect, .yes):
-      if wearablesViewModel.registrationState == .registered {
-        finish(skipped: false)
-      } else {
-        wearablesViewModel.connectGlasses()
-      }
-    case (.connect, .skip), (.connect, .no): finish(skipped: true)
-    case (_, .continueOn), (_, .skip): advance()
-    case (_, .back):
-      guard let previous = step.previous else { return false }
-      go(to: previous)
-    default: return false
+    switch command {
+    case .connect, .tryAgain, .yes, .continueOn:
+      if isRegistered { startReading() } else { connect() }
+    case .no:
+      notNow()
+    case .repeatLast:
+      // Repeat this screen's words, even with VoiceOver: the user asked out loud.
+      let line = notice.map { "\($0) \(SpokenMessage.welcomeRetry)" } ?? welcomeLine
+      Announcer.shared.say(line)
+    default:
+      return false
     }
     return true
   }
 
-  /// VoiceOver focus on the new title. The step's view is new (see `.id(step)`), so give it a
-  /// moment to be in the accessibility tree first.
+  /// VoiceOver focus on the title, once the screen is in the accessibility tree.
   private func focusTitle() {
     titleFocused = false
     Task { @MainActor in
@@ -227,44 +224,39 @@ struct OnboardingView: View {
     }
   }
 
-  /// Speaks a step's key line, led by "Continuing setup" the first time after a resume, but only
-  /// without VoiceOver. With VoiceOver, focus moves to the title and VoiceOver reads the screen
-  /// in the user's own voice; speaking as well would be cut off by, or talk over, VoiceOver.
-  /// Queued, not interrupting: go(to:) has already stopped the last step's speech.
-  private func speakKeyLine(_ text: String, kind: AnnouncementKind) {
+  /// Speaks a line of this screen, queued, only without VoiceOver. With VoiceOver, focus moves to
+  /// the title and VoiceOver reads the screen in the user's own voice; speaking as well would be
+  /// cut off by, or talk over, VoiceOver.
+  private func speakKeyLine(_ text: String) {
     guard !UIAccessibility.isVoiceOverRunning else { return }
-    var line = text
-    if isResuming {
-      isResuming = false
-      line = "\(SpokenMessage.resumingSetup) \(text)"
-    }
-    Announcer.shared.say(line, kind: kind, interrupt: false)
+    Announcer.shared.say(text, interrupt: false)
   }
 }
 
-/// How a step speaks its key line (see OnboardingView.speakKeyLine).
-typealias OnboardingSpeak = (String, AnnouncementKind) -> Void
-
-/// The "Skip this step" and "Leave setup" buttons at the end of every step after Welcome. Side by
-/// side while the footer is pinned, so the main button keeps the room.
-struct OnboardingSkipButtons: View {
-  var onSkip: () -> Void
-  var onExit: () -> Void
-
-  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+/// The last failed attempt, shown so it can be read as well as heard. Marked with a symbol and
+/// the words "Not connected", not colour alone.
+struct ConnectionNoticeView: View {
+  let text: String
 
   var body: some View {
-    let layout = dynamicTypeSize <= .xLarge ? AnyLayout(HStackLayout(alignment: .top, spacing: 12)) : AnyLayout(VStackLayout(spacing: 12))
-    layout {
-      Button("Skip this step", action: onSkip)
-        .buttonStyle(.a11ySecondary)
-        .sayHint(.skip)
-        .accessibilityHint("Goes to the next step.")
-        .accessibilityIdentifier("onboarding_skip_step_button")
-      Button("Leave setup", action: onExit)
-        .buttonStyle(.a11ySecondary)
-        .accessibilityHint("Goes to the app. You can replay setup later.")
-        .accessibilityIdentifier("onboarding_exit_button")
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .font(.rounded(.title3, weight: .bold))
+        .foregroundStyle(Theme.onFace(.orange))
+        .a11yDecorative()
+      Text(text)
+        .font(.rounded(.body, weight: .semibold))
+        .foregroundStyle(Theme.onFace(.orange))
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .padding(16)
+    .background(Theme.face(.orange), in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).strokeBorder(Theme.lip(.orange), lineWidth: 2)
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Not connected. \(text)")
+    .accessibilityIdentifier("connection_notice")
   }
 }

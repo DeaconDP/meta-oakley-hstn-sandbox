@@ -13,7 +13,11 @@
 //  2. Questions about text that was just read ("what does ephemeral mean", "who is Mr. Bennet",
 //     "what happened last time"), parsed by tools/ask/AskGrammar and answered by AskAboutText.
 //  3. Commands every tool understands: pause/stop, carry on, repeat, faster/slower/speed, help,
-//     battery, close.
+//     battery, close, "main menu" (back to the home voice menu) and "close the app" (leave the app).
+//
+// [parseHome] is what the home voice menu (CameraScreen with no tool open) understands: everything
+// here plus bare tool names ("light", "book", "colour"), which are too short to be safe inside a
+// tool but are the natural answer to "Say read my book, read my mail, labels, ... or light".
 //
 // Same style as the book reader's grammar: ordered regex rules over normalised text (Phrases),
 // fillers dropped, and room chatter parses to nothing. Pure Kotlin, JVM-tested (GlobalGrammarTest).
@@ -49,8 +53,14 @@ sealed interface GlobalCommand {
   /** Glasses and phone battery. */
   data object Battery : GlobalCommand
 
-  /** Leave the tool. */
+  /** Leave the tool (in the home menu: leave the app). */
   data object Close : GlobalCommand
+
+  /** "Main menu", "go home": close the tool and go back to the home voice menu (not exit). */
+  data object Home : GlobalCommand
+
+  /** "Close the app": end the glasses session and leave the app, from a tool or the menu. */
+  data object ExitApp : GlobalCommand
 
   /** Open another tool (or the same one with a new argument), keeping the glasses session. */
   data class Open(val request: ToolRequest) : GlobalCommand
@@ -103,6 +113,13 @@ object GlobalGrammar {
 
   private val RULES: List<Rule> =
       listOf(
+          // Before Close, which would take "close the app" as "close this tool".
+          Rule("(?:close|exit|quit|leave|shut(?: down)?|end)(?: (?:the|this))? (?:whole )?(?:app|application)|close everything|turn (?:the )?app off") {
+            GlobalCommand.ExitApp
+          },
+          Rule("(?:(?:go |take me )?(?:back )?(?:to )?(?:the )?(?:main )?menu|(?:open|show)(?: me)? (?:the )?(?:main )?menu|main menu please|(?:go |take me )?(?:back )?home|(?:go |take me )?back to (?:the )?home(?: screen)?|home screen)") {
+            GlobalCommand.Home
+          },
           Rule("(?:close|exit|quit|leave)(?: (?:the|this))?(?: (?:book|reader|book reader|app|tool|mail|mail reader|label reader|labels|light detector|watch|watch for text))?|goodbye|bye|i'?m done(?: here)?|that'?s (?:all|enough)(?: for (?:now|today))?") {
             GlobalCommand.Close
           },
@@ -153,6 +170,29 @@ object GlobalGrammar {
       val m = rule.regex.matchEntire(text) ?: continue
       rule.build(m)?.let { return it }
     }
+    return null
+  }
+
+  /** Bare tool names, only in the home menu (inside a tool they'd be too easy to say by accident). */
+  private val HOME_NAMES: List<Pair<Regex, ToolRequest>> =
+      listOf(
+          Regex("^(?:(?:the |my )?books?|reading|book reading)$") to ToolRequest(ToolId.BOOK),
+          Regex("^(?:(?:the |my )?(?:letters?|post)|mail reader please)$") to ToolRequest(ToolId.MAIL),
+          Regex("^(?:watch|watcher|watch text|text watch|watch for)$") to ToolRequest(ToolId.WATCH),
+          Regex("^(?:barcodes?|(?:the )?label reader|scanner|scan)$") to ToolRequest(ToolId.LABELS),
+          Regex("^(?:colou?rs?|colou?r mode)$") to ToolRequest(ToolId.LIGHT, mode = ToolRequest.MODE_COLOUR),
+          Regex("^(?:(?:the )?lights?|brightness|light level)$") to ToolRequest(ToolId.LIGHT),
+      )
+
+  /**
+   * What the home voice menu understands: [parse], then bare tool names ("light", "book",
+   * "colour"). In the menu Close means leave the app (ToolHub decides; the grammar doesn't).
+   */
+  fun parseHome(transcript: String): GlobalCommand? {
+    parse(transcript)?.let { return it }
+    val text = Phrases.normalize(transcript)
+    if (text.isEmpty()) return null
+    for ((regex, request) in HOME_NAMES) if (regex.matches(text)) return GlobalCommand.Open(request)
     return null
   }
 

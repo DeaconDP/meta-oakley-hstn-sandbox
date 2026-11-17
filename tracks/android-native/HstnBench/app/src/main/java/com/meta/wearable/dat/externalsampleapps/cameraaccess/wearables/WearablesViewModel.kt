@@ -143,7 +143,8 @@ class WearablesViewModel(private val application: Application) : AndroidViewMode
       onAllGranted()
       startMonitoring()
     } else {
-      setRecentError(application.getString(R.string.error_permissions_required))
+      // Says what to do, not just what's missing; spoken by the setup screen's voice (SetupVoice).
+      setRecentError(application.getString(R.string.setup_bluetooth_denied))
     }
   }
 

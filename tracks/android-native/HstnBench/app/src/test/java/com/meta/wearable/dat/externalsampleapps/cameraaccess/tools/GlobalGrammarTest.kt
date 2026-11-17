@@ -105,6 +105,69 @@ class GlobalGrammarTest {
   }
 
   @Test
+  fun mainMenuPhrasesGoHome() {
+    for (p in listOf("main menu", "Main menu, please", "menu", "go home", "home", "back to menu",
+        "back to the main menu", "go back to the menu", "take me home", "open the menu", "go back home",
+        "Glasses, main menu")) {
+      assertEquals(p, GlobalCommand.Home, GlobalGrammar.parse(p))
+      assertEquals(p, GlobalCommand.Home, GlobalGrammar.parseHome(p))
+    }
+  }
+
+  @Test
+  fun closeTheAppLeavesTheApp() {
+    for (p in listOf("close the app", "exit app", "quit the app", "Exit the application", "close this app",
+        "shut down the app", "close everything")) {
+      assertEquals(p, GlobalCommand.ExitApp, GlobalGrammar.parse(p))
+    }
+    // Plain close still means "close this tool" (in the menu ToolHub takes it as leaving the app).
+    for (p in listOf("close", "exit", "goodbye", "quit", "close the book reader", "I'm done")) {
+      assertEquals(p, GlobalCommand.Close, GlobalGrammar.parse(p))
+      assertEquals(p, GlobalCommand.Close, GlobalGrammar.parseHome(p))
+    }
+  }
+
+  @Test
+  fun theHomeMenuAlsoTakesBareToolNames() {
+    val home = { p: String -> (GlobalGrammar.parseHome(p) as? GlobalCommand.Open)?.request }
+    // What the welcome offers, word for word.
+    assertEquals(ToolRequest(ToolId.BOOK), home("read my book"))
+    assertEquals(ToolRequest(ToolId.MAIL), home("read my mail"))
+    assertEquals(ToolRequest(ToolId.LABELS), home("labels"))
+    assertEquals(ToolRequest(ToolId.WATCH), home("watch for text"))
+    assertEquals(ToolRequest(ToolId.LIGHT), home("light"))
+    assertEquals(GlobalCommand.Help, GlobalGrammar.parseHome("what can I say"))
+    // Short names, only in the menu.
+    assertEquals(ToolRequest(ToolId.BOOK), home("book"))
+    assertEquals(ToolRequest(ToolId.MAIL), home("letters"))
+    assertEquals(ToolRequest(ToolId.WATCH), home("watch"))
+    assertEquals(ToolRequest(ToolId.LIGHT, mode = ToolRequest.MODE_COLOUR), home("colour"))
+    assertEquals(ToolRequest(ToolId.LABELS), home("barcode"))
+    for (p in listOf("light", "book", "colour", "watch", "letters", "barcode")) assertNull(p, GlobalGrammar.parse(p))
+    // The full phrases still carry their arguments.
+    assertEquals(ToolRequest(ToolId.WATCH, argument = "42"), home("watch for 42"))
+    assertEquals(GlobalCommand.Resume, GlobalGrammar.parseHome("start"))
+    assertEquals(GlobalCommand.Battery, GlobalGrammar.parseHome("battery"))
+    for (p in listOf("turn right at the lights", "the bus is late again today", "")) assertNull(p, GlobalGrammar.parseHome(p))
+  }
+
+  @Test
+  fun newGlobalPhrasesDontClashWithToolGrammars() {
+    // Tool grammars run first: none of them may claim the menu or exit phrases.
+    for (p in listOf("main menu", "go home", "home", "back to menu", "close the app", "exit app")) {
+      assertNull("book: $p", VoiceCommands.parse(p))
+      val n = com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.Phrases.normalize(p)
+      assertNull("mail: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.mail.MailGrammar.parse(n))
+      assertNull("watch: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.watch.WatchGrammar.parse(n, n))
+      assertNull("labels: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.labels.LabelsGrammar.parse(n))
+      assertNull("light: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.light.LightGrammar.parse(n))
+    }
+    // The book reader's own "close" still works inside it.
+    assertEquals(VoiceCommand.Close, VoiceCommands.parse("close the book"))
+    assertEquals(VoiceCommand.Close, VoiceCommands.parse("goodbye"))
+  }
+
+  @Test
   fun theBookGrammarStillWinsInsideTheBookReader() {
     // The book reader tries its own grammar first: these keep their book meaning.
     assertEquals(VoiceCommand.Resume, VoiceCommands.parse("read the book"))

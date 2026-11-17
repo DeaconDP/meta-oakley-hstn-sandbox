@@ -6,8 +6,7 @@
  * It also proves the whole path can be walked in each of those: every tap below has to land.
  *
  * Launch flags, all only with --ui-testing: --dark-mode forces dark, --preview-listening shows "Listening" and the "Say ..."
- * hints (nothing listens in a UI test), --progress-seed=streak,pages gives the card real-looking
- * data, and --high-contrast draws the Increase Contrast palette.
+ * hints (nothing listens in a UI test), and --high-contrast draws the Increase Contrast palette.
  */
 
 import MWDATMockDeviceTestClient
@@ -68,36 +67,27 @@ final class ThemeTourUITests: XCTestCase {
   private func tour(_ name: String, extra: [String]) async throws {
     variant = name
 
-    launch(["--preview-listening", "--progress-seed=3,2"] + extra)
+    launch(["--preview-listening"] + extra)
     XCTAssertTrue(app.buttons["connect_glasses_button"].waitForExistence(timeout: 15))
     shot("01-home", scrolled: true)
     app.terminate()
 
-    launch(["--onboarding", "--preview-listening", "--progress-seed=3,2"] + extra)
+    launch(["--onboarding", "--preview-listening"] + extra)
     let client = MockDeviceTestClient(portFilePath: portFilePath)
     mockClient = client
     let reachable = await client.waitForServer(timeout: 10)
     XCTAssertTrue(reachable, "Test server should be running")
 
-    tap("onboarding_guided_button", before: "02-welcome")
-    tap("voice_turn_on_button", before: "03-voice")
-    tap("onboarding_continue_button", before: "04-sounds", scrolled: true)
-    tap("onboarding_heard_no_button", before: "05-speaker")
-    shot("05b-speaker-fixes", scrolled: true)
-    tap("onboarding_continue_button", before: nil)
-    tap("onboarding_continue_button", before: "06-verbosity", scrolled: true)
-    tap("onboarding_continue_button", before: "07-disclaimer", scrolled: true)
-    tap("connect_glasses_button", before: "08-connect")
+    // The one first-run screen. Connecting finishes setup and goes straight to the main screen.
+    XCTAssertTrue(app.descendants(matching: .any)["onboarding_welcome"].waitForExistence(timeout: 15))
+    tap("connect_glasses_button", before: "02-welcome", scrolled: true)
 
-    // Setup finishes by connecting: the celebration is up for a few seconds.
-    XCTAssertTrue(app.staticTexts["Waiting for an active device"].waitForExistence(timeout: 20))
-    shot("09-setup-finished", settle: 0.8)
-    try? await Task.sleep(for: .seconds(4))
-    shot("10-camera-waiting", scrolled: true)
+    XCTAssertTrue(app.staticTexts["Put on your glasses"].waitForExistence(timeout: 20))
+    shot("03-waiting-for-glasses", settle: 0.8, scrolled: true)
 
     tap("settings_button", before: nil)
     XCTAssertTrue(app.buttons["voice_control_toggle"].waitForExistence(timeout: 5))
-    shot("11-settings", scrolled: true)
+    shot("04-settings", scrolled: true)
     scrollToTop()
     tap("settings_button", before: nil)
 
@@ -109,60 +99,28 @@ final class ThemeTourUITests: XCTestCase {
     let photoSet = await client.setCapturedImage(deviceId: deviceId, resourceName: "read_page", ext: "png")
     XCTAssertTrue(photoSet)
 
-    XCTAssertTrue(app.buttons["start_session_button"].waitForExistence(timeout: 15))
-    tap("start_session_button", before: "12-camera-ready", scrolled: true)
-    XCTAssertTrue(app.buttons["start_preview_button"].waitForExistence(timeout: 20))
-    tap("start_preview_button", before: "13-session-started", scrolled: true)
+    XCTAssertTrue(app.staticTexts["Ready to read"].waitForExistence(timeout: 15))
+    shot("05-ready-to-read", settle: 1, scrolled: true)
 
-    let allow = app.alerts.buttons["Continue"]
-    if allow.waitForExistence(timeout: 10) { allow.tap() }
-    let springboardAllow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow"]
-    if springboardAllow.waitForExistence(timeout: 5) { springboardAllow.tap() }
-    XCTAssertTrue(app.buttons["stop_preview_button"].waitForExistence(timeout: 20))
+    // One tap: the camera starts itself, then the page is read.
     let read = app.buttons["read_button"]
-    XCTAssertTrue(read.waitForExistence(timeout: 10))
-    shot("14-streaming", settle: 1.5, scrolled: true)
-
     scrollTo(read)
     read.tap()
+    let allow = app.alerts.buttons["Continue"]
+    if allow.waitForExistence(timeout: 15) { allow.tap() }
+    let springboardAllow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow"]
+    if springboardAllow.waitForExistence(timeout: 5) { springboardAllow.tap() }
     XCTAssertTrue(app.staticTexts["read_sentence"].waitForExistence(timeout: 25))
-    // Straight away: this page takes seconds to read, and the celebration only lasts a few.
-    attach("15-reading")
+    attach("06-reading")
 
-    // The seed has two pages today, so reading this one to its end reaches the goal.
     let status = app.staticTexts["read_status"]
     let deadline = Date().addingTimeInterval(90)
     while status.label != "Finished, 4 sentences", Date() < deadline {
       try? await Task.sleep(for: .milliseconds(100))
     }
     XCTAssertEqual(status.label, "Finished, 4 sentences")
-    // Long enough for the card's spring, well inside its few seconds on screen.
-    try? await Task.sleep(for: .milliseconds(500))
-    attach("16-goal-reached")
-    try? await Task.sleep(for: .seconds(5))
     scrollTo(status)
-    shot("17-page-finished")
-
-    let capture = app.buttons["capture_button"]
-    scrollTo(capture)
-    capture.tap()
-    XCTAssertTrue(app.buttons["close_preview_button"].waitForExistence(timeout: 15))
-    shot("18-capture-preview", settle: 1)
-    app.buttons["close_preview_button"].tap()
-
-    let record = app.buttons["record_button"]
-    scrollTo(record)
-    record.tap()
-    XCTAssertTrue(app.staticTexts["recording_indicator"].waitForExistence(timeout: 10))
-    shot("19-recording", settle: 1.2)
-    record.tap()
-    let close = app.buttons["close_preview_button"]
-    XCTAssertTrue(close.waitForExistence(timeout: 15))
-    close.tap()
-    let end = app.buttons["end_session_button"]
-    XCTAssertTrue(end.waitForExistence(timeout: 10))
-    scrollTo(end)
-    end.tap()
+    shot("07-page-finished")
   }
 
   // MARK: - Helpers

@@ -28,6 +28,52 @@ These are the things to change when HstnBench turns into the showcase app. Nothi
 - `Views/RegistrationView.swift`: return from Meta AI is handled silently. This is the place to play the "back, connected" earcon and announcement.
 - No `accessibilityLabel`, `accessibilityHint` or `accessibilityAction` anywhere in the app (grep finds none).
 
+## Voice setup (android-native, 2026-11-12)
+
+A user reported being forced onto the on-screen buttons before the app was connected. Everything before the camera screen now works by voice. Code in `setup/` under the HstnBench sources; strings in `res/values/strings_setup_voice.xml`.
+
+- **Permissions at launch** (`MainActivity.checkPermissions`): Nearby devices (`BLUETOOTH_CONNECT`) and the microphone (`RECORD_AUDIO`) are asked for together, after a spoken sentence ("Android will ask two things… Choose Allow both times."; one-permission versions too). A refusal isn't asked again on each `onStart` in the same run, and a permission Android won't show again (asked before, no rationale) isn't asked at all: the setup screen says how to fix it in Settings instead. Refusing the mic doesn't block the DAT SDK.
+- **The setup screen talks and listens on every launch**, not just voice-first ones (`SetupVoice`, an activity-scoped ViewModel; pure logic in `SetupFlow` and `SetupGrammar`). It waits 2.5 s after the permission check so an already-registered user doesn't hear it start. Welcome: "Welcome. To use your glasses, this app needs to connect to the Meta AI app once. Say connect to start, or say help." Variants say what's missing when the mic or Nearby devices is off. A tool opened by voice before setup is named first ("Mail reader needs a one-time setup first.").
+- **Commands** (phone recogniser, on-device when available; the mic is off while the app speaks): *connect / set up / yes / start / register / pair / try again* → "Opening Meta AI. Approve the connection there, then come back." then `startRegistration`. *help / what can I say* → the list of commands. *repeat / say that again / pardon*. *open settings* → this app's Android settings. *quit / close the app / exit / goodbye* → "Closing…" and `moveTaskToBack`. *no / not now / don't connect* → "Okay. Say connect when you're ready…" (negation is checked first, so "don't connect" never opens Meta AI). Commands only count in utterances of up to 7 words; a short unknown phrase gets "Sorry, I didn't get that" at most every 8 s; longer chatter is ignored.
+- **Quiet users** get two reminders (25 s, then 50 s later: "I'll stop reminding you now…"), then silence until they speak again.
+- **Coming back from Meta AI still unconnected**: "You're back, but the app isn't connected to your glasses yet. Say connect to try again, or say help." If the app never left (Meta AI not installed, or the mock's failed registration), after 10 s: "Meta AI didn't open, or the connection didn't finish…". Returning to the app at other times: "Glasses setup. Say connect to start, or say help."
+- **Handover**: once registered, the setup screen leaves the composition, and `SetupVoice.detach()` stops the recogniser and shuts its TTS down, so the registered screen's own voice mode has the mic.
+- **Errors are spoken.** Snackbar errors go through `SetupVoice.announce` (TTS, accessibility audio) unless TalkBack is on (`isTouchExplorationEnabled`), in which case the snackbar is a polite live region and TalkBack reads it. The Nearby devices error now says how to fix it.
+- **TalkBack fallback**: the Connect button stays, with the description "Connect my glasses. Opens the Meta AI app to approve the connection, then come back here." A visible status line shows "Listening…", "Speaking…" or "Microphone off…" and the last phrase heard.
+- **Tests**: `SetupGrammarTest` (5) and `SetupFlowTest` (12) on the JVM; `SetupVoiceTest` (instrumented, mock with `initiallyRegistered = false`): welcome spoken, "help", "don't connect" doesn't register, "connect" speaks the handoff and reaches the registered screen with the setup mic released; a failed registration speaks "didn't open". Speech is injected with `SetupVoice.hear()` because the phone recogniser can't be fed audio in a test. **Not yet run on a phone** (the A26 wasn't reachable on 2026-11-12).
+- **Not covered**: Meta AI's own registration screens (outside our control; open question 1 above), whether focus/TalkBack land sensibly on return, the phone recogniser's restart beeps on Samsung, and the real time from Wearables init to the registered state (the 2.5 s settle is a guess).
+
+## Spoken tips (ios-native, 2026-11-16)
+
+The status lines name buttons ("Start a session to use the camera"), so a user running the app by voice could sit on a screen without knowing which words it takes. `A11y/Voice/VoiceCoach.swift` now says what to say next after a quiet spell. It's the iOS counterpart of Android's IdleNudge.
+
+- **When:** only while voice control is listening, with the tips setting on (the default), and while nothing is being said or read. The first tip comes after 8 s of quiet, then more at 30 s, 1 min and 2 min. The last one says "I'll stop reminding you now. Say help whenever you need me." A voice command, a VoiceOver focus move, or a new situation starts the count over. Once a situation's first tip has been heard to the end three times, that situation starts at 30 s instead. Replay setup brings the 8 s tips back.
+- **What:** one line per situation: each setup step, not linked (home), glasses not found, folded or not worn, camera off ("Hold a page, a letter or a label in front of you and say read"), camera on (with the framing tip), after a page ("say read for something new, back or next, repeat"), and paused. Short verbosity gives shorter lines. When VoiceOver's speech could reach the mic, every command is given as "reader, …". Nothing is suggested during a wait, an alert, a recording, the preview sheet or a required update.
+- **Reading goal:** the first tip on the camera screen adds "Two more pages reach today's goal" only when the user is part way there. It never speaks at zero pages and never mentions a missed day, in keeping with ReadingProgress's no-penalty rule.
+- **In-app only.** Nothing reaches the user outside the app (decided 2026-11-16).
+- **Settings:** "Turn spoken tips off/on" next to the voice control toggle. It's disabled while voice control is off.
+- **Tests:** `VoiceCoachTests` (16): the schedule, the lines, the driver on a fake clock, and a check that every "say X" in every tip parses as a command on the screen where it's offered.
+- **Not covered:** taps that change nothing and say nothing don't count as acting, so a sighted user tapping around can still hear a tip. Not tried on the real phone yet.
+
+## One screen (ios-native, 2026-11-17)
+
+Setup was six steps before the app: welcome, voice control, learn the sounds, speaker test, detail level, safety, then connect, then the old registration screen. The owner said it needs to be "way easier and smoother and simpler". It is now one screen. Code in `A11y/Onboarding/OnboardingView.swift`.
+
+- **What it says.** The mascot and one spoken line: "Hi, I'm SpeakUp. I read printed pages out loud through your glasses. I can make mistakes, so don't rely on me for medicine doses, money or finding your way. First, let's connect your glasses. I'll open the Meta AI app: choose Connect there, then come back. Say connect, or tap Connect glasses." The screen shows the same words.
+- **One big button.** Connect glasses starts registration with Meta AI straight away. The old Connect step and the registration screen are merged into it. Not now goes to the home screen, which can still connect.
+- **Coming back.** Registered: "Connected to …. Hold up a page and say read." and the main screen, nothing else. Not finished: the reason is spoken and shown, then "Your glasses aren't connected yet. Say try again, or tap Try again." The button becomes Try again. If the app was closed while Meta AI had the user and comes back registered, it goes straight on.
+- **Done means reached the app.** Onboarding is marked done when the main screen is reached or the user chooses Not now. There is no finish step. Replay setup lands on the same screen; with the glasses already connected it offers Start reading.
+- **By voice:** "connect", "try again", "yes", "not now" (or "skip", "later"), "repeat", plus help, stop, faster and slower. Every action is also a button and works with VoiceOver. Spoken tips say what to say next for each state of the screen.
+- **What went, and why:**
+  - *Speaker test:* the audio route is detected instead. After connecting, if sound is still on the phone speaker, one sentence says to check Bluetooth.
+  - *Detail level and speech rate:* sensible defaults (normal, system rate). Both stay in Settings.
+  - *Safety and privacy screen:* the core of the disclaimer is one sentence on the welcome. It counts as heard, so the main screen doesn't repeat the long version.
+  - *Learn the sounds:* dropped. Every earcon comes with a spoken line, so nothing depends on learning them first.
+  - *Voice control step:* the microphone and speech recognition are asked for on this screen. The one-sentence reason is spoken after the welcome line, then iOS's two dialogs. No permissions screen.
+- **Why.** Detect, don't ask. Each extra screen was another place to get lost before the app did anything useful, and most of them asked about things we can detect or default.
+- **Tests:** `VoiceTests` (welcome commands, "not now" surviving filler stripping, the first screen asking for permissions), `VoiceCoachTests` (tips for the three states), `A11yCoreTests` (the safety sentence keeps the disclaimer's point), and the UI tests: connect by voice reaches the main screen, "not now" reaches the home screen, and the audit and theme tour cover the one screen.
+- **Not covered:** a failed connection in the UI tests (the mock always registers), and whether the permission dialogs can land while Meta AI is opening if the user taps Connect during the reason.
+
 ## Launch (every day)
 
 The goal is to get from "I want to read this" to an answer without looking for an icon.
@@ -64,10 +110,35 @@ Every failure gets a spoken sentence, an earcon, and one action. It's never just
 ## Choices to make once, with sensible defaults
 
 - **Whose voice.** Changed 2026-11-03: the app's British woman's voice (`AppVoice`) is the default, with VoiceOver running too, because it reads through the glasses and the owner asked for it. "Use VoiceOver's voice" is the opt-out in settings; with it on, replies use `prefersAssistiveTechnologySettings = true` and status lines use `UIAccessibility` announcements (notes/a11y-perception-stack.md > TTS). VoiceOver still reads the screen itself in the user's own voice: focus changes, alerts and the onboarding text. Don't ask about this during onboarding. If no British woman's voice is installed, the app says and shows once how to download one (Settings > Accessibility > Spoken Content > Voices > English; the path still needs confirming on a real phone), since iOS can't download voices for an app.
-- **Voice control.** On by default, off switch in settings. The setup step after Welcome explains the microphone and speech recognition in speech, then asks. Skipped setup and updates from older builds get the same explanation and dialogs on the main screen. A denial is spoken with the fix, and every button keeps working. Details and the audio rules are in `A11y/Voice/` and the header of `A11y/Core/A11yAudioSession.swift`.
-- **Detect, don't ask.** Read `isVoiceOverRunning`, `isZoomEnabled` (via the accessibility settings APIs), the Dynamic Type size, Bold Text, Increase Contrast and Reduce Motion, and adapt to them. Only one question on the first screen: "Do you want a guided setup, or skip to the app?"
+- **Voice control.** On by default, off switch in settings. Since 2026-11-17 the setup screen explains the microphone and speech recognition in one spoken sentence after the welcome, then asks. Updates from older builds get the same explanation and dialogs on the main screen. A denial is spoken with the fix, and every button keeps working. Details and the audio rules are in `A11y/Voice/` and the header of `A11y/Core/A11yAudioSession.swift`.
+- **Detect, don't ask.** Read `isVoiceOverRunning`, `isZoomEnabled` (via the accessibility settings APIs), the Dynamic Type size, Bold Text, Increase Contrast and Reduce Motion, and adapt to them. Since 2026-11-17 the first screen asks nothing but "connect?": no guided-or-skip question, no speaker test, no detail level (see "One screen").
 - **Low vision is its own path.** People using Zoom or large text want visual onboarding that scales: Dynamic Type up to AX5, targets of 60 pt or more, contrast of 7:1 or more in an optional high-contrast theme, no meaning carried by colour alone, `accessibilityIgnoresInvertColors` on camera previews, and the magnifier view (ROADMAP step 5) reachable from the first screen.
-- **UI style.** Changed 2026-11-03: a playful, chunky style (SF Rounded, 3D buttons on a darker lip, an original vector mascot, a path of tiles, a streak and a daily goal), all in `A11y/Theme/` and `A11y/Progress/`. The look never carries meaning alone: every state is also words and shape. Bright faces take dark text, and the lip doubles as the outline, because a bright green alone is only about 2:1 on white. Lowest computed ratios, enforced by `ThemePaletteTests`: text on faces 7.80:1 light, 8.54:1 dark, 9.35:1 Increase Contrast light, 10.59:1 Increase Contrast dark; ink on page and cards at least 13.5:1, secondary ink at least 8.4:1; control boundaries at least 3.58:1 and progress fill on its track at least 3.42:1 in every variant. Main green `#63D420` with `#0B2200` text (8.82:1) and lip `#2E7D0C` (5.18:1 on white); dark `#7BE241` with the same text (10.29:1) on page `#101C24`. A missed day ends the current streak count but costs nothing else, and is never mentioned.
+- **UI style.** Changed 2026-11-03: a playful, chunky style (3D buttons on a darker lip, an original vector mascot, a path of tiles, a streak and a daily goal), all in `A11y/Theme/` and `A11y/Progress/`. The look never carries meaning alone: every state is also words and shape. Bright faces take dark text, and the lip doubles as the outline, because a bright face alone is under 3:1 on a light page (white on Signal Yellow is about 1.5:1). A missed day ends the current streak count but costs nothing else, and is never mentioned.
+- **SpeakUp palette (iOS).** Rebranded 2026-11-14 as SpeakUp ("Your glasses, out loud."). Typeface Atkinson Hyperlegible (Regular and Bold, bundled from `A11y/Theme/Fonts`, scaled with `Font.custom(_:size:relativeTo:)` so Dynamic Type still works; Bold Text switches to Bold). Brand colours: Night `#0B0B1A`, Dusk `#1E1A3D`, Dusk Line `#3A3470`, Signal Yellow `#FFD60A` (main action, Night text on it, 13.81:1), Paper `#FFF8E7`, Voice Coral `#FF6B5B` (speaking, warnings), Listen Cyan `#3DD9EB` (listening). The voice indicator shows a cyan bar while listening and a coral bar while the app talks or can't listen; its words say the same thing. Values per variant in `ThemePalette.swift`:
+
+  | | Light | Dark | Increase Contrast light | Increase Contrast dark |
+  |---|---|---|---|---|
+  | Page / card | Paper `#FFF8E7` / `#FFFFFF` | Night `#0B0B1A` / Dusk `#1E1A3D` | `#FFFFFF` / `#FFFFFF` | `#000000` / Night `#0B0B1A` |
+  | Ink / soft ink | Night / `#37325C` | Paper / `#D6D0EE` | `#000000` / Dusk | `#FFFFFF` / `#F0ECFF` |
+  | Main face / lip / text | `#FFD60A` / `#8A6400` / Night | `#FFD60A` / `#B89400` / Night | `#FFD60A` / `#5C4200` / `#000000` | `#FFE14D` / `#E0B800` / `#000000` |
+  | Listening cue | `#00727F` | `#3DD9EB` | `#004E57` | `#6FE6F3` |
+  | Speaking cue | `#C0392B` | `#FF6B5B` | `#8A1C12` | `#FF8A7D` |
+  | Progress fill / track | `#8A6400` / `#E6E1F0` | `#FFD60A` / Dusk Line `#3A3470` | `#5C4200` / `#E6E1F0` | `#FFE14D` / `#2A2550` |
+
+  Lowest computed ratios, enforced by `ThemePaletteTests` (minimum in brackets):
+
+  | Pair | Light | Dark | IC light | IC dark |
+  |---|---|---|---|---|
+  | Text on button faces (4.5 / 7) | 6.97 | 6.97 | 9.18 | 9.18 |
+  | Night text on Signal Yellow | 13.81 | 13.81 | 14.88 | 16.13 |
+  | Ink on page and cards (4.5 / 7) | 18.41 | 15.61 | 21.00 | 19.50 |
+  | Soft ink on page and cards (4.5 / 7) | 11.18 | 11.11 | 16.53 | 16.85 |
+  | Locked text on locked face (4.5 / 7) | 10.00 | 10.75 | 13.96 | 14.86 |
+  | Control boundaries: outlines and lips (3) | 4.84 | 3.89 | 9.31 | 6.34 |
+  | Listening and speaking cues (3) | 5.14 | 5.91 | 9.31 | 8.53 |
+  | Progress fill on its track (3) | 4.20 | 7.81 | 7.34 | 10.91 |
+
+  The lowest text pair is Night on Voice Coral (6.97:1), so Coral buttons keep Night text and the Increase Contrast variants lighten Coral to `#FF8A7D`. Green stays for success and "connected" marks and the celebration card (the yellow mascot would vanish on a yellow card). `AccentColor` and `appPrimaryColor` are `#8A6400` in light mode (5.08:1 on Paper) and Signal Yellow in dark mode (13.81:1 on Night).
 - **Sighted help is allowed, not assumed.** Step 0 may need it. Every step from 2 onward must be completable alone. A "hand to a helper" mode can show the Meta AI steps visually without hiding what's happening from the user.
 
 ## How to test it

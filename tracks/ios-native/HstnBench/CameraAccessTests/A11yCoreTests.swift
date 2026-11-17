@@ -3,7 +3,7 @@
  *
  * Covers what can be checked off-device: preferences persist (in an isolated defaults suite, so
  * the host app's real settings are untouched), spoken lines stay short, earcons stay under
- * 300 ms with a tutorial line each, and launch actions run at most once.
+ * 300 ms and render, and launch actions run at most once.
  */
 
 import AVFoundation
@@ -49,7 +49,7 @@ final class A11yPreferencesTests: XCTestCase {
     preferences.useVoiceOverVoice = true
     preferences.earconsEnabled = false
     preferences.onboardingCompleted = true
-    preferences.onboardingStep = "speakerTest"
+    preferences.onboardingStep = "connecting"
     preferences.disclaimerHeard = true
 
     // A fresh instance reads only what was persisted.
@@ -59,7 +59,7 @@ final class A11yPreferencesTests: XCTestCase {
     XCTAssertTrue(reloaded.useVoiceOverVoice)
     XCTAssertFalse(reloaded.earconsEnabled)
     XCTAssertTrue(reloaded.onboardingCompleted)
-    XCTAssertEqual(reloaded.onboardingStep, "speakerTest")
+    XCTAssertEqual(reloaded.onboardingStep, "connecting")
     XCTAssertTrue(reloaded.disclaimerHeard)
   }
 
@@ -123,8 +123,13 @@ final class SpokenMessageTests: XCTestCase {
       SpokenMessage.cameraPermissionDenied,
       SpokenMessage.glassesAppUpdateRequired,
       SpokenMessage.firmwareUpdateRequired(deviceName: "Oakley Meta HSTN"),
-      SpokenMessage.speakerTestQuestion,
-      SpokenMessage.launchLooking,
+      SpokenMessage.welcomeRetry,
+      SpokenMessage.connectedNext,
+      SpokenMessage.setupConnected,
+      SpokenMessage.setupNotNow,
+      SpokenMessage.readyToRead,
+      SpokenMessage.cameraOn,
+      SpokenMessage.cameraEnded,
       SpokenMessage.launchOpeningForStatus,
       SpokenMessage.launchNothingToRepeat,
     ]
@@ -133,12 +138,31 @@ final class SpokenMessageTests: XCTestCase {
   /// Heard once, during onboarding. Longer is fine, but still one breath or two.
   private var onboardingLines: [String] {
     [
-      SpokenMessage.welcome,
+      SpokenMessage.welcomeIntro,
+      SpokenMessage.safetyNote,
+      SpokenMessage.welcomeConnect,
+      SpokenMessage.welcomeAlreadyConnected,
+      SpokenMessage.soundOnPhoneSpeaker,
       SpokenMessage.beforeMetaAIHandoff,
       SpokenMessage.disclaimer,
-      SpokenMessage.privacy,
       SpokenMessage.cameraPermissionNeeded,
     ]
+  }
+
+  /// The first screen's one safety sentence stands in for the disclaimer, so it keeps its point.
+  func testSafetyNoteKeepsTheDisclaimersPoint() {
+    let note = SpokenMessage.safetyNote.lowercased()
+    for point in ["mistakes", "medicine", "money", "finding your way"] {
+      XCTAssertTrue(note.contains(point), "Safety note lost \"\(point)\": \(SpokenMessage.safetyNote)")
+    }
+  }
+
+  /// The first screen says how to go on, by voice and by button.
+  func testWelcomeSaysWhatToSayAndTap() {
+    XCTAssertTrue(SpokenMessage.welcomeConnect.contains("Say connect"))
+    XCTAssertTrue(SpokenMessage.welcomeConnect.contains("tap Connect glasses"))
+    XCTAssertTrue(SpokenMessage.welcomeRetry.contains("Say try again"))
+    XCTAssertTrue(SpokenMessage.welcomeAlreadyConnected.contains("Say continue"))
   }
 
   func testStatusLinesAreShort() {
@@ -179,14 +203,6 @@ final class EarconTests: XCTestCase {
     }
   }
 
-  func testEveryEarconHasAMeaning() {
-    for earcon in Earcon.allCases {
-      XCTAssertFalse(earcon.spokenMeaning.isEmpty, "\(earcon)")
-    }
-    // Distinct meanings, so the "learn the sounds" tutorial never says the same thing twice.
-    XCTAssertEqual(Set(Earcon.allCases.map(\.spokenMeaning)).count, Earcon.allCases.count)
-  }
-
   func testEarconsRender() throws {
     let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1))
     for earcon in Earcon.allCases {
@@ -206,16 +222,16 @@ final class LaunchActionRouterTests: XCTestCase {
 
   func testConsumeReturnsOnce() {
     let router = LaunchActionRouter()
-    router.request(.look)
-    XCTAssertEqual(router.pending, .look)
-    XCTAssertEqual(router.consume(), .look)
+    router.request(.read)
+    XCTAssertEqual(router.pending, .read)
+    XCTAssertEqual(router.consume(), .read)
     XCTAssertNil(router.pending)
     XCTAssertNil(router.consume())
   }
 
   func testLatestRequestWins() {
     let router = LaunchActionRouter()
-    router.request(.look)
+    router.request(.read)
     router.request(.status)
     XCTAssertEqual(router.consume(), .status)
     XCTAssertNil(router.consume())
@@ -224,7 +240,7 @@ final class LaunchActionRouterTests: XCTestCase {
   func testExpiredRequestIsDropped() {
     var clock = Date(timeIntervalSince1970: 1_000)
     let router = LaunchActionRouter(maxAge: 60, now: { clock })
-    router.request(.look)
+    router.request(.read)
     clock.addTimeInterval(61)
     XCTAssertNil(router.consume())
     XCTAssertNil(router.pending, "An expired request is still cleared")
@@ -240,14 +256,14 @@ final class LaunchActionRouterTests: XCTestCase {
 
   func testRawValuesAreStable() {
     // Raw values may end up in URLs or logs; renaming a case shouldn't silently change them.
-    XCTAssertEqual(LaunchAction.look.rawValue, "look")
+    XCTAssertEqual(LaunchAction.read.rawValue, "read")
     XCTAssertEqual(LaunchAction.status.rawValue, "status")
     XCTAssertEqual(LaunchAction.repeatLast.rawValue, "repeatLast")
   }
 
   func testIntentsOpenTheAppOnlyWhenNeeded() {
-    // Look needs a foreground stream; Status and Repeat answer through Siri, so work locked.
-    XCTAssertTrue(LookIntent.openAppWhenRun)
+    // Read needs a foreground stream; Status and Repeat answer through Siri, so work locked.
+    XCTAssertTrue(ReadIntent.openAppWhenRun)
     XCTAssertFalse(StatusIntent.openAppWhenRun)
     XCTAssertFalse(RepeatLastIntent.openAppWhenRun)
   }

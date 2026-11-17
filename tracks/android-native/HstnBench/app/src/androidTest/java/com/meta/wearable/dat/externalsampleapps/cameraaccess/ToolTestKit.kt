@@ -129,6 +129,25 @@ object ToolTestKit {
               .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
       )
 
+  /** Launches like the normal app icon: no tool, no extras (the home voice menu). */
+  fun launchFromIcon(): ActivityScenario<MainActivity> =
+      ActivityScenario.launch(
+          Intent(context, MainActivity::class.java)
+              .setAction(Intent.ACTION_MAIN)
+              .addCategory(Intent.CATEGORY_LAUNCHER)
+              .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+      )
+
+  /**
+   * Waits until nothing is being said and the echo guard's tail (2 s) has passed, so a phrase the
+   * app just offered ("Say read my mail…") isn't taken for its own echo.
+   */
+  fun waitForQuiet(hub: ToolHub, timeoutMs: Long = 30_000L) {
+    val end = System.currentTimeMillis() + timeoutMs
+    while (hub.isSpeakingAside && System.currentTimeMillis() < end) Thread.sleep(100)
+    Thread.sleep(2_500)
+  }
+
   /** Launches with a deep link, e.g. "hstnbench://light?mode=colour". */
   fun launchDeepLink(uri: String): ActivityScenario<MainActivity> =
       ActivityScenario.launch(

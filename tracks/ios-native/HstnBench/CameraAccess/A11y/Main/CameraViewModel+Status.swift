@@ -78,10 +78,8 @@ extension CameraViewModel {
     var earcon = Earcon.ready
     switch a11yPhase {
     case .noDevice: return (SpokenMessage.glassesNotConnected, .attention)
-    case .idle: text = SpokenMessage.readyToStartSession
-    case .sessionStarting: text = SpokenMessage.sessionStarting
-    case .sessionReady: text = SpokenMessage.readyToStartPreview
-    case .previewStarting: text = SpokenMessage.cameraStarting
+    case .idle, .sessionReady: text = SpokenMessage.readyToRead
+    case .sessionStarting, .previewStarting: text = SpokenMessage.cameraStarting
     case .waitingForDevice: text = SpokenMessage.waitingForGlasses
     case .stopping: text = SpokenMessage.stopping
     case .paused:
@@ -89,21 +87,9 @@ extension CameraViewModel {
       earcon = .attention
     case .streaming: text = SpokenMessage.cameraOn
     }
-    if isRecording { text = SpokenMessage.recording(elapsed: spokenRecordingElapsed) + " " + text }
     if let batteryLevel, batteryLevel <= cameraBatteryWarningPercent {
       text += " " + SpokenMessage.batteryLow(percent: batteryLevel)
     }
     return (text, earcon)
-  }
-
-  /// "1 minute, 5 seconds", for VoiceOver values and the status line.
-  var spokenRecordingElapsed: String {
-    guard let recordingStartDate else { return "starting" }
-    return Self.spokenDuration(Date().timeIntervalSince(recordingStartDate))
-  }
-
-  static func spokenDuration(_ seconds: TimeInterval) -> String {
-    let whole = max(0, Int(seconds))
-    return Duration.seconds(whole).formatted(.units(allowed: [.minutes, .seconds], width: .wide))
   }
 }

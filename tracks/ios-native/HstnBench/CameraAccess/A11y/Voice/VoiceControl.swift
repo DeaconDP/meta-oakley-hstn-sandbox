@@ -8,8 +8,8 @@
  *
  * Which listener: VoiceListenerPolicy. Glasses during a STARTED session with the wearable mic
  * granted, otherwise the phone. reconcile() is the one place that applies the decision, and every
- * change of input calls it. A recording, the background, or a call pauses listening; the first two
- * also matter for privacy and for the audio session, which a recording must find free.
+ * change of input calls it. The background or a call pauses listening; the background also
+ * matters for privacy.
  *
  * Privacy: on-device recognition only. Transcripts are parsed and dropped. Only command names are
  * kept (`lastCommand`) or logged.
@@ -73,7 +73,7 @@ final class VoiceControl {
   /// The last command understood. Commands only; heard speech is never kept.
   private(set) var lastCommand: VoiceCommand?
   private(set) var lastCommandAt: Date?
-  /// The phone's permissions, which the setup step and settings show.
+  /// The phone's permissions, which the voice indicator and settings show.
   private(set) var phoneMicPermission = VoicePermission.notDetermined
   private(set) var speechPermission = VoicePermission.notDetermined
   private(set) var screen: VoiceScreen?
@@ -88,6 +88,9 @@ final class VoiceControl {
     return VoiceCommandParser.availableCommands(context: context(on: screen))
   }
 
+  /// Bare commands aren't safe right now, so prompts should say "reader, ..." (see VoiceCommand).
+  var needsWakeWord: Bool { environment.micHearsVoiceOver(activeListener) }
+
   /// For settings: "Voice control: listening".
   var statusText: String {
     switch status {
@@ -101,9 +104,6 @@ final class VoiceControl {
 
   // MARK: Private
 
-  /// Set by a step for commands only it can answer. Tried before the screen's handler.
-  @ObservationIgnored var stepHandler: (@MainActor (VoiceCommand) -> Bool)?
-
   @ObservationIgnored private let environment: Environment
   @ObservationIgnored private let preferences: A11yPreferences
   @ObservationIgnored private var handler: (@MainActor (VoiceCommand) -> Bool)?
@@ -112,7 +112,6 @@ final class VoiceControl {
   @ObservationIgnored private var backoff = RestartBackoff()
   @ObservationIgnored private var restartTask: Task<Void, Never>?
   @ObservationIgnored private var inBackground = false
-  @ObservationIgnored private var isRecording = false
   @ObservationIgnored private var interrupted = false
   @ObservationIgnored private var makeGlassesListener: (@MainActor () -> any SpeechListener)?
   @ObservationIgnored private var glassesMicGranted = false
@@ -188,17 +187,6 @@ final class VoiceControl {
     reconcile()
   }
 
-  /// Before the recorder takes the session. Returns with the mic and session free.
-  func recordingWillStart() {
-    isRecording = true
-    reconcile()
-  }
-
-  func recordingDidEnd() {
-    isRecording = false
-    reconcile()
-  }
-
   // MARK: Settings
 
   func setEnabled(_ enabled: Bool) {
@@ -219,8 +207,8 @@ final class VoiceControl {
     speechPermission = environment.speechPermission()
   }
 
-  /// The system dialogs, for the setup step's button (which has already explained them) or the
-  /// prompt on the main screen. A denial is spoken by reconcile.
+  /// The system dialogs, for the voice indicator's Allow button or after the spoken explanation
+  /// (promptForPermissions). A denial is spoken by reconcile.
   func requestPermissions() async {
     guard !environment.isInert, !permissionPromptInFlight else { return }
     permissionPromptInFlight = true
@@ -230,7 +218,8 @@ final class VoiceControl {
     reconcile()
   }
 
-  /// Not asked during setup yet (setup was skipped, or this is an update): explain, then ask.
+  /// Not asked yet: one spoken sentence on why, then the dialogs. Queued, so it follows whatever the
+  /// screen is saying (the first screen's welcome line).
   private func promptForPermissions() {
     guard !permissionPromptInFlight else { return }
     permissionPromptInFlight = true
@@ -254,7 +243,6 @@ final class VoiceControl {
     guard let screen, matches(screen) else { return }
     self.screen = nil
     handler = nil
-    stepHandler = nil
   }
 
   /// A finished utterance from a listener, or from a test. The seam for injecting transcripts.
@@ -284,7 +272,7 @@ final class VoiceControl {
     lastCommand = command
     lastCommandAt = environment.now()
     Self.logger.info("command \(command.rawValue, privacy: .public)")
-    if stepHandler?(command) == true || handler?(command) == true { return }
+    if handler?(command) == true { return }
     performCommon(command, on: screen)
   }
 
@@ -386,7 +374,7 @@ final class VoiceControl {
 
   private var policyInputs: VoiceListenerPolicy.Inputs {
     VoiceListenerPolicy.Inputs(
-      enabled: preferences.voiceControlEnabled, inBackground: inBackground, recording: isRecording, interrupted: interrupted,
+      enabled: preferences.voiceControlEnabled, inBackground: inBackground, interrupted: interrupted,
       glassesAvailable: makeGlassesListener != nil, glassesMicGranted: glassesMicGranted,
       glassesCoolingOff: glassesCoolOffUntil.map { environment.now() < $0 } ?? false,
       phoneMic: phoneMicPermission, speechRecognition: speechPermission, onDeviceRecognizerAvailable: phoneLocale != nil)
@@ -417,11 +405,9 @@ final class VoiceControl {
     case .needsPermission:
       stopListener()
       enter(.unavailable, reason: "Waiting for permission to use the microphone and speech recognition.")
-      // Setup has its own step that explains this first; otherwise ask once the app is up.
-      if let screen {
-        if case .setup = screen { return }
-        promptForPermissions()
-      }
+      // Asked once a screen is up, the first screen included: that is where "say connect" is
+      // first offered.
+      if screen != nil { promptForPermissions() }
     case .denied:
       stopListener()
       unavailable(SpokenMessage.voicePermissionDenied)

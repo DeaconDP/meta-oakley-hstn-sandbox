@@ -79,8 +79,7 @@ final class ViewModelIntegrationTests: XCTestCase {
     XCTAssertEqual(viewModel.streamState, .stopped)
     XCTAssertFalse(viewModel.hasSession)
     XCTAssertFalse(viewModel.isStreaming)
-    XCTAssertFalse(viewModel.hasReceivedFirstFrame)
-    XCTAssertNil(viewModel.currentVideoFrame)
+    XCTAssertNil(viewModel.latestReadFrame)
 
     // Step 1: start a session (no stream yet)
     viewModel.startSession()
@@ -93,13 +92,12 @@ final class ViewModelIntegrationTests: XCTestCase {
 
     // Wait for streaming to establish
     await observeUntil(timeout: 10) {
-      viewModel.isStreaming && viewModel.hasReceivedFirstFrame && viewModel.currentVideoFrame != nil
+      viewModel.isStreaming && viewModel.latestReadFrame != nil
     }
 
     // Verify streaming is active and receiving frames
     XCTAssertTrue(viewModel.isStreaming)
-    XCTAssertTrue(viewModel.hasReceivedFirstFrame)
-    XCTAssertNotNil(viewModel.currentVideoFrame)
+    XCTAssertNotNil(viewModel.latestReadFrame)
 
     // Stop streaming — session stays connected
     viewModel.stopStreaming()
@@ -115,9 +113,9 @@ final class ViewModelIntegrationTests: XCTestCase {
     XCTAssertFalse(viewModel.hasSession)
   }
 
-  // MARK: - Photo Capture Flow Tests
+  // MARK: - Still for reading
 
-  func testStreamingAndPhotoCaptureFlow() async throws {
+  func testStreamingAndStillForReading() async throws {
     guard let camera = cameraKit else {
       XCTFail("Mock device and camera should be available")
       return
@@ -143,7 +141,6 @@ final class ViewModelIntegrationTests: XCTestCase {
     // Initially nothing is running
     XCTAssertEqual(viewModel.streamState, .stopped)
     XCTAssertFalse(viewModel.isStreaming)
-    XCTAssertNil(viewModel.activePreview)
 
     // Start a session, then start streaming
     viewModel.startSession()
@@ -152,28 +149,16 @@ final class ViewModelIntegrationTests: XCTestCase {
 
     // Wait for streaming to establish
     await observeUntil(timeout: 10) {
-      viewModel.isStreaming && viewModel.hasReceivedFirstFrame && viewModel.currentVideoFrame != nil
+      viewModel.isStreaming && viewModel.latestReadFrame != nil
     }
 
     XCTAssertTrue(viewModel.isStreaming)
-    XCTAssertTrue(viewModel.hasReceivedFirstFrame)
-    XCTAssertNotNil(viewModel.currentVideoFrame)
 
-    // Capture photo while streaming — opens the capture preview
-    viewModel.capturePhoto()
-    await observeUntil(timeout: 10) { viewModel.activePreview != nil }
-
-    // Verify a photo preview opened while the stream stayed live
-    if case .photo = viewModel.activePreview {
-      // expected
-    } else {
-      XCTFail("Expected a photo capture preview")
-    }
+    // The reader's still arrives while the stream stays live.
+    let still = await viewModel.captureStillForReading()
+    XCTAssertNotNil(still, "Expected a still for reading")
+    XCTAssertFalse(viewModel.isCapturingPhoto)
     XCTAssertTrue(viewModel.isStreaming)
-
-    // Dismiss the preview, then tear down
-    viewModel.dismissCapturePreview()
-    XCTAssertNil(viewModel.activePreview)
 
     viewModel.endSession()
     await observeUntil(timeout: 5) { !viewModel.isStreaming && !viewModel.hasSession }
@@ -184,7 +169,7 @@ final class ViewModelIntegrationTests: XCTestCase {
 
   // MARK: - Pause/Resume Flow Tests
 
-  func testStreamPausedViaSingleTapKeepsPreviewVisible() async throws {
+  func testStreamPausedViaSingleTapAndResumes() async throws {
     guard let camera = cameraKit, let device = mockDevice else {
       XCTFail("Mock device and camera should be available")
       return
@@ -205,23 +190,20 @@ final class ViewModelIntegrationTests: XCTestCase {
     await observeUntil(timeout: 5) { viewModel.isSessionActive }
     await viewModel.startStreaming()
     await observeUntil(timeout: 10) {
-      viewModel.isStreaming && viewModel.hasReceivedFirstFrame && viewModel.currentVideoFrame != nil
+      viewModel.isStreaming && viewModel.latestReadFrame != nil
     }
 
     // Single tap on the touchpad pauses the stream.
     device.services.captouch.tap()
     await observeUntil(timeout: 5) { viewModel.streamState == .paused }
 
-    // Regression: paused must keep the last frame visible (the bug hid it).
     XCTAssertTrue(viewModel.isPaused)
-    XCTAssertNotNil(viewModel.currentVideoFrame, "Last frame should be retained while paused")
-    XCTAssertTrue(viewModel.showsLivePreview, "Preview should remain visible when paused")
+    XCTAssertEqual(viewModel.a11yPhase, .paused)
 
-    // Single tap again → resumes streaming, preview still visible.
+    // Single tap again → resumes streaming.
     device.services.captouch.tap()
     await observeUntil(timeout: 5) { viewModel.isStreaming }
     XCTAssertFalse(viewModel.isPaused, "Second tap should exit the paused state")
-    XCTAssertTrue(viewModel.showsLivePreview)
 
     viewModel.endSession()
     await observeUntil(timeout: 5) { !viewModel.hasSession }
@@ -249,7 +231,7 @@ final class ViewModelIntegrationTests: XCTestCase {
     await observeUntil(timeout: 5) { viewModel.isSessionActive }
     await viewModel.startStreaming()
     await observeUntil(timeout: 10) {
-      viewModel.isStreaming && viewModel.hasReceivedFirstFrame && viewModel.currentVideoFrame != nil
+      viewModel.isStreaming && viewModel.latestReadFrame != nil
     }
 
     NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)

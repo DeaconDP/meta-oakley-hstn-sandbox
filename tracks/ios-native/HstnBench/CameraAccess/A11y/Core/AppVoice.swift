@@ -1,7 +1,7 @@
 /*
  * AppVoice - the one voice the app speaks with
  *
- * The Announcer and TtsReply speak with a female British English voice, whatever the system
+ * The Announcer speaks with a female British English voice, whatever the system
  * language or region. Choosing is VoiceSelection.choose, a pure function over VoiceDescriptor:
  * en-GB and female (by gender, or by known name when iOS reports no gender), best quality first,
  * then Serena, Kate, Stephanie and Martha in that order.

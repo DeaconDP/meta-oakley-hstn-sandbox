@@ -3,7 +3,8 @@
  *
  * Observable so settings and onboarding screens update live. Defaults: the app's own British
  * voice (AppVoice), including with VoiceOver running, unless the user opts to follow VoiceOver's;
- * voice control on; earcons on; normal verbosity; and the system default speech rate.
+ * voice control on; spoken tips on; earcons on; normal verbosity; the system default speech rate; and
+ * the natural (OpenAI) reading voice whenever a key is set (CloudReading).
  */
 
 import AVFoundation
@@ -45,6 +46,9 @@ final class A11yPreferences {
     static let onboardingCompleted = "a11y.onboardingCompleted"
     static let onboardingStep = "a11y.onboardingStep"
     static let disclaimerHeard = "a11y.disclaimerHeard"
+    static let voiceTipsEnabled = "a11y.voiceTipsEnabled"
+    static let voiceTipsHeard = "a11y.voiceTipsHeard"
+    static let useNaturalVoice = "a11y.useNaturalVoice"
   }
 
   @ObservationIgnored private let defaults: UserDefaults
@@ -105,6 +109,23 @@ final class A11yPreferences {
     didSet { defaults.set(disclaimerHeard, forKey: Key.disclaimerHeard) }
   }
 
+  /// VoiceCoach: say what can be said next after a quiet spell. On by default; needs voice control.
+  var voiceTipsEnabled: Bool {
+    didSet { defaults.set(voiceTipsEnabled, forKey: Key.voiceTipsEnabled) }
+  }
+
+  /// How many times each of VoiceCoach's first tips was heard to the end, by situation. A tip heard
+  /// a few times comes later, since the user has learned it.
+  var voiceTipsHeard: [String: Int] {
+    didSet { defaults.set(voiceTipsHeard, forKey: Key.voiceTipsHeard) }
+  }
+
+  /// Read with the cloud path (OpenAI transcription and voice) when a key is set. On by default;
+  /// off forces on-phone recognition and the app's own voice.
+  var useNaturalVoice: Bool {
+    didSet { defaults.set(useNaturalVoice, forKey: Key.useNaturalVoice) }
+  }
+
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
     verbosity = defaults.string(forKey: Key.verbosity).flatMap(Verbosity.init(rawValue:)) ?? .normal
@@ -118,14 +139,19 @@ final class A11yPreferences {
     onboardingCompleted = defaults.bool(forKey: Key.onboardingCompleted)
     onboardingStep = defaults.string(forKey: Key.onboardingStep)
     disclaimerHeard = defaults.bool(forKey: Key.disclaimerHeard)
+    voiceTipsEnabled = defaults.object(forKey: Key.voiceTipsEnabled) as? Bool ?? true
+    voiceTipsHeard = defaults.dictionary(forKey: Key.voiceTipsHeard) as? [String: Int] ?? [:]
+    useNaturalVoice = defaults.object(forKey: Key.useNaturalVoice) as? Bool ?? true
   }
 
   /// Starts onboarding over, e.g. "replay setup" in Settings. The disclaimer is part of
-  /// onboarding, so it is heard again too. Voice, rate, verbosity and earcon choices are kept.
+  /// onboarding, so it is heard again too, and spoken tips come back early as for a new user.
+  /// Voice, rate, verbosity, earcon and tips on/off choices are kept.
   func resetOnboarding() {
     onboardingCompleted = false
     onboardingStep = nil
     disclaimerHeard = false
+    voiceTipsHeard = [:]
   }
 
   private static func clampRate(_ rate: Float) -> Float {

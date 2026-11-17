@@ -39,6 +39,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpColors
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpButton
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.ButtonKind
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.VoiceState
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.voiceStateFor
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.AttachTool
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolScaffold
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolScreenContext
@@ -62,7 +67,13 @@ fun LabelsScreen(ctx: ToolScreenContext) {
   AttachTool(ctx.hub, vm, ctx.request)
   val ui by vm.ui.collectAsStateWithLifecycle()
   val state by vm.state.collectAsStateWithLifecycle()
-  ToolScaffold(toolId = ToolId.LABELS, title = stringResource(R.string.labels_name), ui = ui, onClose = ctx.onClose) {
+  val voiceState =
+      when (state.phase) {
+        LabelsPhase.SEARCHING, LabelsPhase.LOOKING_UP -> VoiceState.THINKING
+        LabelsPhase.READING -> VoiceState.SPEAKING
+        else -> voiceStateFor(ui.microphone)
+      }
+  ToolScaffold(toolId = ToolId.LABELS, title = stringResource(R.string.labels_name), ui = ui, onClose = ctx.onClose, voiceState = voiceState) {
     Text(
         text =
             stringResource(
@@ -74,7 +85,7 @@ fun LabelsScreen(ctx: ToolScreenContext) {
                   LabelsPhase.READING -> R.string.labels_phase_reading
                 },
             ),
-        color = Color.White,
+        color = SpeakUpColors.Paper,
         fontSize = 22.sp,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.testTag("labels_phase").semantics { liveRegion = LiveRegionMode.Polite },
@@ -82,7 +93,7 @@ fun LabelsScreen(ctx: ToolScreenContext) {
     state.code?.let { code ->
       Text(
           text = stringResource(R.string.labels_code_line, code.format, code.raw),
-          color = Color.White,
+          color = SpeakUpColors.Paper,
           fontSize = 20.sp,
           modifier = Modifier.testTag("labels_code"),
       )
@@ -90,14 +101,14 @@ fun LabelsScreen(ctx: ToolScreenContext) {
     if (state.isMedicine) {
       Text(
           text = stringResource(R.string.labels_medicine_screen, state.medicineName ?: ""),
-          color = Color(0xFFFFD54F),
+          color = SpeakUpColors.VoiceCoral,
           fontSize = 22.sp,
           fontWeight = FontWeight.Bold,
           modifier = Modifier.testTag("labels_medicine"),
       )
     }
     state.product?.let {
-      Text(text = it, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("labels_product"))
+      Text(text = it, color = SpeakUpColors.Paper, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("labels_product"))
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
       BigButton(R.string.labels_scan_button, "labels_scan", Modifier.weight(1f)) { vm.press(LabelsCommand.Scan) }
@@ -110,7 +121,7 @@ fun LabelsScreen(ctx: ToolScreenContext) {
     }
     state.labelText?.let {
       Column(modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-        Text(text = it, color = Color.White, fontSize = 22.sp, lineHeight = 30.sp, modifier = Modifier.testTag("labels_text"))
+        Text(text = it, color = SpeakUpColors.Paper, fontSize = 22.sp, lineHeight = 30.sp, modifier = Modifier.testTag("labels_text"))
       }
     }
   }
@@ -118,11 +129,11 @@ fun LabelsScreen(ctx: ToolScreenContext) {
 
 @Composable
 private fun BigButton(label: Int, tag: String, modifier: Modifier, onClick: () -> Unit) {
-  Button(
+  SpeakUpButton(
+      label = stringResource(label),
       onClick = onClick,
-      colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-      modifier = modifier.heightIn(min = 64.dp).testTag(tag),
-  ) {
-    Text(text = stringResource(label), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-  }
+      kind = ButtonKind.SECONDARY,
+      minHeight = 64.dp,
+      modifier = modifier.testTag(tag),
+  )
 }

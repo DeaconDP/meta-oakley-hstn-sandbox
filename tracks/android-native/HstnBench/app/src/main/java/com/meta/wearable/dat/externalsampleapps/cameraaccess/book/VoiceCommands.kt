@@ -102,7 +102,7 @@ object VoiceCommands {
             VoiceCommand.AutoTurn(true)
           },
           // Leaving.
-          Rule("(?:close|exit|quit|leave)(?: the)?(?: book| reader| book reader| app)?|goodbye|bye|i'?m done(?: reading)?|that'?s enough for (?:now|today)|stop reading for (?:now|today)") {
+          Rule("(?:close|exit|quit|leave)(?: the)?(?: book| reader| book reader)?|goodbye|bye|i'?m done(?: reading)?|that'?s enough for (?:now|today)|stop reading for (?:now|today)") {
             VoiceCommand.Close
           },
           // Speed.

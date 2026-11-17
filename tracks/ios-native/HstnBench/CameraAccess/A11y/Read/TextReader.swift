@@ -1,23 +1,40 @@
 /*
- * TextReader - "Read it aloud (word for word)": trigger, frame, OCR, framing check, then the
- * text sentence by sentence, with next / previous / repeat / stop
+ * TextReader - "Read it aloud (word for word)": trigger, picture, text, then the text sentence by
+ * sentence, with next / previous / repeat / stop
  *
- * Flow for one trigger (Read button, VoiceOver "Read text", Siri "Read this with HSTN Reader"):
+ * Two paths, chosen per trigger:
+ * - Cloud (CloudReading.isEnabled: an OpenAI key is set, "Use natural voice" is on, not under
+ *   test). The page photo is sent to OpenAI to be transcribed, and the text is read with OpenAI's
+ *   conversational voice. The photo and the text leave the phone for OpenAI.
+ * - On the phone (no key, the user chose the phone voice, unit and UI tests, or any cloud error).
+ *   Apple Vision OCR and the app's own voice; nothing leaves the phone.
+ *
+ * Flow for one trigger (Read button, VoiceOver "Read text", Siri "Read this with SpeakUp"):
  * 1. At once: cut whatever the app is saying, play the "working" earcon (inside the 100 ms
  *    budget) and start the working tick, so the wait is never silent.
  * 2. Make sure the stream is up; if not, take the next step (start session / preview) and wait.
- * 3. Take the latest decoded stream frame (CameraViewModel keeps it). No capturePhoto in the
- *    common case: it costs ~0.4 s on the mock and ~3.9 s measured elsewhere, while the stream
- *    frame is already there (ROADMAP phase 2, "New metric"). capturePhoto is the fallback, said
- *    out loud, when there is no frame from the last second or the text is too small in it.
- * 4. OCR on device (TextRecognizer), framing check (ReadFraming). A poor frame gets spoken
+ * 3. On the phone: take the latest decoded stream frame (CameraViewModel keeps it). No
+ *    capturePhoto in the common case: it costs ~0.4 s on the mock and ~3.9 s measured elsewhere,
+ *    while the stream frame is already there (ROADMAP phase 2, "New metric"). capturePhoto is the
+ *    fallback, said out loud, when there is no frame from the last second or the text is too
+ *    small in it.
+ *    Cloud: always the full-resolution in-stream photo ("a photo of each page"), falling back to
+ *    the latest frame if the photo fails.
+ * 4. On the phone: OCR (TextRecognizer), framing check (ReadFraming). A poor frame gets spoken
  *    guidance instead of reading; a cut-off frame gets guidance, then what is visible is read.
- * 5. Sentences go to the Announcer as replies, clause by clause, one sentence after another.
+ *    Cloud: the transcription streams in (OpenAIClient) and is split into sentences as it arrives
+ *    (StreamingSentenceSplitter). A `SPEAKUP_NOTE:` reply is the model's guidance and is spoken
+ *    like ours. On any cloud error: one short line, then the on-phone path for the same picture.
+ * 5. On the phone: sentences go to the Announcer as replies, clause by clause, one after another.
+ *    Cloud: the first sentence goes to the voice as soon as it is complete; while a sentence plays,
+ *    the next one's audio is fetched (CloudSpeechClip), so there are no gaps. If the voice fails:
+ *    one short line, then the rest is read with the phone's voice.
  *
  * Metrics (BenchClock, picked up by bench.sh): `trigger_to_first_word` from the trigger to the
- * synthesizer starting the first line of the response, whatever that line is (detail `first=`
- * says whether it was text, guidance or a fallback notice); `ocr` for Vision alone; `frame_age`
- * for how old the stream frame was when OCR got it.
+ * first line of the response being heard, whatever that line is (detail `first=` says whether it
+ * was text, guidance or a fallback notice; `source=` is frame, photo, cloud or cloud_fallback);
+ * `ocr` for Vision alone; `frame_age` for how old the stream frame was when OCR got it;
+ * `cloud_first_text` from the photo being ready to the first transcribed text arriving.
  */
 
 import Foundation
@@ -62,6 +79,8 @@ struct ReadTiming: Equatable {
     if let ocrMs { parts.append("OCR \(ocrMs) ms") }
     if let frameAgeMs { parts.append("frame \(frameAgeMs) ms old") }
     if source == "photo" { parts.append("from a photo") }
+    if source == "cloud" { parts.append("natural voice") }
+    if source == "cloud_fallback" { parts.append("read on the phone") }
     return parts.joined(separator: ", ")
   }
 }
@@ -111,8 +130,20 @@ final class TextReader {
   /// older OCR run do nothing.
   @ObservationIgnored private var generation = 0
   @ObservationIgnored private var pendingFirstWord: PendingFirstWord?
-  /// This page has counted towards today's progress, so hearing its end again doesn't count twice.
-  @ObservationIgnored private var pageCounted = false
+
+  // Cloud reading. `generation` changes with every navigation, but the transcription keeps
+  // streaming across next/previous, so it checks `readID` (bumped by read() and stop()) instead.
+  @ObservationIgnored private var readID = 0
+  /// Non-nil while the current sentences are spoken with the cloud voice.
+  @ObservationIgnored private var cloudClient: OpenAIClient?
+  /// Each sentence's cloud audio, fetched once: the next one ahead of time, kept for repeats.
+  @ObservationIgnored private var clips: [Int: CloudSpeechClip] = [:]
+  /// The cloud transcription is still streaming, so more sentences may come.
+  @ObservationIgnored private var isTranscribing = false
+  /// Reading reached the last sentence so far while more were still coming.
+  @ObservationIgnored private var waitingForMore = false
+  /// Waits for the Announcer to go quiet, then starts the cloud voice.
+  @ObservationIgnored private var speechTask: Task<Void, Never>?
 
   private struct PendingFirstWord {
     var generation: Int
@@ -150,15 +181,17 @@ final class TextReader {
     let myGeneration = generation
     task?.cancel()
     announcer.stop()
+    readID += 1
+    let myRead = readID
+    resetCloud()
     earcons.play(.working)
     earcons.startWorkingTick(owner: Self.tickOwner)
     pendingFirstWord = PendingFirstWord(generation: myGeneration, triggerAt: triggerAt)
     sentences = []
     index = 0
     notice = nil
-    pageCounted = false
     phase = .preparing
-    task = Task { await run(myGeneration) }
+    task = Task { await run(myGeneration, read: myRead) }
   }
 
   // MARK: Navigation
@@ -167,6 +200,13 @@ final class TextReader {
     guard hasSentences else { return speakNothingToNavigate() }
     if index + 1 < sentences.count {
       startSpeaking(at: index + 1)
+    } else if isTranscribing {
+      // More text is still arriving: wait for the next sentence instead of saying "last".
+      generation += 1
+      speechTask?.cancel()
+      announcer.stop()
+      waitingForMore = true
+      phase = .reading
     } else {
       generation += 1
       phase = .finished
@@ -188,8 +228,13 @@ final class TextReader {
   /// Stops speech and any recognition in flight. Keeps the sentences for previous/repeat.
   func stop() {
     generation += 1
+    readID += 1
     task?.cancel()
     task = nil
+    isTranscribing = false
+    waitingForMore = false
+    speechTask?.cancel()
+    speechTask = nil
     pendingFirstWord = nil
     earcons.stopWorkingTick(owner: Self.tickOwner)
     announcer.stop()
@@ -203,11 +248,15 @@ final class TextReader {
 
   // MARK: Pipeline
 
-  private func run(_ myGeneration: Int) async {
+  private func run(_ myGeneration: Int, read myRead: Int) async {
     guard let source else {
       return finish(guidance: SpokenMessage.readNoCamera, earcon: .error, myGeneration)
     }
     guard await ensureStream(source, myGeneration) else { return }
+
+    if let client = CloudReading.shared.client() {
+      return await runCloud(source, client: client, myGeneration, read: myRead)
+    }
 
     // The frame: the latest stream frame, or a photo when there's no recent one.
     var image: UIImage
@@ -226,7 +275,14 @@ final class TextReader {
       image = photo
       fromPhoto = true
     }
+    await recognizeAndRespond(image, fromPhoto: fromPhoto, source: source, myGeneration)
+  }
 
+  /// On-phone OCR and the framing check for `image`, then the response. Also the cloud fallback.
+  private func recognizeAndRespond(
+    _ image: UIImage, fromPhoto initialFromPhoto: Bool, source: any ReadFrameSource, _ myGeneration: Int
+  ) async {
+    var fromPhoto = initialFromPhoto
     phase = .recognizing
     guard var recognized = await recognize(image, myGeneration) else { return }
     var verdict = FramingAdvisor.assess(recognized.page, quality: recognized.quality)
@@ -245,7 +301,7 @@ final class TextReader {
         return
       }
     }
-    if fromPhoto { pendingFirstWord?.source = "photo" }
+    if fromPhoto, pendingFirstWord?.source == "frame" { pendingFirstWord?.source = "photo" }
     clock.note("read verdict=\(verdict.logName) lines=\(recognized.page.lines.count) source=\(fromPhoto ? "photo" : "frame")")
     respond(to: recognized.page, verdict: verdict, myGeneration)
   }
@@ -338,7 +394,10 @@ final class TextReader {
 
   private func startSpeaking(at newIndex: Int) {
     generation += 1
-    task?.cancel()
+    // A cloud transcription still streaming keeps going: navigation only changes what is spoken.
+    if !isTranscribing { task?.cancel() }
+    waitingForMore = false
+    speechTask?.cancel()
     pendingFirstWord = nil
     earcons.stopWorkingTick(owner: Self.tickOwner)
     speak(at: newIndex, interrupt: true, generation)
@@ -349,6 +408,9 @@ final class TextReader {
     guard sentences.indices.contains(sentenceIndex) else { return }
     index = sentenceIndex
     phase = .reading
+    if let cloudClient {
+      return speakCloud(at: sentenceIndex, interrupt: interrupt, client: cloudClient, myGeneration)
+    }
     let chunks = sentences[sentenceIndex].chunks
     for (chunkIndex, chunk) in chunks.enumerated() {
       let isLast = chunkIndex == chunks.count - 1
@@ -371,30 +433,19 @@ final class TextReader {
   private func sentenceEnded(_ sentenceIndex: Int, finished: Bool, _ myGeneration: Int) {
     guard isCurrent(myGeneration) else { return }
     guard finished else {
-      // Cut by something else (a photo, a status line, VoiceOver's stop).
+      // Cut by something else (a status line, VoiceOver's stop).
       if phase == .reading { phase = .stopped }
       return
     }
     if sentenceIndex + 1 < sentences.count {
       speak(at: sentenceIndex + 1, interrupt: false, myGeneration)
+    } else if isTranscribing {
+      // The voice caught up with the transcription; addCloudSentence carries on.
+      waitingForMore = true
     } else {
       phase = .finished
       announcer.announce(
         SpokenMessage.readEnd(verbosity: A11yPreferences.shared.verbosity), earcon: .done, kind: .reply, interrupt: false)
-      recordFinishedPage()
-    }
-  }
-
-  /// The page was read to its end, the only thing that counts as reading it. A milestone queues
-  /// behind the end line, so it can't cut into the reading, and any new trigger cancels it.
-  private func recordFinishedPage() {
-    guard !pageCounted else { return }
-    pageCounted = true
-    let store = ReadingProgressStore.shared
-    let milestone = store.recordPage()
-    Celebrations.shared.pageRead(summary: store.summary, milestone: milestone)
-    if let milestone {
-      announcer.say(milestone.spokenLine, kind: .reply, interrupt: false)
     }
   }
 
@@ -421,6 +472,180 @@ final class TextReader {
     phase = .idle
   }
 
+  // MARK: Cloud
+
+  /// Photo, streamed transcription, sentences to the cloud voice as they complete.
+  private func runCloud(_ source: any ReadFrameSource, client: OpenAIClient, _ myGeneration: Int, read myRead: Int) async {
+    pendingFirstWord?.source = "cloud"
+    // A photo per page, as asked; the latest stream frame if the photo fails.
+    let photo = await source.captureStillForReading()
+    guard isCurrent(myGeneration) else { return }
+    let image: UIImage
+    let fromPhoto: Bool
+    if let photo {
+      image = photo
+      fromPhoto = true
+    } else {
+      clock.note("read cloud photo failed, using the stream frame")
+      var frame = source.latestReadFrame
+      if frame == nil { frame = await recentFrame(source, myGeneration) }
+      guard let frame, isCurrent(myGeneration) else {
+        return finish(guidance: SpokenMessage.readPhotoFailed, earcon: .error, myGeneration)
+      }
+      image = frame.image
+      fromPhoto = false
+    }
+
+    phase = .recognizing
+    let photoReadyAt = BenchClock.uptimeNanoseconds()
+    let jpeg = await Task.detached(priority: .userInitiated) { CloudImage.jpeg(image) }.value
+    guard isCurrent(myGeneration) else { return }
+    guard let jpeg else {
+      return await readOnPhoneInstead(image, fromPhoto: fromPhoto, source: source, reason: "jpeg")
+    }
+
+    cloudClient = client
+    isTranscribing = true
+    var splitter = StreamingSentenceSplitter()
+    var heardFirstText = false
+    do {
+      for try await delta in client.transcriptionDeltas(jpeg: jpeg) {
+        guard isCurrentRead(myRead) else { return }
+        if !heardFirstText {
+          heardFirstText = true
+          clock.record(
+            "cloud_first_text", ms: Self.milliseconds(since: photoReadyAt),
+            detail: "size=\(Self.pixelSize(image)) source=\(fromPhoto ? "photo" : "frame")")
+        }
+        for sentence in splitter.append(delta) { addCloudSentence(sentence) }
+      }
+      guard isCurrentRead(myRead) else { return }
+      for sentence in splitter.finish() { addCloudSentence(sentence) }
+    } catch {
+      guard isCurrentRead(myRead), !(error is CancellationError) else { return }
+      let reason = (error as? OpenAIError)?.logName ?? "unknown"
+      return await readOnPhoneInstead(image, fromPhoto: fromPhoto, source: source, reason: reason)
+    }
+    isTranscribing = false
+    transcriptionFinished(note: splitter.note)
+  }
+
+  /// A sentence from the stream: the first one starts the voice at once; later ones continue a
+  /// voice that caught up, or have their audio fetched ahead while the one before plays.
+  private func addCloudSentence(_ text: String) {
+    let preferences = A11yPreferences.shared
+    let rendered = CloudSentence.rendered(text, verbosity: preferences.verbosity, earconsEnabled: preferences.earconsEnabled)
+    guard !rendered.chunks.isEmpty else { return }
+    sentences.append(rendered)
+    let newIndex = sentences.count - 1
+    if newIndex == 0 {
+      earcons.stopWorkingTick(owner: Self.tickOwner)
+      clock.note("read verdict=cloud")
+      speak(at: 0, interrupt: false, generation)
+    } else if waitingForMore {
+      waitingForMore = false
+      speak(at: newIndex, interrupt: false, generation)
+    } else if newIndex == index + 1, phase == .reading, let cloudClient {
+      _ = clip(at: newIndex, client: cloudClient)
+    }
+  }
+
+  private func transcriptionFinished(note: String?) {
+    let preferences = A11yPreferences.shared
+    if sentences.isEmpty {
+      // The model's own hint (SPEAKUP_NOTE), or ours when it sent nothing readable.
+      clock.note("read cloud no_text note=\(note != nil)")
+      let guidance = note ?? SpokenMessage.readGuidance(.noText, verbosity: preferences.verbosity) ?? SpokenMessage.readFailed
+      return finish(guidance: guidance, earcon: .attention, generation)
+    }
+    clock.note("read cloud sentences=\(sentences.count)")
+    guard waitingForMore else { return }
+    // The voice was waiting at the last sentence: that was all of it.
+    waitingForMore = false
+    phase = .finished
+    announcer.announce(SpokenMessage.readEnd(verbosity: preferences.verbosity), earcon: .done, kind: .reply, interrupt: false)
+  }
+
+  /// Any transcription error: one short line, then the on-phone path for the same picture. If the
+  /// stream broke part way, the phone reads the page from the start.
+  private func readOnPhoneInstead(_ image: UIImage, fromPhoto: Bool, source: any ReadFrameSource, reason: String) async {
+    clock.note("read cloud failed reason=\(reason), reading on the phone")
+    if !sentences.isEmpty {
+      generation += 1
+      announcer.stop()
+      sentences = []
+      index = 0
+      pendingFirstWord = nil
+    }
+    resetCloud()
+    let myGeneration = generation
+    pendingFirstWord?.source = "cloud_fallback"
+    earcons.startWorkingTick(owner: Self.tickOwner)
+    speakInterim(SpokenMessage.readCloudFallback, first: "cloud_fallback", myGeneration)
+    await recognizeAndRespond(image, fromPhoto: fromPhoto, source: source, myGeneration)
+  }
+
+  /// Plays sentence `at` with the cloud voice once the Announcer is quiet (a progress line may
+  /// still be playing), fetching the next sentence's audio meanwhile.
+  private func speakCloud(at sentenceIndex: Int, interrupt: Bool, client: OpenAIClient, _ myGeneration: Int) {
+    let current = clip(at: sentenceIndex, client: client)
+    if sentenceIndex + 1 < sentences.count { _ = clip(at: sentenceIndex + 1, client: client) }
+    if interrupt { announcer.stop() }  // Also stops the cloud voice.
+    let onStart = firstWordHandler(myGeneration, first: "text")
+    speechTask?.cancel()
+    speechTask = Task { [weak self] in
+      guard let self else { return }
+      while self.announcer.isSpeaking, self.generation == myGeneration, !Task.isCancelled {
+        try? await Task.sleep(for: .milliseconds(30))
+      }
+      guard self.generation == myGeneration, !Task.isCancelled else { return }
+      CloudVoicePlayer.shared.play(current, onStart: onStart) { [weak self] end in
+        self?.cloudSentenceEnded(sentenceIndex, end: end, myGeneration)
+      }
+    }
+  }
+
+  private func cloudSentenceEnded(_ sentenceIndex: Int, end: CloudVoicePlayer.End, _ myGeneration: Int) {
+    guard myGeneration == generation else { return }
+    switch end {
+    case .finished: sentenceEnded(sentenceIndex, finished: true, myGeneration)
+    case .cancelled: sentenceEnded(sentenceIndex, finished: false, myGeneration)
+    case .failed: cloudVoiceFailed(at: sentenceIndex, myGeneration)
+    }
+  }
+
+  /// The cloud voice failed on a sentence: one short line, then the phone's voice from there on
+  /// (the transcription, if still streaming, carries on).
+  private func cloudVoiceFailed(at sentenceIndex: Int, _ myGeneration: Int) {
+    clock.note("read cloud voice failed at sentence \(sentenceIndex + 1), using the phone voice")
+    cloudClient = nil
+    for clip in clips.values { clip.cancel() }
+    clips = [:]
+    pendingFirstWord?.source = "cloud_fallback"
+    announcer.say(
+      SpokenMessage.readCloudFallback, kind: .reply, interrupt: false,
+      onStart: firstWordHandler(myGeneration, first: "cloud_fallback"))
+    speak(at: sentenceIndex, interrupt: false, myGeneration)
+  }
+
+  /// The sentence's cloud audio: kept from before, or fetched now. A failed fetch is retried.
+  private func clip(at sentenceIndex: Int, client: OpenAIClient) -> CloudSpeechClip {
+    if let clip = clips[sentenceIndex], clip.failure == nil { return clip }
+    let clip = CloudSpeechClip(text: CloudSentence.speechText(sentences[sentenceIndex]), client: client)
+    clips[sentenceIndex] = clip
+    return clip
+  }
+
+  private func resetCloud() {
+    speechTask?.cancel()
+    speechTask = nil
+    for clip in clips.values { clip.cancel() }
+    clips = [:]
+    cloudClient = nil
+    isTranscribing = false
+    waitingForMore = false
+  }
+
   // MARK: Metric
 
   private func firstWordHandler(_ myGeneration: Int, first: String) -> Announcer.StartHandler {
@@ -441,6 +666,15 @@ final class TextReader {
 
   private func isCurrent(_ myGeneration: Int) -> Bool {
     myGeneration == generation && !Task.isCancelled
+  }
+
+  /// For the cloud transcription, which outlives navigation (see `readID`).
+  private func isCurrentRead(_ myRead: Int) -> Bool {
+    myRead == readID && !Task.isCancelled
+  }
+
+  private static func milliseconds(since start: UInt64) -> Int {
+    Int((BenchClock.uptimeNanoseconds() &- start) / 1_000_000)
   }
 
   private static func age(of frame: ReadFrame) -> TimeInterval {

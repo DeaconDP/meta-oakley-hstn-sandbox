@@ -3,12 +3,12 @@
  *
  * Feeds the mock a printed page (A11y/Read/Fixtures/read_page.mp4 as the camera feed, the same
  * page as read_page.png for the photo fallback; made by tracks/ios-native/tools/
- * make-read-fixtures.swift), starts the stream, presses Read, and checks that the reader found
+ * make-read-fixtures.swift), presses Read (which starts the camera), and checks that the reader found
  * the text, spoke it (the timing line only appears once the first word has started), and that
  * next / stop work. The timing line carries the same numbers that go to the log as
  * `metric=trigger_to_first_word`, `ocr` and `frame_age`, which bench.sh summarises.
  *
- * Kept apart from CameraAccessUITests so the photo benchmark test there stays exactly as it is.
+ * bench.sh runs testReadAloud for its timings, so keep it doing one read the same way.
  */
 
 import MWDATMockDeviceTestClient
@@ -39,8 +39,8 @@ final class ReadAloudUITests: XCTestCase {
 
   override func tearDown() async throws {
     if app.state == .runningForeground {
-      let endSession = app.buttons["end_session_button"]
-      if endSession.exists, endSession.isEnabled { endSession.tap() }
+      let stop = app.buttons["read_stop_button"]
+      if stop.exists, stop.isHittable { stop.tap() }
     }
     if let pairedDeviceId {
       _ = await mockClient.unpairDevice(deviceId: pairedDeviceId)
@@ -53,25 +53,8 @@ final class ReadAloudUITests: XCTestCase {
   // MARK: - Test
 
   func testReadAloud() async throws {
-    let connect = app.buttons["Connect my glasses"]
-    XCTAssertTrue(connect.waitForExistence(timeout: 10), "Should start on the home screen")
-    connect.tap()
-    XCTAssertTrue(app.staticTexts["Waiting for an active device"].waitForExistence(timeout: 15))
-
-    let paired = await mockClient.pairDevice()
-    let deviceId = try XCTUnwrap(paired, "pairDevice should return a deviceId")
-    pairedDeviceId = deviceId
-    let feedSet = await mockClient.setCameraFeed(deviceId: deviceId, resourceName: "read_page", ext: "mp4")
-    XCTAssertTrue(feedSet, "Mock should accept the printed-page feed")
-    let photoSet = await mockClient.setCapturedImage(deviceId: deviceId, resourceName: "read_page", ext: "png")
-    XCTAssertTrue(photoSet, "Mock should accept the printed-page photo")
-
-    startSessionAndStream()
-
-    let read = app.buttons["read_button"]
-    XCTAssertTrue(read.waitForExistence(timeout: 10), "Read should sit next to Take photo")
-    XCTAssertTrue(waitUntilEnabled(read), "Read should be enabled while streaming")
-    read.tap()
+    try await connectAndPairPrintedPage()
+    readFromCold()
 
     // A sentence on screen means OCR ran and reading started.
     let sentence = app.staticTexts["read_sentence"]
@@ -98,34 +81,16 @@ final class ReadAloudUITests: XCTestCase {
     XCTAssertTrue(app.buttons["read_repeat_button"].exists, "Repeat stays available after stopping")
   }
 
-  /// Reading a page to its end is what counts: one page, on the card, as one spoken value. Stopping
-  /// early (testReadAloud) doesn't count, and the card starts every run empty.
-  func testFinishingAPageCountsIt() async throws {
-    let connect = app.buttons["Connect my glasses"]
-    XCTAssertTrue(connect.waitForExistence(timeout: 10), "Should start on the home screen")
-    let card = app.descendants(matching: .any)["reading_progress"]
-    connect.tap()
-    XCTAssertTrue(app.staticTexts["Waiting for an active device"].waitForExistence(timeout: 15))
-    XCTAssertTrue(card.waitForExistence(timeout: 5), "The camera screen should show the progress card")
-    XCTAssertEqual(card.label, "Reading progress")
-    XCTAssertEqual(card.value as? String, "0 of 3 pages today. Read a page to start a streak.")
-
-    let paired = await mockClient.pairDevice()
-    let deviceId = try XCTUnwrap(paired, "pairDevice should return a deviceId")
-    pairedDeviceId = deviceId
-    _ = await mockClient.setCameraFeed(deviceId: deviceId, resourceName: "read_page", ext: "mp4")
-    _ = await mockClient.setCapturedImage(deviceId: deviceId, resourceName: "read_page", ext: "png")
-    startSessionAndStream()
-
-    let read = app.buttons["read_button"]
-    XCTAssertTrue(waitUntilEnabled(read), "Read should be enabled while streaming")
-    read.tap()
+  /// Left alone, the reader reads the whole page and says it has finished.
+  func testReadsAPageToTheEnd() async throws {
+    try await connectAndPairPrintedPage()
+    readFromCold()
 
     let status = app.staticTexts["read_status"]
     XCTAssertTrue(
       waitForLabel(status, timeout: 90) { $0 == "Finished, \(Self.pageSentences.count) sentences" },
       "The page should be read to its end, got '\(status.label)'")
-    XCTAssertEqual(card.value as? String, "1 of 3 pages today. 1-day streak.")
+    XCTAssertFalse(app.descendants(matching: .any)["reading_progress"].exists, "No streak card")
   }
 
   /// The fixture page (tools/make-read-fixtures.swift), in reading order.
@@ -165,28 +130,33 @@ final class ReadAloudUITests: XCTestCase {
 
   // MARK: - Helpers
 
-  private func startSessionAndStream() {
-    let startSession = app.buttons["start_session_button"]
-    XCTAssertTrue(startSession.waitForExistence(timeout: 15), "Start Session should appear once a device is active")
-    startSession.tap()
+  private func connectAndPairPrintedPage() async throws {
+    let connect = app.buttons["Connect my glasses"]
+    XCTAssertTrue(connect.waitForExistence(timeout: 10), "Should start on the home screen")
+    connect.tap()
+    let title = app.staticTexts["status_title"]
+    XCTAssertTrue(waitForLabel(title, timeout: 15) { $0 == "Put on your glasses" }, "Should wait for glasses")
 
-    let startPreview = app.buttons["start_preview_button"]
-    XCTAssertTrue(startPreview.waitForExistence(timeout: 20), "Start Preview should appear once the session is started")
-    startPreview.tap()
+    let paired = await mockClient.pairDevice()
+    let deviceId = try XCTUnwrap(paired, "pairDevice should return a deviceId")
+    pairedDeviceId = deviceId
+    let feedSet = await mockClient.setCameraFeed(deviceId: deviceId, resourceName: "read_page", ext: "mp4")
+    XCTAssertTrue(feedSet, "Mock should accept the printed-page feed")
+    let photoSet = await mockClient.setCapturedImage(deviceId: deviceId, resourceName: "read_page", ext: "png")
+    XCTAssertTrue(photoSet, "Mock should accept the printed-page photo")
+    XCTAssertTrue(waitForLabel(title, timeout: 15) { $0 == "Ready to read" }, "Should be ready once the glasses are active")
+  }
 
+  /// One tap on Read with nothing running. The camera starts by itself; the mock's camera permission
+  /// prompt is confirmed, and the read carries on after it.
+  private func readFromCold() {
+    app.buttons["read_button"].tap()
     // Camera is denied by default in the mock: confirm the redirect when asked.
     let allow = app.alerts.buttons["Continue"]
-    if allow.waitForExistence(timeout: 10) { allow.tap() }
+    if allow.waitForExistence(timeout: 15) { allow.tap() }
     // The first stream of a run asks for Local Network access (SpringBoard dialog).
     let springboardAllow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow"]
     if springboardAllow.waitForExistence(timeout: 5) { springboardAllow.tap() }
-
-    XCTAssertTrue(app.buttons["stop_preview_button"].waitForExistence(timeout: 20), "Preview should be streaming")
-  }
-
-  private func waitUntilEnabled(_ element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
-    let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: element)
-    return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
   }
 
   private func waitForLabel(_ element: XCUIElement, timeout: TimeInterval = 10, _ matches: @escaping (String) -> Bool) -> Bool {

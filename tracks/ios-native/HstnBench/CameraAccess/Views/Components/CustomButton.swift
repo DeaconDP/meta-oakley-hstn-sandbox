@@ -26,7 +26,7 @@ struct CustomButton: View {
 
     var tone: Tone {
       switch self {
-      case .primary: .green
+      case .primary: .yellow
       case .secondary: .neutral
       case .destructive: .red
       }

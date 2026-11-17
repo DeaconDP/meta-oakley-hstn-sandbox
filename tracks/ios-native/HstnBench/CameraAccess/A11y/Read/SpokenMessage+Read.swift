@@ -95,7 +95,7 @@ extension SpokenMessage {
 
   static let readPhotoFailed = "The photo for reading wasn't taken. Try again."
 
-  static let readNoCamera = "The camera isn't ready. Open the camera screen and start the preview."
+  static let readNoCamera = "The camera isn't ready yet. Try again in a moment."
 
   static let readCameraTimedOut = "The camera didn't start in time. Try reading again."
 
@@ -108,6 +108,26 @@ extension SpokenMessage {
   static func readEnd(verbosity: Verbosity) -> String {
     verbosity == .short ? "End." : "End of text."
   }
+
+  // MARK: Read: natural voice (cloud)
+
+  /// Any cloud error; the phone's OCR or voice carries on straight after.
+  static let readCloudFallback = "Couldn't reach the reading service, reading on the phone instead."
+
+  static let readCloudKeySaved = "Key saved. Reading uses the natural voice."
+
+  static let readCloudKeySavedVoiceOff = "Key saved. Turn on Use natural voice to read with it."
+
+  static let readCloudKeyNotSaved = "That key wasn't saved. Paste the whole key and try again."
+
+  static let readCloudKeyRemoved = "Key removed. Reading uses the phone's voice."
+
+  /// Removed the pasted key, but the build has one of its own.
+  static let readCloudKeyRemovedBuiltIn = "Key removed. Reading uses the key built into this app."
+
+  static let readNaturalVoiceOn = "Natural voice on."
+
+  static let readNaturalVoiceOff = "Natural voice off. Reading stays on the phone."
 
   // MARK: Read: numbers that aren't read
 

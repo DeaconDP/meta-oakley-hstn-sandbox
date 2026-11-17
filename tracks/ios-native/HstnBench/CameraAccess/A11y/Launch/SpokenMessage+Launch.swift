@@ -8,8 +8,6 @@
 extension SpokenMessage {
   // MARK: Launch
 
-  static let launchLooking = "Looking."
-
   static let launchOpeningForStatus = "Opening the app to check your glasses."
 
   static let launchNothingToRepeat = "Nothing to repeat yet."
