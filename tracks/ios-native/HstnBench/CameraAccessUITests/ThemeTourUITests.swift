@@ -35,7 +35,14 @@ final class ThemeTourUITests: XCTestCase {
   override func tearDown() async throws {
     // Only while the app is up: its test server goes with it, and a request to it would never end.
     if let pairedDeviceId, mockClient != nil, app.state == .runningForeground {
-      _ = await mockClient.unpairDevice(deviceId: pairedDeviceId)
+      // Bounded: the mock server's requests have no timeout of their own.
+      let client = mockClient!
+      let unpaired = XCTestExpectation(description: "unpair")
+      Task {
+        _ = await client.unpairDevice(deviceId: pairedDeviceId)
+        unpaired.fulfill()
+      }
+      _ = await XCTWaiter.fulfillment(of: [unpaired], timeout: 10)
     }
     pairedDeviceId = nil
     app.terminate()
