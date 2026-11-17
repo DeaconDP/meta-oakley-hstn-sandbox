@@ -37,6 +37,90 @@ struct CameraNarration: ViewModifier {
   }
 }
 
+/// The camera screen's two alerts, answered by voice. While one is up it is a blocking VoiceControl
+/// prompt, so commands go to it and not to the screen behind:
+/// - "Allow camera access": yes / allow / continue goes ahead (Meta AI opens, then the read carries
+///   on); no / not now / cancel cancels; "read" says the question again.
+/// - An error: its action's words ("try again", "yes", "update") take the action; OK / no close it;
+///   "read" closes it and reads.
+/// Every answer closes the alert as well, as its buttons do.
+struct CameraVoicePrompts: ViewModifier {
+  let viewModel: CameraViewModel
+  let narrator: CameraNarrator
+  let perform: @MainActor (CameraErrorAction) -> Void
+
+  func body(content: Content) -> some View {
+    content
+      .onChange(of: viewModel.showError, initial: true) { _, shown in
+        if shown { showErrorPrompt() } else { VoiceControl.shared.dismissPrompt(.cameraError) }
+      }
+      // A second error can replace the first while the alert stays up.
+      .onChange(of: viewModel.errorAction) { _, _ in
+        if viewModel.showError { showErrorPrompt() }
+      }
+      .onChange(of: viewModel.showCameraPermissionRedirectConfirm, initial: true) { _, shown in
+        if shown { showPermissionPrompt() } else { VoiceControl.shared.dismissPrompt(.cameraPermission) }
+      }
+      .onDisappear {
+        VoiceControl.shared.dismissPrompt(.cameraError)
+        VoiceControl.shared.dismissPrompt(.cameraPermission)
+      }
+  }
+
+  private func showErrorPrompt() {
+    let viewModel = viewModel
+    let perform = perform
+    VoiceControl.shared.showPrompt(.cameraError, accepts: CameraProblem.voiceCommands(for: viewModel.errorAction)) { command in
+      let action = viewModel.errorAction
+      switch command {
+      case .ok, .no:
+        Self.close(viewModel)
+      case .read:
+        Self.close(viewModel)
+        TextReader.shared.read()
+      case .yes, .tryAgain, .update:
+        Self.close(viewModel)
+        if let action {
+          perform(action)
+        } else if command == .tryAgain {
+          TextReader.shared.read()
+        }
+      default:
+        return false
+      }
+      return true
+    }
+  }
+
+  private func showPermissionPrompt() {
+    let viewModel = viewModel
+    let narrator = narrator
+    VoiceControl.shared.showPrompt(.cameraPermission, accepts: [.yes, .continueOn, .no, .read]) { command in
+      switch command {
+      case .yes, .continueOn:
+        VoiceControl.shared.dismissPrompt(.cameraPermission)
+        // The same as the alert's Continue: the read that asked carries on once it's allowed.
+        Task { await viewModel.confirmCameraPermissionRedirect { TextReader.shared.read() } }
+      case .no:
+        VoiceControl.shared.dismissPrompt(.cameraPermission)
+        viewModel.showCameraPermissionRedirectConfirm = false
+        narrator.cameraPermissionPromptCancelled()
+      case .read:
+        // Still waiting for an answer: the reader says the question again.
+        TextReader.shared.read()
+      default:
+        return false
+      }
+      return true
+    }
+  }
+
+  private static func close(_ viewModel: CameraViewModel) {
+    VoiceControl.shared.dismissPrompt(.cameraError)
+    viewModel.dismissError()
+  }
+}
+
 extension View {
   /// VoiceOver custom actions (swipe up/down on any camera-screen element): read the text in
   /// view, hear the status line, or hear the last spoken line again. While there is something

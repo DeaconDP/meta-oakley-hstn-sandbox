@@ -40,11 +40,15 @@ struct HomeScreenView: View {
       }
   }
 
-  /// Help, stop, repeat, faster and slower are VoiceControl's own.
+  /// Help, stop, repeat, faster, slower, goodbye and the settings but disconnect are VoiceControl's own.
   private func handleVoice(_ command: VoiceCommand) -> Bool {
     switch command {
-    case .connect, .tryAgain: viewModel.connectGlasses()
+    case .connect, .tryAgain:
+      // An alert left up would sit over Meta AI's return.
+      viewModel.dismissError()
+      viewModel.connectGlasses()
     case .status: Announcer.shared.announce(SpokenMessage.voiceHomeStatus, earcon: .attention)
+    case .disconnect: viewModel.disconnectByVoice()
     default: return false
     }
     return true

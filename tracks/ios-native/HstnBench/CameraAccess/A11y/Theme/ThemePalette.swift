@@ -108,13 +108,14 @@ struct ThemePalette: Equatable, Sendable {
 
   // SpeakUp brand: Night #0B0B1A, Dusk #1E1A3D, Dusk Line #3A3470, Signal Yellow #FFD60A,
   // Paper #FFF8E7, Voice Coral #FF6B5B (speaking, warnings), Listen Cyan #3DD9EB (listening).
-  // Light mode puts Night ink on Paper; dark mode puts Paper ink on Night and Dusk. Bright faces
+  // Light mode puts Night ink on Paper; dark mode puts Paper ink on Night and Dusk. The outline
+  // (`stroke`) is the brand's: Night in light, Paper in dark (tokens.json role.*.outline). Bright faces
   // keep their brand value in both and carry Night text; their lips and the listen/speak colours
   // go darker in light mode, where the bright value alone wouldn't reach 3:1 on Paper.
 
   static let light = ThemePalette(
     name: "light", page: ThemeRGB(0xFFF8E7), surface: ThemeRGB(0xFFFFFF), ink: ThemeRGB(0x0B0B1A), inkSoft: ThemeRGB(0x37325C),
-    stroke: ThemeRGB(0x6F6896), lockedFace: ThemeRGB(0xEEEAF6), lockedStroke: ThemeRGB(0x6F6896), lockedText: ThemeRGB(0x37325C),
+    stroke: ThemeRGB(0x0B0B1A), lockedFace: ThemeRGB(0xEEEAF6), lockedStroke: ThemeRGB(0x6F6896), lockedText: ThemeRGB(0x37325C),
     track: ThemeRGB(0xE6E1F0), fill: ThemeRGB(0x8A6400), listen: ThemeRGB(0x00727F), speak: ThemeRGB(0xC0392B),
     yellow: ToneColors(0xFFD60A, lip: 0x8A6400, on: 0x0B0B1A),
     green: ToneColors(0x63D420, lip: 0x2E7D0C, on: 0x0B2200),
@@ -125,7 +126,7 @@ struct ThemePalette: Equatable, Sendable {
 
   static let dark = ThemePalette(
     name: "dark", page: ThemeRGB(0x0B0B1A), surface: ThemeRGB(0x1E1A3D), ink: ThemeRGB(0xFFF8E7), inkSoft: ThemeRGB(0xD6D0EE),
-    stroke: ThemeRGB(0x8F87CF), lockedFace: ThemeRGB(0x2A2550), lockedStroke: ThemeRGB(0x948CD4), lockedText: ThemeRGB(0xE2DDF5),
+    stroke: ThemeRGB(0xFFF8E7), lockedFace: ThemeRGB(0x2A2550), lockedStroke: ThemeRGB(0x948CD4), lockedText: ThemeRGB(0xE2DDF5),
     track: ThemeRGB(0x3A3470), fill: ThemeRGB(0xFFD60A), listen: ThemeRGB(0x3DD9EB), speak: ThemeRGB(0xFF6B5B),
     yellow: ToneColors(0xFFD60A, lip: 0xB89400, on: 0x0B0B1A),
     green: ToneColors(0x7BE241, lip: 0x46A812, on: 0x0B2200),
@@ -136,7 +137,7 @@ struct ThemePalette: Equatable, Sendable {
 
   static let lightHighContrast = ThemePalette(
     name: "lightHighContrast", page: ThemeRGB(0xFFFFFF), surface: ThemeRGB(0xFFFFFF), ink: ThemeRGB(0x000000), inkSoft: ThemeRGB(0x1E1A3D),
-    stroke: ThemeRGB(0x2A2550), lockedFace: ThemeRGB(0xEEEAF6), lockedStroke: ThemeRGB(0x2A2550), lockedText: ThemeRGB(0x1E1A3D),
+    stroke: ThemeRGB(0x000000), lockedFace: ThemeRGB(0xEEEAF6), lockedStroke: ThemeRGB(0x2A2550), lockedText: ThemeRGB(0x1E1A3D),
     track: ThemeRGB(0xE6E1F0), fill: ThemeRGB(0x5C4200), listen: ThemeRGB(0x004E57), speak: ThemeRGB(0x8A1C12),
     yellow: ToneColors(0xFFD60A, lip: 0x5C4200, on: 0x000000),
     green: ToneColors(0x63D420, lip: 0x1B5200, on: 0x041200),
@@ -147,7 +148,7 @@ struct ThemePalette: Equatable, Sendable {
 
   static let darkHighContrast = ThemePalette(
     name: "darkHighContrast", page: ThemeRGB(0x000000), surface: ThemeRGB(0x0B0B1A), ink: ThemeRGB(0xFFFFFF), inkSoft: ThemeRGB(0xF0ECFF),
-    stroke: ThemeRGB(0xC4BEEB), lockedFace: ThemeRGB(0x1E1A3D), lockedStroke: ThemeRGB(0xC4BEEB), lockedText: ThemeRGB(0xF4F1FF),
+    stroke: ThemeRGB(0xFFFFFF), lockedFace: ThemeRGB(0x1E1A3D), lockedStroke: ThemeRGB(0xC4BEEB), lockedText: ThemeRGB(0xF4F1FF),
     track: ThemeRGB(0x2A2550), fill: ThemeRGB(0xFFE14D), listen: ThemeRGB(0x6FE6F3), speak: ThemeRGB(0xFF8A7D),
     yellow: ToneColors(0xFFE14D, lip: 0xE0B800, on: 0x000000),
     green: ToneColors(0x8CF050, lip: 0x68C42E, on: 0x041200),
@@ -196,8 +197,154 @@ enum Theme {
   static func lip(_ tone: Tone) -> Color { dynamic { $0.colors(for: tone).lip } }
   static func onFace(_ tone: Tone) -> Color { dynamic { $0.colors(for: tone).onFace } }
 
-  static let cardRadius: CGFloat = 24
-  static let buttonRadius: CGFloat = 20
+  /// The mascot's sticker outline around props drawn in Night ink outside its body: Paper on dark
+  /// pages, where Night ink would vanish; the page colour on light ones, where it doesn't show.
+  static let mascotOutline = dynamic { $0.isDark ? $0.ink : $0.page }
+
+  /// The voice ribbon's colour for each state (tokens.json `state`). Yellow, Cyan and Coral are the
+  /// brand values on dark pages; on light pages they use the darker partners that reach 3:1 on Paper.
+  static func ribbon(_ state: RibbonState) -> Color {
+    switch state {
+    case .idle: dynamic { $0.isDark ? $0.yellow.face : $0.yellow.lip }
+    case .listening: listen
+    case .thinking: ink
+    case .speaking, .error: speak
+    }
+  }
+
+  // MARK: Layout tokens (tokens.json `space`, `radius`, `size`)
+
+  enum Space {
+    static let xxs: CGFloat = 4
+    static let xs: CGFloat = 8
+    static let sm: CGFloat = 12
+    static let md: CGFloat = 16
+    static let lg: CGFloat = 24
+    static let xl: CGFloat = 32
+    static let xxl: CGFloat = 48
+  }
+
+  enum Radius {
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 16
+    static let lg: CGFloat = 24
+    static let xl: CGFloat = 32
+    /// Clamped by the shape to half its height: a capsule.
+    static let pill: CGFloat = 999
+  }
+
+  static let cardRadius: CGFloat = Radius.lg
+  static let buttonRadius: CGFloat = Radius.md
+  /// The one main action on a screen.
+  static let primaryButtonHeight: CGFloat = 72
+  static let touchTargetMin: CGFloat = 56
+  static let outlineWidth: CGFloat = 2
+  static let outlineWidthIncreased: CGFloat = 3
+
+  /// Readable column width on wide screens.
+  static let maxContentWidth: CGFloat = 700
+
+  // MARK: Motion (tokens.json `motion`)
+
+  /// Every state change (a card appearing, the status changing, the mascot's mood): 240 ms on the
+  /// brand's cubic-bezier(0.2, 0, 0, 1). Calm, no bounce.
+  static let stateChangeAnimation = Animation.timingCurve(0.2, 0, 0, 1, duration: 0.24)
+
+  /// The state-change animation, or none under Reduce Motion: changes then simply cut, and anything
+  /// using an opacity transition doesn't move.
+  static func stateChange(reduceMotion: Bool) -> Animation? {
+    reduceMotion ? nil : stateChangeAnimation
+  }
+}
+
+extension ThemePalette {
+  var isDark: Bool { name.hasPrefix("dark") }
+}
+
+/// Follows the phone's light or dark setting unless the user picks one in Settings (System, then
+/// Dark, then Light). Dark mode is the brand's dark design (tokens.json). UI tests can force either
+/// with --dark-mode / --light-mode.
+@MainActor
+@Observable
+final class ThemeAppearance {
+  static let shared = ThemeAppearance()
+
+  enum Mode: String, Sendable, CaseIterable {
+    case system, dark, light
+
+    /// The settings button's order: System, Dark, Light, then System again.
+    var next: Mode {
+      switch self {
+      case .system: .dark
+      case .dark: .light
+      case .light: .system
+      }
+    }
+
+    var title: String {
+      switch self {
+      case .system: "Match the phone"
+      case .dark: "Dark"
+      case .light: "Light"
+      }
+    }
+  }
+
+  @ObservationIgnored private let defaults: UserDefaults
+  static let key = "theme.appearance"
+
+  /// The user's choice, kept in UserDefaults. System until they choose.
+  var mode: Mode {
+    didSet { defaults.set(mode.rawValue, forKey: Self.key) }
+  }
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+    mode = defaults.string(forKey: Self.key).flatMap(Mode.init(rawValue:)) ?? .system
+  }
+
+  /// What the app asks the system for: a test's forced mode first, then the user's choice. nil
+  /// follows the phone.
+  var colorScheme: ColorScheme? {
+    if LaunchOptions.forcesDarkMode { return .dark }
+    if LaunchOptions.forcesLightMode { return .light }
+    return Self.colorScheme(for: mode)
+  }
+
+  static func colorScheme(for mode: Mode) -> ColorScheme? {
+    switch mode {
+    case .system: nil
+    case .dark: .dark
+    case .light: .light
+    }
+  }
+
+  /// The settings button: the next mode, said out loud.
+  func cycle() {
+    mode = mode.next
+    Announcer.shared.say(SpokenMessage.appearance(mode))
+  }
+}
+
+extension LaunchOptions {
+  /// With --ui-testing: light mode, for the tour and audits, whatever the Simulator is set to.
+  static let forcesLightMode = isUITesting && ProcessInfo.processInfo.arguments.contains("--light-mode")
+}
+
+extension View {
+  /// Animates changes to `value` with the shared state-change motion, respecting Reduce Motion.
+  func stateAnimation<V: Equatable>(value: V) -> some View {
+    modifier(StateAnimation(value: value))
+  }
+}
+
+private struct StateAnimation<V: Equatable>: ViewModifier {
+  let value: V
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  func body(content: Content) -> some View {
+    content.animation(Theme.stateChange(reduceMotion: reduceMotion), value: value)
+  }
 }
 
 /// SpeakUp's typeface: Atkinson Hyperlegible (Braille Institute, SIL OFL 1.1), bundled from
@@ -222,20 +369,17 @@ enum BrandFont {
     Thread.isMainThread ? MainActor.assumeIsolated { UIAccessibility.isBoldTextEnabled } : false
   }
 
-  /// The default (Large) size of each Dynamic Type style, which `relativeTo:` scales from.
+  /// Each Dynamic Type style's size at the default (Large) setting, from the brand scale
+  /// (tokens.json `type.scale`): headline 34, title 26, body large 22, body and label 20, caption 18.
+  /// Nothing is below 18, and `relativeTo:` scales every one with the user's text size.
   static func baseSize(_ style: Font.TextStyle) -> CGFloat {
     switch style {
-    case .largeTitle: 34
-    case .title: 28
-    case .title2: 22
-    case .title3: 20
-    case .headline, .body: 17
-    case .callout: 16
-    case .subheadline: 15
-    case .footnote: 13
-    case .caption: 12
-    case .caption2: 11
-    @unknown default: 17
+    case .largeTitle: 34  // headline
+    case .title: 26  // title
+    case .title2, .title3: 22  // body large
+    case .headline, .body, .callout: 20  // label, body
+    case .subheadline, .footnote, .caption, .caption2: 18  // caption, the minimum
+    @unknown default: 20
     }
   }
 }
@@ -245,5 +389,10 @@ extension Font {
   /// (Named for the SF Rounded it replaced, so every screen picked it up unchanged.)
   static func rounded(_ style: Font.TextStyle, weight: Font.Weight = .bold) -> Font {
     .custom(BrandFont.name(for: weight), size: BrandFont.baseSize(style), relativeTo: style)
+  }
+
+  /// The brand face at an exact size that still scales with Dynamic Type like `style`.
+  static func brand(size: CGFloat, relativeTo style: Font.TextStyle, weight: Font.Weight = .bold) -> Font {
+    .custom(BrandFont.name(for: weight), size: size, relativeTo: style)
   }
 }

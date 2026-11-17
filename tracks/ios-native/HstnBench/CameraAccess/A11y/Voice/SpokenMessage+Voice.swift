@@ -69,4 +69,55 @@ extension SpokenMessage {
   static let voiceFastest = "That's the fastest."
 
   static let voiceSlowest = "That's the slowest."
+
+  /// Before each system permission dialog (microphone, then speech recognition).
+  static let voiceDialogOnScreen = "A dialog is on screen. With VoiceOver, double-tap Allow."
+
+  /// "Reader, goodbye". The phrase is ReadIntent's "\(.applicationName) read" (LaunchIntents); Siri
+  /// wakes listening on any screen (LaunchActionRouter).
+  static let voiceGoodbye = "Bye. Say 'SpeakUp read' to Siri to start again."
+
+  /// Answer to anything else while a yes/no question waits.
+  static let voiceSayYesOrNo = "Say yes or no first."
+
+  /// Shown (and in settings) while voice control sleeps after goodbye.
+  static let voiceAsleep = "Not listening since you said goodbye. Choose Listen again, or say 'SpeakUp read' to Siri."
+
+  /// Once, before the first read ever.
+  static let voiceInterruptTip = "To interrupt me, say reader, stop."
+
+  /// The first camera session, with the glasses mic not yet allowed.
+  static let voiceGlassesMicOffer = "Want me to listen through your glasses? Say yes or no."
+
+  static let voiceGlassesMicDeclined = "OK, I'll keep using the phone's microphone. Say listen through glasses any time."
+
+  static let voiceGlassesMicAlready = "I'm already listening through your glasses."
+
+  static let voiceGlassesMicNeedsCamera = "I can listen through your glasses once the camera is on. Say read to start it."
+
+  static let replayingSetup = "OK, let's go through setup again."
+
+  // MARK: Appearance
+
+  static func appearance(_ mode: ThemeAppearance.Mode) -> String {
+    switch mode {
+    case .system: "Appearance matches the phone."
+    case .dark: "Dark appearance."
+    case .light: "Light appearance."
+    }
+  }
+
+  // MARK: Detail level
+
+  static func verbosity(_ level: Verbosity) -> String {
+    switch level {
+    case .short: "Shorter. I'll keep it brief."
+    case .normal: "Normal detail."
+    case .detailed: "More detail. I'll explain a bit more."
+    }
+  }
+
+  static let verbosityShortest = "That's already as short as I go."
+
+  static let verbosityLongest = "That's already the most detail."
 }

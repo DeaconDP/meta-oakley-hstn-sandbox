@@ -157,12 +157,15 @@ final class SpokenMessageTests: XCTestCase {
     }
   }
 
-  /// The first screen says how to go on, by voice and by button.
-  func testWelcomeSaysWhatToSayAndTap() {
+  /// The first screen says how to go on by voice, leading with the command. The buttons are there
+  /// for VoiceOver, which reads them itself, so the spoken lines don't mention tapping.
+  func testWelcomeSaysWhatToSay() {
     XCTAssertTrue(SpokenMessage.welcomeConnect.contains("Say connect"))
-    XCTAssertTrue(SpokenMessage.welcomeConnect.contains("tap Connect glasses"))
     XCTAssertTrue(SpokenMessage.welcomeRetry.contains("Say try again"))
     XCTAssertTrue(SpokenMessage.welcomeAlreadyConnected.contains("Say continue"))
+    for line in [SpokenMessage.welcomeConnect, SpokenMessage.welcomeRetry, SpokenMessage.welcomeAlreadyConnected] {
+      XCTAssertFalse(line.lowercased().contains("tap"), line)
+    }
   }
 
   func testStatusLinesAreShort() {

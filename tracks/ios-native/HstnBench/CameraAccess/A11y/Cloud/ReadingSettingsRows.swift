@@ -25,10 +25,9 @@ struct ReadingSettingsRows: View {
 
   var body: some View {
     Text("Reading")
-      .font(.rounded(.headline, weight: .heavy))
+      .font(.rounded(.title2, weight: .heavy))
       .foregroundStyle(Theme.ink)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
       .accessibilityAddTraits(.isHeader)
     Text(statusText)
       .font(.rounded(.subheadline, weight: .bold))
@@ -48,7 +47,10 @@ struct ReadingSettingsRows: View {
     .onChange(of: preferences.useNaturalVoice) { _, isOn in
       Announcer.shared.say(isOn ? SpokenMessage.readNaturalVoiceOn : SpokenMessage.readNaturalVoiceOff)
     }
-    SecureField("Paste an OpenAI API key", text: $draftKey)
+    SecureField(
+      "Paste an OpenAI API key", text: $draftKey,
+      // The system placeholder grey is under 4.5:1 on Paper; soft ink passes in every variant.
+      prompt: Text("Paste an OpenAI API key").foregroundStyle(Theme.inkSoft))
       .font(.rounded(.body, weight: .medium))
       .foregroundStyle(Theme.ink)
       .textInputAutocapitalization(.never)
@@ -58,14 +60,15 @@ struct ReadingSettingsRows: View {
       .onSubmit(saveKey)
       .padding(.horizontal, 16)
       .frame(minHeight: 60)
-      .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.buttonRadius, style: .continuous))
+      .background(Theme.page, in: RoundedRectangle(cornerRadius: Theme.buttonRadius, style: .continuous))
       .overlay {
         RoundedRectangle(cornerRadius: Theme.buttonRadius, style: .continuous).strokeBorder(Theme.stroke, lineWidth: 2)
       }
       .accessibilityLabel("OpenAI API key")
       .accessibilityHint("Paste your key, then choose Save key. It is kept in this phone's Keychain.")
       .accessibilityIdentifier("openai_key_field")
-    CustomButton(title: "Save key", style: .primary, isDisabled: trimmedDraft.isEmpty, action: saveKey)
+    // Secondary: the screen's one yellow action is Read text, and Settings has none.
+    CustomButton(title: "Save key", style: .secondary, isDisabled: trimmedDraft.isEmpty, action: saveKey)
       .accessibilityHint("Saves the pasted key so pages are read with the natural voice.")
       .accessibilityIdentifier("openai_key_save_button")
     if cloud.hasStoredKey {

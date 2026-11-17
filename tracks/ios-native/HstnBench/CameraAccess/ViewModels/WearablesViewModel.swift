@@ -36,6 +36,22 @@ enum WearablesAlertAction: Sendable {
     case .openFirmwareUpdate, .openGlassesAppUpdate: "Update in Meta AI"
     }
   }
+
+  /// The spoken answers that take this action while its alert is up.
+  var voiceCommands: [VoiceCommand] {
+    switch self {
+    case .retryConnect, .reconnect: [.yes, .tryAgain, .connect]
+    case .openFirmwareUpdate, .openGlassesAppUpdate: [.yes, .update]
+    }
+  }
+
+  /// What to say next, spoken after the alert's sentence.
+  var spokenHint: String {
+    switch self {
+    case .retryConnect, .reconnect: SpokenMessage.alertSayConnect
+    case .openFirmwareUpdate, .openGlassesAppUpdate: SpokenMessage.alertSayUpdate
+    }
+  }
 }
 
 /// A registration request that Meta AI started and handed to this app. Identifiable so a sheet can
@@ -106,7 +122,10 @@ struct WearablesProblem {
 final class WearablesViewModel {
   var devices: [DeviceIdentifier]
   var registrationState: RegistrationState
-  var showError: Bool = false
+  /// The alert closing any way (a button, the binding, voice) also ends its voice prompt.
+  var showError: Bool = false {
+    didSet { if !showError { VoiceControl.shared.dismissPrompt(.wearablesError) } }
+  }
   var errorTitle: String = ""
   var errorMessage: String = ""
   var errorAction: WearablesAlertAction?
@@ -118,8 +137,17 @@ final class WearablesViewModel {
   /// The last unsuccessful outcome, shown next to the connect button so it can be read as well as
   /// heard. Cleared when a new attempt starts or registration succeeds.
   private(set) var connectionNotice: String?
-  /// A registration Meta AI started, waiting for the user's Continue or Not now.
-  var pendingRegistrationRequest: PendingRegistrationRequest?
+  /// A registration Meta AI started, waiting for the user's Continue or Not now. While it is up its
+  /// sheet takes voice answers (a blocking prompt), so the screen underneath gets no commands.
+  var pendingRegistrationRequest: PendingRegistrationRequest? {
+    didSet {
+      if pendingRegistrationRequest == nil {
+        VoiceControl.shared.dismissPrompt(.registrationRequest)
+      } else {
+        showRegistrationRequestPrompt()
+      }
+    }
+  }
   /// Appended to the next "Connected to …" line, e.g. onboarding's "Hold up a page and say read.". One line
   /// instead of two, so nothing can be spoken out of order or cut between them.
   @ObservationIgnored var connectedFollowUp: String?
@@ -240,6 +268,18 @@ final class WearablesViewModel {
     }
   }
 
+  /// "Disconnect": asks first ("Disconnect your glasses? Say yes or no."), since connecting again
+  /// means a trip through Meta AI.
+  func disconnectByVoice(voice: VoiceControl = .shared) {
+    guard registrationState == .registered else {
+      return Announcer.shared.say(SpokenMessage.disconnectNothing)
+    }
+    voice.confirm(
+      SpokenMessage.disconnectConfirm,
+      onYes: { [weak self] in self?.disconnectGlasses() },
+      onNo: { Announcer.shared.say(SpokenMessage.disconnectKept) })
+  }
+
   func disconnectGlasses() {
     userRequestedDisconnect = true
     Task { @MainActor in
@@ -307,6 +347,18 @@ final class WearablesViewModel {
   private func receiveRegistrationRequest(_ request: RegistrationRequest) {
     pendingRegistrationRequest = PendingRegistrationRequest(request: request)
     Announcer.shared.announce(SpokenMessage.metaAIRegistrationRequest, earcon: .attention)
+  }
+
+  /// "Yes", "continue" or "connect" goes ahead; "no" or "not now" declines.
+  private func showRegistrationRequestPrompt() {
+    VoiceControl.shared.showPrompt(.registrationRequest, accepts: [.yes, .continueOn, .connect, .no]) { [weak self] command in
+      switch command {
+      case .yes, .continueOn, .connect: self?.continueRegistrationRequest()
+      case .no: self?.declineRegistrationRequest()
+      default: return false
+      }
+      return true
+    }
   }
 
   func continueRegistrationRequest() {
@@ -492,10 +544,36 @@ final class WearablesViewModel {
     errorMessage = problem.message
     errorAction = problem.action
     showError = true
+    showErrorPrompt(for: problem.action)
     if UIAccessibility.isVoiceOverRunning {
       EarconPlayer.shared.play(problem.earcon)
     } else {
-      Announcer.shared.announce(problem.message, earcon: problem.earcon)
+      // With what to say next, since the alert answers to voice.
+      let hint = problem.action?.spokenHint ?? SpokenMessage.alertSayOK
+      Announcer.shared.announce("\(problem.message) \(hint)", earcon: problem.earcon)
+    }
+  }
+
+  /// The alert by voice: its action's words take the action, OK / no / not now close it. Either way
+  /// the alert is dismissed, as its buttons do.
+  private func showErrorPrompt(for action: WearablesAlertAction?) {
+    let accepts = (action?.voiceCommands ?? [.yes]) + [.ok, .no]
+    VoiceControl.shared.showPrompt(.wearablesError, accepts: accepts) { [weak self] command in
+      guard let self else { return false }
+      switch command {
+      case .ok:
+        self.dismissError()
+      case .no:
+        // Passed on as well: on the first screen "not now" also means skip setup, as it says.
+        self.dismissError()
+        return false
+      case .yes, .tryAgain, .connect, .update:
+        // performErrorAction dismisses first; with no action, "yes" just closes it.
+        if self.errorAction == nil { self.dismissError() } else { self.performErrorAction() }
+      default:
+        return false
+      }
+      return true
     }
   }
 

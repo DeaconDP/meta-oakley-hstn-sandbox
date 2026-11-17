@@ -12,7 +12,9 @@
  * Nothing else is asked. The audio route is detected, not tested: after connecting, a tip if sound
  * is still on the phone speaker. Verbosity and speech rate keep their defaults and live in
  * Settings. Voice control asks for the microphone and speech recognition here, after one spoken
- * sentence (VoiceControl.promptForPermissions), queued behind the welcome line.
+ * sentence (VoiceControl.promptForPermissions), queued behind the welcome and safety lines and
+ * before "Say connect" (VoiceControl.whenPermissionsSettled), so the command is only offered once
+ * it can be heard.
  *
  * MainAppView shows it while A11yPreferences.onboardingCompleted is false, so "Replay setup" is
  * `A11yPreferences.shared.resetOnboarding()`. Reaching the main screen, or Not now, marks it done.
@@ -58,10 +60,8 @@ struct OnboardingView: View {
       // WearablesViewModel has said "Connected to …" with connectedFollowUp as one line.
       if state == .registered { finishConnected(alreadySpoken: true) }
     }
-    .onChange(of: wearablesViewModel.connectionNotice) { _, newNotice in
-      // Queued behind the reason, which the view model has just said.
-      if newNotice != nil, !isRegistered { speakKeyLine(SpokenMessage.welcomeRetry) }
-    }
+    // A connection that didn't finish: WearablesViewModel says why with "Say try again, or not
+    // now." (its alert answers to voice), so nothing more is said here.
     // "Connecting…" otherwise only changes visually.
     .a11yAnnounce(onChangeOf: wearablesViewModel.isConnecting) { connecting in
       connecting ? "Connecting." : nil
@@ -147,10 +147,15 @@ struct OnboardingView: View {
     }
     wearablesViewModel.connectedFollowUp = SpokenMessage.connectedNext
     focusTitle()
-    // Before setScreen: if voice control still needs permission, its one-sentence explanation and
-    // the system dialogs queue behind this line instead of cutting it off.
-    speakKeyLine(welcomeLine)
+    // Who we are and the safety sentence first. Then, if voice control still needs permission, its
+    // one-sentence explanation and the system dialogs (queued behind, not cutting it off). Only then
+    // "Say connect", once saying it can work.
+    speakKeyLine("\(SpokenMessage.welcomeIntro) \(SpokenMessage.safetyNote)")
     VoiceControl.shared.setScreen(.welcome, handler: handleVoice)
+    VoiceControl.shared.whenPermissionsSettled { [wearablesViewModel] in
+      let registered = wearablesViewModel.registrationState == .registered
+      speakKeyLine(registered ? SpokenMessage.welcomeAlreadyConnected : SpokenMessage.welcomeConnect)
+    }
     VoiceCoach.shared.provide(for: .welcome) { [wearablesViewModel] in
       // Nothing to suggest while Meta AI is being opened or waited for.
       if wearablesViewModel.isConnecting { return nil }
@@ -201,7 +206,7 @@ struct OnboardingView: View {
   /// help, stop, faster and slower are VoiceControl's own.
   private func handleVoice(_ command: VoiceCommand) -> Bool {
     switch command {
-    case .connect, .tryAgain, .yes, .continueOn:
+    case .connect, .tryAgain, .yes, .continueOn, .next:
       if isRegistered { startReading() } else { connect() }
     case .no:
       notNow()

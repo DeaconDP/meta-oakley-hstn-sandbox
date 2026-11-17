@@ -1,7 +1,8 @@
 /*
  * ChunkyButtonStyle - the 3D button: a saturated face on a darker lip that compresses when pressed
  *
- * Rules (notes/a11y-onboarding.md, "Low vision is its own path"): targets of at least 60 pt, text in
+ * Rules (notes/a11y-onboarding.md, "Low vision is its own path"): targets of at least 60 pt (the yellow
+ * primary is 72, tokens.json size.primaryButtonHeight), text in
  * Dynamic Type styles that wraps instead of truncating, and state carried by shape: pressed moves
  * the face down onto its lip, disabled goes flat with a dashed outline. Reduce Motion takes away the
  * animation, not the state. A disabled button keeps full text contrast, because someone with low
@@ -17,9 +18,13 @@ struct ChunkyButtonStyle: ButtonStyle {
   var tone: Tone = .yellow
   var lipHeight: CGFloat = 6
   var radius: CGFloat = Theme.buttonRadius
+  /// Nil: 72 for the yellow primary, 60 for everything else.
+  var minHeight: CGFloat?
 
   func makeBody(configuration: Configuration) -> some View {
-    ChunkyButtonBody(configuration: configuration, tone: tone, lipHeight: lipHeight, radius: radius)
+    ChunkyButtonBody(
+      configuration: configuration, tone: tone, lipHeight: lipHeight, radius: radius,
+      minHeight: minHeight ?? (tone == .yellow ? Theme.primaryButtonHeight : 60))
   }
 }
 
@@ -35,6 +40,7 @@ private struct ChunkyButtonBody: View {
   let tone: Tone
   let lipHeight: CGFloat
   let radius: CGFloat
+  let minHeight: CGFloat
 
   @Environment(\.isEnabled) private var isEnabled
   @Environment(\.colorSchemeContrast) private var contrast
@@ -44,11 +50,12 @@ private struct ChunkyButtonBody: View {
   var body: some View {
     let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
     let pressed = configuration.isPressed && isEnabled
-    let line: CGFloat = contrast == .increased ? 3 : 2
+    let line: CGFloat = contrast == .increased ? Theme.outlineWidthIncreased : Theme.outlineWidth
 
     VStack(spacing: 2) {
       configuration.label
         .font(.rounded(.headline, weight: .heavy))
+        .tracking(0.4)
         .multilineTextAlignment(.center)
         .fixedSize(horizontal: false, vertical: true)
       if let sayCommand, isEnabled {
@@ -56,9 +63,9 @@ private struct ChunkyButtonBody: View {
       }
     }
     .foregroundStyle(isEnabled ? Theme.onFace(tone) : Theme.lockedText)
-    .padding(.horizontal, 16)
-    .padding(.vertical, 10)
-    .frame(maxWidth: .infinity, minHeight: 60)
+    .padding(.horizontal, Theme.Space.md)
+    .padding(.vertical, Theme.Space.sm)
+    .frame(maxWidth: .infinity, minHeight: minHeight)
     .background { shape.fill(isEnabled ? Theme.face(tone) : Theme.lockedFace) }
     .overlay {
       if isEnabled {
@@ -106,7 +113,8 @@ struct A11yNote: View {
 
   var body: some View {
     Text(text)
-      .font(.rounded(.callout, weight: .medium))
+      .font(.rounded(.body, weight: .regular))
+      .lineSpacing(5)
       .foregroundStyle(Theme.ink)
       .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)

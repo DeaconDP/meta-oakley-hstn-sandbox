@@ -101,7 +101,7 @@ extension SpokenMessage {
 
   static let readFailed = "Text recognition failed on this picture. Try reading again."
 
-  static let readNothingToNavigate = "Nothing read yet. Use Read text first."
+  static let readNothingToNavigate = "Nothing read yet. Say read first."
 
   static let readLastSentence = "That was the last sentence."
 
@@ -111,12 +111,38 @@ extension SpokenMessage {
 
   // MARK: Read: natural voice (cloud)
 
-  /// Any cloud error; the phone's OCR or voice carries on straight after.
+  /// A cloud error with no line of its own (offline, server); the phone's OCR or voice carries on
+  /// straight after.
   static let readCloudFallback = "Couldn't reach the reading service, reading on the phone instead."
+
+  /// OpenAI refused the key (401/403, invalid_api_key). The cloud isn't tried again this session.
+  static let readCloudKeyRefused =
+    "The reading service didn't accept the key. Reading on the phone for now; set a new key in Settings."
+
+  /// insufficient_quota: the OpenAI account has no credit left.
+  static let readCloudQuota = "The reading service account is out of credit. Reading on the phone for now."
+
+  /// 429 without a quota code: too many requests just now.
+  static let readCloudBusy = "The reading service is busy right now. Reading on the phone instead."
+
+  /// The line for a cloud failure, by what went wrong.
+  static func readCloudFallback(for error: OpenAIError?) -> String {
+    switch error {
+    case .unauthorized: readCloudKeyRefused
+    case .quota: readCloudQuota
+    case .rateLimited: readCloudBusy
+    case .noKey, .network, .server, nil: readCloudFallback
+    }
+  }
 
   static let readCloudKeySaved = "Key saved. Reading uses the natural voice."
 
-  static let readCloudKeySavedVoiceOff = "Key saved. Turn on Use natural voice to read with it."
+  static let readCloudKeySavedVoiceOff = "Key saved. Say natural voice on to read with it."
+
+  static let readNaturalVoiceOnKeyRefused =
+    "Natural voice on, but the reading service didn't accept the key. Until you set a new key in Settings, I'll read on the phone."
+
+  static let readNaturalVoiceOnNoKey = "Natural voice on, but there's no OpenAI key yet. Until you add one in Settings, I'll read on the phone."
 
   static let readCloudKeyNotSaved = "That key wasn't saved. Paste the whole key and try again."
 

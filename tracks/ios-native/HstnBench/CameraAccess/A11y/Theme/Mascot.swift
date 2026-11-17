@@ -3,7 +3,8 @@
  *
  * All vector, drawn in the icon's 512 x 512 space and scaled to fit. It reflects state with its
  * eyes, mouth and props, and it is decorative: hidden from VoiceOver, kept as is under Smart Invert,
- * and whatever it shows is always in text beside it too.
+ * and whatever it shows is always in text beside it too. The ink is always Night (it sits on yellow);
+ * props outside the body get a theme-aware outline so they still show on a Night page.
  */
 
 import SwiftUI
@@ -50,24 +51,36 @@ struct Mascot: View {
     }
   }
 
+  /// Props reach outside the yellow body, where Night ink would vanish on a Night page. Each one
+  /// sits on a sticker outline in Theme.mascotOutline: Paper on dark pages, the page colour on light.
   @ViewBuilder
   private var props: some View {
+    let halo = Self.haloWidth
     switch mood {
     case .idle:
       EmptyView()
     case .listening:
+      MascotShape(draw: Self.soundWaves, stroke: StrokeStyle(lineWidth: 16 + halo, lineCap: .round)).fill(Theme.mascotOutline)
       MascotShape(draw: Self.soundWaves, stroke: StrokeStyle(lineWidth: 16, lineCap: .round)).fill(ink)
     case .reading:
+      MascotShape(draw: Self.bookPages, stroke: StrokeStyle(lineWidth: 12 + halo, lineJoin: .round)).fill(Theme.mascotOutline)
       MascotShape(draw: Self.bookPages).fill(Color.white)
       MascotShape(draw: Self.bookPages, stroke: StrokeStyle(lineWidth: 12, lineJoin: .round)).fill(ink)
       MascotShape(draw: Self.bookLines, stroke: StrokeStyle(lineWidth: 8, lineCap: .round)).fill(ink)
     case .happy:
+      MascotShape(draw: Self.sparkles, stroke: StrokeStyle(lineWidth: halo, lineJoin: .round)).fill(Theme.mascotOutline)
       MascotShape(draw: Self.sparkles).fill(ink)
     case .confused:
+      MascotShape(draw: Self.questionMark, stroke: StrokeStyle(lineWidth: 18 + halo, lineCap: .round, lineJoin: .round))
+        .fill(Theme.mascotOutline)
+      MascotShape(draw: Self.questionDot, stroke: StrokeStyle(lineWidth: halo)).fill(Theme.mascotOutline)
       MascotShape(draw: Self.questionMark, stroke: StrokeStyle(lineWidth: 18, lineCap: .round, lineJoin: .round)).fill(ink)
       MascotShape(draw: Self.questionDot).fill(ink)
     }
   }
+
+  /// Both sides of the outline together, in drawing units: about 2 pt at the status card's size.
+  private static let haloWidth: CGFloat = 22
 
   // MARK: Drawing, in 512 x 512
 

@@ -241,14 +241,15 @@ final class AppVoice {
       Self.logger.error("voice: no English voice is installed, using the system default")
     }
     if wasLoaded, let new, new.isBritishFemale, previous?.isBritishFemale != true {
-      downloadNotice = nil
-      preferences.voiceDownloadNoticeHeard = true
+      dismissDownloadNotice()
       Announcer.shared.say(SpokenMessage.voiceNowInstalled(name: VoiceSelection.baseName(new.voice)), interrupt: false)
     }
   }
 
   /// Once, ever: says and shows how to download a British woman's voice. A line cut off before its
   /// end comes back next launch, as with the disclaimer. Queued, so it follows the status line.
+  /// Heard to the end, the banner closes by itself; "OK", "got it" or "dismiss" closes it sooner
+  /// (a non-blocking prompt: every other command still works while it's up).
   func offerDownloadIfNeeded() {
     guard !LaunchOptions.isAutomatedTest else { return }
     _ = voice  // make sure the lookup has happened
@@ -259,14 +260,22 @@ final class AppVoice {
     else { return }
     let current = choice.map { VoiceSelection.baseName($0.voice) }
     downloadNotice = SpokenMessage.voiceDownloadOnScreen(current: current)
-    Announcer.shared.announce(SpokenMessage.voiceDownload(current: current), earcon: .attention, interrupt: false) {
+    let spoken = SpokenMessage.voiceDownload(current: current)
+    VoiceControl.shared.showPrompt(.voiceDownload, accepts: [.ok], blocking: false) { [weak self] _ in
+      // Cut the notice if it is what's being said; anything else (a page) carries on.
+      if Announcer.shared.textBeingSpoken().contains(spoken) { Announcer.shared.stop() }
+      self?.dismissDownloadNotice()
+      return true
+    }
+    Announcer.shared.announce(spoken, earcon: .attention, interrupt: false) {
       [weak self] finished in
-      if finished { self?.preferences.voiceDownloadNoticeHeard = true }
+      if finished { self?.dismissDownloadNotice() }
     }
   }
 
   func dismissDownloadNotice() {
     downloadNotice = nil
     preferences.voiceDownloadNoticeHeard = true
+    VoiceControl.shared.dismissPrompt(.voiceDownload)
   }
 }
