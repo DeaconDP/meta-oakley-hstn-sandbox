@@ -196,8 +196,14 @@ struct CameraView: View {
     case .read: runLaunchAction(.read)
     case .status: runLaunchAction(.status)
     case .stop:
-      // Stopping the reader also stops the voice; otherwise just cut what is being said.
-      if reader.isActive { reader.stop() } else { Announcer.shared.stop() }
+      // Stopping the reader also stops the voice; otherwise cut what is being said, and drop a read
+      // still waiting behind "Camera access allowed".
+      if reader.isActive {
+        reader.stop()
+      } else {
+        reader.cancelPendingRead()
+        Announcer.shared.stop()
+      }
     case .repeatLast:
       if reader.hasSentences { reader.repeatSentence() } else { runLaunchAction(.repeatLast) }
     // After a stop, continue starts the stopped sentence again; next always moves on.
@@ -385,13 +391,12 @@ struct CameraView: View {
           VStack(alignment: .leading, spacing: Theme.Space.sm) {
             settingsSectionTitle("Look and setup")
             CustomButton(
-              title: ThemeAppearance.shared.colorScheme == .dark ? "Use light mode" : "Use dark mode", style: .secondary,
+              title: "Appearance: \(ThemeAppearance.shared.mode.title)", style: .secondary,
               isDisabled: false
             ) {
-              let appearance = ThemeAppearance.shared
-              appearance.mode = appearance.colorScheme == .dark ? .light : .dark
+              ThemeAppearance.shared.cycle()
             }
-            .accessibilityHint("SpeakUp is dark unless you choose light. Text stays high contrast either way.")
+            .accessibilityHint("Switches between matching the phone, dark and light. Text stays high contrast in each.")
             .accessibilityIdentifier("appearance_toggle")
             CustomButton(title: "Replay setup", style: .secondary, isDisabled: false) {
               setSettingsMenu(open: false)

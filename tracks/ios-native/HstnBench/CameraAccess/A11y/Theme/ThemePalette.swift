@@ -261,40 +261,73 @@ extension ThemePalette {
   var isDark: Bool { name.hasPrefix("dark") }
 }
 
-/// Light or dark. The brand is dark-first (tokens.json), so the app is dark unless the user picks
-/// light in Settings. UI tests can force either with --dark-mode / --light-mode.
+/// Follows the phone's light or dark setting unless the user picks one in Settings (System, then
+/// Dark, then Light). Dark mode is the brand's dark design (tokens.json). UI tests can force either
+/// with --dark-mode / --light-mode.
 @MainActor
 @Observable
 final class ThemeAppearance {
   static let shared = ThemeAppearance()
 
-  enum Mode: String, Sendable {
-    case dark, light
+  enum Mode: String, Sendable, CaseIterable {
+    case system, dark, light
+
+    /// The settings button's order: System, Dark, Light, then System again.
+    var next: Mode {
+      switch self {
+      case .system: .dark
+      case .dark: .light
+      case .light: .system
+      }
+    }
+
+    var title: String {
+      switch self {
+      case .system: "Match the phone"
+      case .dark: "Dark"
+      case .light: "Light"
+      }
+    }
   }
 
   @ObservationIgnored private let defaults: UserDefaults
   static let key = "theme.appearance"
 
-  /// The user's choice, kept in UserDefaults. Dark until they choose light.
+  /// The user's choice, kept in UserDefaults. System until they choose.
   var mode: Mode {
     didSet { defaults.set(mode.rawValue, forKey: Self.key) }
   }
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
-    mode = defaults.string(forKey: Self.key).flatMap(Mode.init(rawValue:)) ?? .dark
+    mode = defaults.string(forKey: Self.key).flatMap(Mode.init(rawValue:)) ?? .system
   }
 
-  /// What the app asks the system for: a test's forced mode first, then the user's choice.
-  var colorScheme: ColorScheme {
+  /// What the app asks the system for: a test's forced mode first, then the user's choice. nil
+  /// follows the phone.
+  var colorScheme: ColorScheme? {
     if LaunchOptions.forcesDarkMode { return .dark }
     if LaunchOptions.forcesLightMode { return .light }
-    return mode == .light ? .light : .dark
+    return Self.colorScheme(for: mode)
+  }
+
+  static func colorScheme(for mode: Mode) -> ColorScheme? {
+    switch mode {
+    case .system: nil
+    case .dark: .dark
+    case .light: .light
+    }
+  }
+
+  /// The settings button: the next mode, said out loud.
+  func cycle() {
+    mode = mode.next
+    Announcer.shared.say(SpokenMessage.appearance(mode))
   }
 }
 
 extension LaunchOptions {
-  /// With --ui-testing: light mode, for the tour and audits now that the app starts dark.
+  /// With --ui-testing: light mode, for the tour and audits, whatever the Simulator is set to.
   static let forcesLightMode = isUITesting && ProcessInfo.processInfo.arguments.contains("--light-mode")
 }
 

@@ -10,6 +10,7 @@ import AVFoundation
 import Foundation
 import MWDATCore
 import MWDATMockDevice
+import SwiftUI
 // ast-grep-ignore: swift-testing/swift/no-new-xctest
 import XCTest
 
@@ -294,12 +295,16 @@ final class VoiceCommandParserTests: XCTestCase {
     XCTAssertEqual(parse("play", camera), .ignored(.unavailableHere))
   }
 
-  func testGoodbyeEverywhere() {
+  /// Goodbye stops listening, so a bystander's "bye" mustn't: it needs the wake word.
+  func testGoodbyeEverywhereWithTheWakeWord() {
     for screen in [VoiceScreen.welcome, .home, .camera] {
-      for phrase in ["goodbye", "good bye", "bye", "I'm done", "I am done", "stop listening", "goodbye thanks"] {
-        XCTAssertEqual(parse(phrase, VoiceContext(screen: screen)), .command(.goodbye), "\(phrase) on \(screen)")
+      for phrase in ["goodbye", "good bye", "bye", "I'm done", "I am done", "stop listening", "goodbye thanks", "go to sleep"] {
+        let context = VoiceContext(screen: screen)
+        XCTAssertEqual(parse("reader, \(phrase)", context), .command(.goodbye), "\(phrase) on \(screen)")
+        XCTAssertEqual(parse(phrase, context), .ignored(.needsWakeWord), "bare \(phrase) on \(screen)")
       }
     }
+    XCTAssertEqual(parse("speakup, I'm done"), .command(.goodbye))
     // Still conversation when it's part of something longer.
     XCTAssertEqual(parse("stop listening to him"), .ignored(.unrecognized))
     XCTAssertEqual(parse("I'm done with the dishes"), .ignored(.unrecognized))
@@ -341,12 +346,21 @@ final class VoiceCommandParserTests: XCTestCase {
     }
     XCTAssertEqual(parse("ok", camera), .ignored(.unavailableHere))
     let question = VoiceContext(screen: .camera, promptCommands: [.yes, .no])
-    for phrase in ["yes", "allow", "allow it", "sure", "go ahead"] {
+    for phrase in ["yes", "yeah", "yep", "allow", "allow it"] {
       XCTAssertEqual(parse(phrase, question), .command(.yes), phrase)
+    }
+    // Loose yeses can open Meta AI or disconnect: wake word only.
+    for phrase in ["sure", "go ahead"] {
+      XCTAssertEqual(parse(phrase, question), .ignored(.needsWakeWord), phrase)
+      XCTAssertEqual(parse("reader, \(phrase)", question), .command(.yes), phrase)
     }
     for phrase in ["no", "not now", "cancel"] {
       XCTAssertEqual(parse(phrase, question), .command(.no), phrase)
     }
+    // "cancel" on the first screen would skip setup: bare only inside an alert.
+    let welcome = VoiceContext(screen: .welcome)
+    XCTAssertEqual(parse("cancel", welcome), .ignored(.needsWakeWord))
+    XCTAssertEqual(parse("reader cancel", welcome), .command(.no))
     // "ok" is still a wake word lead-in.
     XCTAssertEqual(parse("ok reader stop", camera), .command(.stop))
   }
@@ -357,7 +371,7 @@ final class VoiceCommandParserTests: XCTestCase {
     XCTAssertEqual(parse("not now", sheet), .command(.no))
     XCTAssertEqual(parse("try again", sheet), .ignored(.unavailableHere))
     XCTAssertEqual(parse("help", sheet), .command(.help))
-    XCTAssertEqual(parse("goodbye", sheet), .command(.goodbye))
+    XCTAssertEqual(parse("reader, goodbye", sheet), .command(.goodbye))
     let alert = VoiceContext(screen: .camera, promptCommands: CameraProblem.voiceCommands(for: .tryAgain))
     for (phrase, command) in [("try again", VoiceCommand.tryAgain), ("yes", .yes), ("ok", .ok), ("no", .no), ("read", .read)] {
       XCTAssertEqual(parse(phrase, alert), .command(command), phrase)
@@ -380,6 +394,24 @@ final class VoiceCommandParserTests: XCTestCase {
     XCTAssertEqual(parse("speak up stop", speaking), .command(.stop))
     XCTAssertEqual(parse("speakup, stop", speaking), .command(.stop))
     XCTAssertEqual(parse("speak", speaking), .ignored(.needsWakeWord))
+  }
+
+  /// A question ends "Say yes or no.", so for a second or so a bare "yes" would match the echo
+  /// check. Once the question has finished, its own answers are the user.
+  func testAPromptAnswerAfterTheQuestionIsNotAnEcho() {
+    let asked = VoiceContext(screen: .camera, spokenText: "Disconnect your glasses? Say yes or no.", promptCommands: [.yes, .no])
+    XCTAssertEqual(parse("yes", asked), .command(.yes))
+    XCTAssertEqual(parse("no", asked), .command(.no))
+    let offer = VoiceContext(
+      screen: .camera, spokenText: "Want me to listen through your glasses? Say yes or no.", extraCommands: [.yes, .no])
+    XCTAssertEqual(parse("yes", offer), .command(.yes))
+    // Still speaking: the wake word rule applies.
+    var speaking = asked
+    speaking.isSpeaking = true
+    XCTAssertEqual(parse("yes", speaking), .ignored(.needsWakeWord))
+    // Not an answer to anything: the echo check still drops what we just said.
+    let welcome = VoiceContext(screen: .welcome, spokenText: "Say yes to connect.")
+    XCTAssertEqual(parse("yes", welcome), .ignored(.overlapsSpeech))
   }
 
   func testHelpLeavesTheSettingsToSettings() {
@@ -537,6 +569,7 @@ private final class Harness {
   var speechRequested = 0
   var grantOnRequest = true
   var hasCloudKey = true
+  var cloudKeyRefused = false
   var phoneListeners: [FakeListener] = []
   var stopSpeechCalls = 0
   var repeatCalls = 0
@@ -579,6 +612,7 @@ private final class Harness {
       setIdleTimerDisabled: { [unowned self] in idleTimerDisabled = $0 },
       glassesSpeechEnabled: { true },
       hasCloudKey: { [unowned self] in hasCloudKey },
+      cloudKeyRefused: { [unowned self] in cloudKeyRefused },
       now: { [unowned self] in now })
   }
 }
@@ -1017,7 +1051,7 @@ final class VoiceControlTests: XCTestCase {
     var screenGot: [VoiceCommand] = []
     control.setScreen(.camera) { screenGot.append($0); return false }
     harness.lines = []
-    control.inject(transcript: "goodbye")
+    control.inject(transcript: "reader, goodbye")
     XCTAssertEqual(screenGot, [.goodbye], "the screen stops reading and ends the camera")
     XCTAssertEqual(harness.lines, [SpokenMessage.voiceGoodbye])
     XCTAssertTrue(SpokenMessage.voiceGoodbye.contains("SpeakUp read"), "ReadIntent's Siri phrase")
@@ -1036,7 +1070,7 @@ final class VoiceControlTests: XCTestCase {
 
   func testComingBackToTheFrontWakesAfterGoodbye() {
     _ = beginListening()
-    control.inject(transcript: "I'm done")
+    control.inject(transcript: "reader, I'm done")
     control.noteBackground(true)
     control.noteBackground(false)
     XCTAssertFalse(control.isAsleep)
@@ -1134,6 +1168,153 @@ final class VoiceControlTests: XCTestCase {
     await settle()
     XCTAssertEqual(harness.lines, [])
     XCTAssertFalse(preferences.glassesMicOffered)
+  }
+
+  // MARK: The yes/no question lapses
+
+  func testAConfirmationExpiresSoALateYesDoesNothing() async throws {
+    _ = beginListening()
+    control.confirmTimeout = .milliseconds(50)
+    var answers: [String] = []
+    control.confirm(SpokenMessage.disconnectConfirm, onYes: { answers.append("yes") }, onNo: { answers.append("no") })
+    try await Task.sleep(for: .milliseconds(200))
+    XCTAssertNil(control.activePrompt)
+    control.inject(transcript: "yeah")
+    XCTAssertEqual(answers, [])
+  }
+
+  func testAConfirmationEndsOnGoodbyeAndOnAScreenChange() {
+    _ = beginListening()
+    control.confirm(SpokenMessage.disconnectConfirm, onYes: {}, onNo: {})
+    control.inject(transcript: "reader, goodbye")
+    XCTAssertNil(control.activePrompt)
+
+    control.wake()
+    control.confirm(SpokenMessage.disconnectConfirm, onYes: {}, onNo: {})
+    control.setScreen(.home) { _ in false }
+    XCTAssertNil(control.activePrompt)
+  }
+
+  func testOtherCommandsDuringAConfirmationAskForYesOrNo() {
+    _ = beginListening()
+    control.confirm(SpokenMessage.disconnectConfirm, onYes: {}, onNo: {})
+    harness.lines = []
+    control.inject(transcript: "read")
+    XCTAssertEqual(harness.lines, [SpokenMessage.voiceSayYesOrNo])
+    harness.lines = []
+    control.inject(transcript: "what time is the bus")  // conversation: still silent
+    XCTAssertEqual(harness.lines, [])
+  }
+
+  // MARK: Permissions settled
+
+  /// Either one refused counts as settled, as in the listening policy: nothing more will be asked.
+  func testPermissionsPendingFollowsTheListeningPolicy() {
+    XCTAssertTrue(VoiceControl.permissionsPending(mic: .notDetermined, speech: .notDetermined))
+    XCTAssertTrue(VoiceControl.permissionsPending(mic: .granted, speech: .notDetermined))
+    XCTAssertTrue(VoiceControl.permissionsPending(mic: .notDetermined, speech: .granted))
+    XCTAssertFalse(VoiceControl.permissionsPending(mic: .notDetermined, speech: .denied))
+    XCTAssertFalse(VoiceControl.permissionsPending(mic: .denied, speech: .notDetermined))
+    XCTAssertFalse(VoiceControl.permissionsPending(mic: .granted, speech: .granted))
+  }
+
+  func testSayConnectIsNotStuckWhenSpeechWasRefused() {
+    harness.phoneMic = .notDetermined
+    harness.speech = .denied
+    control.begin()
+    control.setScreen(.welcome) { _ in false }
+    var offered = false
+    control.whenPermissionsSettled { offered = true }
+    XCTAssertTrue(offered)
+  }
+
+  // MARK: A refused key
+
+  func testNaturalVoiceOnSaysWhyAfterARefusedKey() {
+    _ = beginListening()
+    harness.cloudKeyRefused = true
+    harness.lines = []
+    control.inject(transcript: "natural voice on")
+    XCTAssertEqual(harness.lines, [SpokenMessage.readNaturalVoiceOnKeyRefused])
+  }
+
+  // MARK: Listen again
+
+  func testThePausedIndicatorOffersListenAgainAfterGoodbye() {
+    let asleep = VoiceIndicatorModel.make(
+      status: .paused, reason: SpokenMessage.voiceAsleep, listener: nil, micPermission: .granted, speechPermission: .granted,
+      isSpeaking: false, heard: nil, canPrompt: true)
+    XCTAssertEqual(asleep.fix, .listenAgain)
+    let background = VoiceIndicatorModel.make(
+      status: .paused, reason: VoicePauseReason.background.text, listener: nil, micPermission: .granted,
+      speechPermission: .granted, isSpeaking: false, heard: nil, canPrompt: true)
+    XCTAssertNil(background.fix)
+  }
+}
+
+@MainActor
+final class ReviewFixTests: XCTestCase {
+  /// The read that raised an alert doesn't repeat it (the screen is saying it); a read started
+  /// while it was already up does.
+  func testAnAlertIsRepeatedOnlyIfItWasAlreadyUp() {
+    XCTAssertEqual(TextReader.repromptLine("Say yes.", alreadyUpWhenReadStarted: true), "Say yes.")
+    XCTAssertNil(TextReader.repromptLine("Say yes.", alreadyUpWhenReadStarted: false))
+    XCTAssertNil(TextReader.repromptLine(nil, alreadyUpWhenReadStarted: true))
+  }
+
+  /// After "Camera access allowed", the read carries on only if nothing moved on.
+  func testThePermissionReadCarriesOnOnlyIfNothingMovedOn() {
+    XCTAssertTrue(CameraViewModel.shouldCarryOn(readTokenThen: 3, readTokenNow: 3, asleep: false))
+    XCTAssertFalse(CameraViewModel.shouldCarryOn(readTokenThen: 3, readTokenNow: 4, asleep: false), "a stop or another read")
+    XCTAssertFalse(CameraViewModel.shouldCarryOn(readTokenThen: 3, readTokenNow: 3, asleep: true), "goodbye")
+  }
+
+  func testStopAndCancelChangeTheReadToken() {
+    let reader = TextReader()
+    let start = reader.readToken
+    reader.cancelPendingRead()
+    XCTAssertNotEqual(reader.readToken, start)
+    let afterCancel = reader.readToken
+    reader.stop()
+    XCTAssertNotEqual(reader.readToken, afterCancel)
+  }
+
+  func testAppearanceFollowsThePhoneUntilChosen() throws {
+    let suite = "Appearance.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let appearance = ThemeAppearance(defaults: defaults)
+    XCTAssertEqual(appearance.mode, .system)
+    XCTAssertNil(ThemeAppearance.colorScheme(for: .system))
+    XCTAssertEqual(ThemeAppearance.colorScheme(for: .dark), .dark)
+    XCTAssertEqual(ThemeAppearance.colorScheme(for: .light), .light)
+    XCTAssertEqual(ThemeAppearance.Mode.system.next, .dark)
+    XCTAssertEqual(ThemeAppearance.Mode.dark.next, .light)
+    XCTAssertEqual(ThemeAppearance.Mode.light.next, .system)
+    appearance.mode = .light
+    XCTAssertEqual(ThemeAppearance(defaults: defaults).mode, .light)
+    for mode in ThemeAppearance.Mode.allCases {
+      XCTAssertFalse(SpokenMessage.appearance(mode).isEmpty)
+    }
+  }
+
+  /// Idle is a still frame, as are Reduce Motion and Low Power Mode; a moving ribbon pauses unseen.
+  func testTheRibbonOnlyMovesWhenItMeansSomething() {
+    XCTAssertFalse(VoiceRibbon.animates(.idle, reduceMotion: false, lowPower: false))
+    XCTAssertFalse(VoiceRibbon.animates(.error, reduceMotion: false, lowPower: false))
+    XCTAssertTrue(VoiceRibbon.animates(.listening, reduceMotion: false, lowPower: false))
+    XCTAssertTrue(VoiceRibbon.animates(.speaking, reduceMotion: false, lowPower: false))
+    XCTAssertFalse(VoiceRibbon.animates(.listening, reduceMotion: true, lowPower: false))
+    XCTAssertFalse(VoiceRibbon.animates(.listening, reduceMotion: false, lowPower: true))
+    XCTAssertFalse(VoiceRibbon.timelinePaused(visible: true, active: true))
+    XCTAssertTrue(VoiceRibbon.timelinePaused(visible: false, active: true))
+    XCTAssertTrue(VoiceRibbon.timelinePaused(visible: true, active: false))
+  }
+
+  func testASiriRequestIsStillTakenWithWakeInIt() {
+    let router = LaunchActionRouter()
+    router.request(.read)
+    XCTAssertEqual(router.consume(), .read)
   }
 }
 

@@ -45,12 +45,20 @@ enum OpenAIError: Error, Equatable, Sendable {
     }
   }
 
+  /// 403 isn't a refused key by itself (a region or model not allowed); it counts as one only with
+  /// the invalid_api_key code, which check(_:bytes:) reads from the body first.
   static func from(status: Int) -> OpenAIError {
     switch status {
-    case 401, 403: .unauthorized
+    case 401: .unauthorized
     case 429: .rateLimited
     default: .server
     }
+  }
+
+  /// A non-200 response: the body's code when it names one, otherwise the status.
+  static func from(status: Int, code: String?) -> OpenAIError {
+    let fromCode = from(code: code)
+    return fromCode == .server ? from(status: status) : fromCode
   }
 
   /// An `error.code` from a response body or a stream error event.
@@ -329,7 +337,7 @@ struct OpenAIClient: Sendable {
   private static func check(_ response: URLResponse, bytes: URLSession.AsyncBytes) async throws {
     guard let http = response as? HTTPURLResponse else { throw OpenAIError.network }
     guard http.statusCode != 200 else { return }
-    if http.statusCode == 401 || http.statusCode == 403 { throw OpenAIError.unauthorized }
+    if http.statusCode == 401 { throw OpenAIError.unauthorized }
     var body = Data()
     for try await byte in bytes {
       body.append(byte)
@@ -337,7 +345,6 @@ struct OpenAIClient: Sendable {
     }
     let object = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
     let code = (object?["error"] as? [String: Any])?["code"] as? String
-    let fromCode = OpenAIError.from(code: code)
-    throw fromCode == .server ? OpenAIError.from(status: http.statusCode) : fromCode
+    throw OpenAIError.from(status: http.statusCode, code: code)
   }
 }

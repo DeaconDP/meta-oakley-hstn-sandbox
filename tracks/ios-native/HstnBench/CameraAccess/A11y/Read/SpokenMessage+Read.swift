@@ -139,6 +139,9 @@ extension SpokenMessage {
 
   static let readCloudKeySavedVoiceOff = "Key saved. Say natural voice on to read with it."
 
+  static let readNaturalVoiceOnKeyRefused =
+    "Natural voice on, but the reading service didn't accept the key. Until you set a new key in Settings, I'll read on the phone."
+
   static let readNaturalVoiceOnNoKey = "Natural voice on, but there's no OpenAI key yet. Until you add one in Settings, I'll read on the phone."
 
   static let readCloudKeyNotSaved = "That key wasn't saved. Paste the whole key and try again."

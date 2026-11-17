@@ -333,7 +333,11 @@ final class OpenAIRequestTests: XCTestCase {
 
   func testStatusAndErrorMapping() {
     XCTAssertEqual(OpenAIError.from(status: 401), .unauthorized)
-    XCTAssertEqual(OpenAIError.from(status: 403), .unauthorized)
+    // 403 alone is not a refused key (a region or model not allowed); with invalid_api_key it is.
+    XCTAssertEqual(OpenAIError.from(status: 403), .server)
+    XCTAssertEqual(OpenAIError.from(status: 403, code: "invalid_api_key"), .unauthorized)
+    XCTAssertEqual(OpenAIError.from(status: 403, code: nil), .server)
+    XCTAssertEqual(OpenAIError.from(status: 429, code: "insufficient_quota"), .quota)
     XCTAssertEqual(OpenAIError.from(status: 429), .rateLimited)
     XCTAssertEqual(OpenAIError.from(status: 500), .server)
     XCTAssertEqual(OpenAIError.from(status: 400), .server)

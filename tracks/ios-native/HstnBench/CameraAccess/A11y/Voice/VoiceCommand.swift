@@ -19,6 +19,11 @@
  * the always-on commands count (`promptCommands`), so "yes" can't reach the screen underneath. A
  * non-blocking prompt (a notice, an offer) only adds its answers (`extraCommands`).
  *
+ * Wake word only: "goodbye" and its synonyms, and the loose yeses "sure" / "go ahead" (they can
+ * open Meta AI or disconnect), so a bystander's "bye" or "sure" does nothing. "cancel" is bare only
+ * inside an alert. A prompt's own answer said after its question has finished skips the echo check,
+ * since the question ends "Say yes or no.".
+ *
  * Settings ("natural voice on", "shorter", "disconnect"...) work on the home and camera screens.
  * Help leaves them out and offers "settings", which lists them, so help stays one breath.
  */
@@ -229,16 +234,41 @@ enum VoiceCommandParser {
 
   // MARK: Parse
 
+  /// Phrases a bystander could say in passing, with big effects (stop listening, open Meta AI,
+  /// disconnect, skip setup): they only count after the wake word ("reader, goodbye"). Bare yes
+  /// stays yes, yeah, yep, yes please, and the deliberate "allow".
+  static let wakeOnlyPhrases: Set<String> = {
+    var set = Set(phrases[.goodbye] ?? [])
+    set.formUnion(["sure", "go ahead"])
+    return set
+  }()
+
+  /// Bare only while an alert or question is up: on a screen, "cancel" from across the room would
+  /// skip setup.
+  static let promptOnlyBarePhrases: Set<String> = ["cancel"]
+
   static func parse(_ transcript: String, context: VoiceContext) -> VoiceParseResult {
     let tokens = normalize(transcript)
     guard !tokens.isEmpty else { return .ignored(.empty) }
     let (hadWake, afterWake) = stripWakeWord(tokens)
 
     if !hadWake, context.isSpeaking || context.requiresWakeWord { return .ignored(.needsWakeWord) }
-    if overlaps(tokens, spoken: normalize(context.spokenText), hadWake: hadWake) { return .ignored(.overlapsSpeech) }
+    let matched = match(afterWake)
+    // A prompt's own answer, said once its question has finished, is the user, not an echo of
+    // "...Say yes or no." (which the echo check below would otherwise catch for a second or so).
+    let promptAnswers = (context.promptCommands ?? []) + context.extraCommands
+    let answersPrompt = matched.map { promptAnswers.contains($0.command) } ?? false
+    if !(answersPrompt && !context.isSpeaking), overlaps(tokens, spoken: normalize(context.spokenText), hadWake: hadWake) {
+      return .ignored(.overlapsSpeech)
+    }
 
-    guard let command = match(afterWake) else {
+    guard let matched else {
       return hadWake ? .notUnderstood : .ignored(.unrecognized)
+    }
+    let command = matched.command
+    if !hadWake {
+      if wakeOnlyPhrases.contains(matched.phrase) { return .ignored(.needsWakeWord) }
+      if promptOnlyBarePhrases.contains(matched.phrase), context.promptCommands == nil { return .ignored(.needsWakeWord) }
     }
     guard availableCommands(context: context).contains(command) else {
       return hadWake ? .notUnderstood : .ignored(.unavailableHere)
@@ -265,10 +295,11 @@ enum VoiceCommandParser {
   /// The command for the words, peeling filler off one piece at a time and checking for a phrase
   /// after each. Checking as it goes keeps phrases that end in a filler word ("not now", "skip for
   /// now") whole.
-  private static func match(_ tokens: [String]) -> VoiceCommand? {
+  private static func match(_ tokens: [String]) -> (command: VoiceCommand, phrase: String)? {
     var rest = tokens
     while true {
-      if let command = phraseLookup[rest.joined(separator: " ")] { return command }
+      let phrase = rest.joined(separator: " ")
+      if let command = phraseLookup[phrase] { return (command, phrase) }
       guard let shorter = stripOneFiller(rest) else { return nil }
       rest = shorter
     }

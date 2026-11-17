@@ -135,6 +135,16 @@ final class TextReader {
   // Cloud reading. `generation` changes with every navigation, but the transcription keeps
   // streaming across next/previous, so it checks `readID` (bumped by read() and stop()) instead.
   @ObservationIgnored private var readID = 0
+
+  /// Changes with every read() and stop(). A deferred "carry on reading" (after the camera
+  /// permission line) checks it hasn't changed, so it never follows a stop or another read.
+  var readToken: Int { readID }
+
+  /// "Stop" with nothing being read: a read still waiting to carry on (behind the camera
+  /// permission line) mustn't start afterwards.
+  func cancelPendingRead() {
+    readID += 1
+  }
   /// Non-nil while the current sentences are spoken with the cloud voice.
   @ObservationIgnored private var cloudClient: OpenAIClient?
   /// Each sentence's cloud audio, fetched once: the next one ahead of time, kept for repeats.
@@ -178,15 +188,17 @@ final class TextReader {
   /// Read what the glasses see. Interrupts any reading in progress.
   func read() {
     let triggerAt = BenchClock.uptimeNanoseconds()
+    // Cut what's being said first: its completions run now, before this read's counters exist, so
+    // one of them starting a read can't nest inside this one and leave it orphaned.
+    announcer.stop()
+    task?.cancel()
     generation += 1
     let myGeneration = generation
-    task?.cancel()
-    announcer.stop()
+    readID += 1
+    let myRead = readID
     // A read after "goodbye" (Siri's "SpeakUp read", the button) means the user is back.
     VoiceControl.shared.wake()
     speakInterruptTipIfNeeded()
-    readID += 1
-    let myRead = readID
     resetCloud()
     earcons.play(.working)
     earcons.startWorkingTick(owner: Self.tickOwner)
@@ -370,8 +382,11 @@ final class TextReader {
   private func ensureStream(_ source: any ReadFrameSource, _ myGeneration: Int) async -> Bool {
     let deadline = ContinuousClock.now + Self.streamWait
     var announced = false
+    var firstCheck = true
     while isCurrent(myGeneration) {
-      switch source.prepareStreamForReading() {
+      let readiness = source.prepareStreamForReading()
+      defer { firstCheck = false }
+      switch readiness {
       case .ready:
         return true
       case .starting:
@@ -381,9 +396,12 @@ final class TextReader {
         }
       case .blocked(let reprompt):
         clock.note("read blocked by a prompt or alert")
-        // An alert or permission prompt is up: say it again, so the read doesn't end in silence.
         endQuietly(myGeneration)
-        if let reprompt { announcer.announce(reprompt, earcon: .attention, kind: .reply, interrupt: false) }
+        // An alert that was already up gets said again, so this read doesn't end in silence. One
+        // this read raised itself (camera permission, a stream error) is being said right now.
+        if let line = Self.repromptLine(reprompt, alreadyUpWhenReadStarted: firstCheck) {
+          announcer.announce(line, earcon: .attention, kind: .reply, interrupt: false)
+        }
         return false
       case .unavailable(let reason):
         clock.note("read unavailable: \(reason)")
@@ -398,6 +416,12 @@ final class TextReader {
       try? await Task.sleep(for: .milliseconds(100))
     }
     return false
+  }
+
+  /// What a read blocked by an alert says: the alert's line again only if the alert was up before
+  /// this read began (blocked on its first check); otherwise the screen is saying it already.
+  static func repromptLine(_ line: String?, alreadyUpWhenReadStarted: Bool) -> String? {
+    alreadyUpWhenReadStarted ? line : nil
   }
 
   private func recentFrame(_ source: any ReadFrameSource, _ myGeneration: Int) async -> ReadFrame? {

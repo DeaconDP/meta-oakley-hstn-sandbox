@@ -50,7 +50,8 @@ struct MainAppView: View {
       guard !Task.isCancelled else { return }
       AppVoice.shared.offerDownloadIfNeeded()
     }
-    // Dark-first: dark unless the user chose light in Settings (ThemeAppearance).
+    // The phone's setting unless the user chose dark or light in Settings (ThemeAppearance); nil
+    // follows the phone.
     .preferredColorScheme(ThemeAppearance.shared.colorScheme)
     #if DEBUG
     // An inset, not an overlay: it must not sit on top of a page's pinned buttons.
@@ -73,8 +74,8 @@ enum LaunchOptions {
   /// VoiceInjectionOverlay), so UI tests can drive commands with no mic.
   static let injectsVoice = isUITesting && ProcessInfo.processInfo.arguments.contains("--voice-inject")
   /// With --ui-testing: dark mode, for the tour and audits. XCUIDevice.appearance reported success on
-  /// this Simulator (Xcode 27.2) but left the screens light. Otherwise the app is dark unless the
-  /// user picked light (ThemeAppearance); --light-mode forces light.
+  /// this Simulator (Xcode 27.2) but left the screens light. Otherwise the app follows the phone
+  /// unless the user picked dark or light (ThemeAppearance); --light-mode forces light.
   static let forcesDarkMode = isUITesting && ProcessInfo.processInfo.arguments.contains("--dark-mode")
   /// With --ui-testing, for the screenshot tour: draws the Increase Contrast palette without changing
   /// the Simulator's settings.

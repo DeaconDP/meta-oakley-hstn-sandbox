@@ -27,9 +27,12 @@ struct VoiceIndicatorModel: Equatable {
     case turnOn
     case askPermission
     case openSettings
+    /// After "goodbye": start listening again.
+    case listenAgain
 
     var title: String {
       switch self {
+      case .listenAgain: "Listen again"
       case .turnOn: "Turn on"
       case .askPermission: "Allow"
       case .openSettings: "Open Settings"
@@ -38,6 +41,7 @@ struct VoiceIndicatorModel: Equatable {
 
     var hint: String {
       switch self {
+      case .listenAgain: "Starts listening for voice commands again."
       case .turnOn: "Turns voice control back on."
       case .askPermission: "Asks to use the microphone and speech recognition."
       case .openSettings: "Opens Settings for this app."
@@ -112,7 +116,9 @@ struct VoiceIndicatorModel: Equatable {
       return VoiceIndicatorModel(
         title: source, detail: tip, mood: .listening, fix: nil, signal: isSpeaking ? .speaking : .listening)
     case .paused:
-      return VoiceIndicatorModel(title: "Listening paused", detail: reason, mood: .idle, fix: nil)
+      // Goodbye: nothing wakes listening by itself while the app stays in front, so offer it.
+      let asleep = reason == SpokenMessage.voiceAsleep
+      return VoiceIndicatorModel(title: "Listening paused", detail: reason, mood: .idle, fix: asleep ? .listenAgain : nil)
     case .off:
       return VoiceIndicatorModel(
         title: "Voice control is off", detail: "Every button still works.", mood: .idle, fix: .turnOn)
@@ -227,6 +233,8 @@ struct VoiceIndicatorView: View {
 
   private func perform(_ fix: VoiceIndicatorModel.Fix) {
     switch fix {
+    case .listenAgain:
+      voice.wake()
     case .turnOn:
       voice.setEnabled(true)
     case .askPermission:
@@ -240,13 +248,28 @@ struct VoiceIndicatorView: View {
 // MARK: - The voice ribbon
 
 /// A soft three-strand waveform in the state colour (brand-guide.html, "The voice ribbon"). Drawn in
-/// one Canvas from a TimelineView at up to 30 fps, so it costs a few hundred path points a frame and
-/// nothing while still (error, or Reduce Motion). A state change crossfades.
+/// one Canvas from a TimelineView at up to 30 fps while it moves, so it costs a few hundred path
+/// points a frame then, and nothing while still: idle (a still breath, since idle is most of the
+/// time), error, Reduce Motion and Low Power Mode draw one frame, and the timeline pauses while the
+/// ribbon is off screen or the app isn't active. A state change crossfades.
 struct VoiceRibbon: View {
   var state: RibbonState
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.colorSchemeContrast) private var contrast
+  @Environment(\.scenePhase) private var scenePhase
+  @State private var isVisible = false
+  @State private var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+
+  /// Whether the ribbon moves at all. Pure, for the tests.
+  static func animates(_ state: RibbonState, reduceMotion: Bool, lowPower: Bool) -> Bool {
+    !reduceMotion && !lowPower && state != .error && state != .idle
+  }
+
+  /// A moving ribbon still stops drawing while nobody can see it.
+  static func timelinePaused(visible: Bool, active: Bool) -> Bool {
+    !visible || !active
+  }
 
   var body: some View {
     ZStack {
@@ -265,6 +288,13 @@ struct VoiceRibbon: View {
         startPoint: .leading, endPoint: .trailing)
     }
     .accessibilityHidden(true)
+    .onAppear { isVisible = true }
+    .onDisappear { isVisible = false }
+    .task {
+      for await _ in NotificationCenter.default.notifications(named: .NSProcessInfoPowerStateDidChange) {
+        lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+      }
+    }
   }
 
   @ViewBuilder
@@ -272,12 +302,14 @@ struct VoiceRibbon: View {
     let color = Theme.ribbon(state)
     let boost: CGFloat = contrast == .increased ? 1.5 : 1
     let state = state
-    if reduceMotion || state == .error {
+    if !Self.animates(state, reduceMotion: reduceMotion, lowPower: lowPower) {
+      // Idle's breath at its middle (t = 1 s of the 4 s cycle), drawn once.
       Canvas { context, size in
-        Self.draw(in: &context, size: size, time: 1.2, state: state, color: color, boost: boost)
+        Self.draw(in: &context, size: size, time: state == .idle ? 1 : 1.2, state: state, color: color, boost: boost)
       }
     } else {
-      TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
+      let paused = Self.timelinePaused(visible: isVisible, active: scenePhase == .active)
+      TimelineView(.animation(minimumInterval: 1.0 / 30, paused: paused)) { timeline in
         Canvas { context, size in
           let time = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 9_600)
           Self.draw(in: &context, size: size, time: time, state: state, color: color, boost: boost)

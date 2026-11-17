@@ -215,10 +215,13 @@ final class CameraViewModel {
   /// Meta AI app and resumes when the user returns — then starts the stream if
   /// access was granted. `then` runs once "Camera access allowed" has ended (the main screen
   /// reads, so the Read that asked for permission carries on by itself). Heard to the end or cut
-  /// short, it runs either way: a cut line (the Local Network dialog, a route change) used to drop
-  /// the read silently while the stream started anyway.
+  /// short by something else (the camera's own "Waiting for the glasses", a route change), it
+  /// runs; the line used to be cut by the former every time, dropping the read. But not if the
+  /// user moved on meanwhile: a stop, another read, or goodbye (see shouldCarryOn). It runs on the
+  /// next turn, never inside the Announcer.stop() that cut the line.
   func confirmCameraPermissionRedirect(then: (@MainActor () -> Void)? = nil) async {
     showCameraPermissionRedirectConfirm = false
+    let readToken = TextReader.shared.readToken
     guard let session = deviceSession, session.state == .started, camera == nil else {
       benchClock.note("camera permission confirm skipped: no started session, or a camera already")
       return
@@ -237,9 +240,22 @@ final class CameraViewModel {
     // Back from Meta AI: say the result before the camera's own "starting" lines.
     Announcer.shared.announce(SpokenMessage.cameraPermissionGranted, earcon: .done) { [benchClock] finished in
       benchClock.note("camera permission granted, line finished=\(finished)")
-      then?()
+      guard let then else { return }
+      Task { @MainActor in
+        guard
+          Self.shouldCarryOn(
+            readTokenThen: readToken, readTokenNow: TextReader.shared.readToken, asleep: VoiceControl.shared.isAsleep)
+        else { return }
+        then()
+      }
     }
     beginStream(on: session)
+  }
+
+  /// The read that asked for camera access carries on only if nothing moved on since: no stop or
+  /// other read (the reader's token is unchanged) and no goodbye.
+  static func shouldCarryOn(readTokenThen: Int, readTokenNow: Int, asleep: Bool) -> Bool {
+    readTokenThen == readTokenNow && !asleep
   }
 
   /// Creates the camera `Stream` on the started session and starts it. Callers

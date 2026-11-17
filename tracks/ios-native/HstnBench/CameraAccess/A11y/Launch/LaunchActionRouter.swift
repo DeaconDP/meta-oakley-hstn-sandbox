@@ -51,6 +51,10 @@ final class LaunchActionRouter {
   func request(_ action: LaunchAction) {
     requestedAt = now()
     pending = action
+    // The user is back ("SpeakUp read" after goodbye), on whichever screen is up. Only the main
+    // screen takes the action itself, and the app may already be in front, with no foreground
+    // event to wake listening.
+    VoiceControl.shared.wake()
   }
 
   /// Takes the waiting action, or nil if there is none or it expired. Always clears the slot,

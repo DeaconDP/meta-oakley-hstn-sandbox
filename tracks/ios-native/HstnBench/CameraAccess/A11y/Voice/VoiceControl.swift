@@ -75,6 +75,8 @@ final class VoiceControl {
     var glassesSpeechEnabled: @MainActor () -> Bool
     /// An OpenAI key is set, so "natural voice on" can take effect.
     var hasCloudKey: @MainActor () -> Bool
+    /// The service refused the key this session (CloudReading.keyRefused).
+    var cloudKeyRefused: @MainActor () -> Bool
     var now: @MainActor () -> Date
   }
 
@@ -233,6 +235,8 @@ final class VoiceControl {
   /// "Goodbye": the screen has already stopped reading and ended the camera. Stops listening, lets
   /// the screen sleep, and says how to come back.
   func goToSleep() {
+    // A question left open would block commands, or act on a "yes" heard much later.
+    dismissPrompt(.confirm)
     environment.say(SpokenMessage.voiceGoodbye, .disconnected, true, nil)
     isAsleep = true
     reconcile()
@@ -279,7 +283,8 @@ final class VoiceControl {
     guard !environment.isInert, !permissionPromptInFlight else { return }
     permissionPromptInFlight = true
     // One line before each dialog, heard to the end first, so VoiceOver users know what's up.
-    if environment.phoneMicPermission() == .notDetermined {
+    // Either one refused means no phone listening (VoiceListenerPolicy), so no point in the other.
+    if environment.speechPermission() != .denied, environment.phoneMicPermission() == .notDetermined {
       await sayAndWait(SpokenMessage.voiceDialogOnScreen)
       await environment.requestMicPermission()
     }
@@ -298,10 +303,16 @@ final class VoiceControl {
   /// answered before (or can't be shown), otherwise after them. The first screen says "Say
   /// connect" here, so it is only offered once listening can work.
   func whenPermissionsSettled(_ body: @escaping @MainActor () -> Void) {
-    let pending = environment.phoneMicPermission() == .notDetermined
-      || (environment.phoneMicPermission() != .denied && environment.speechPermission() == .notDetermined)
+    let pending = Self.permissionsPending(mic: environment.phoneMicPermission(), speech: environment.speechPermission())
     guard !environment.isInert, preferences.voiceControlEnabled, pending else { return body() }
     afterPermissions.append(body)
+  }
+
+  /// Dialogs still to come, by the listening policy's rule: either one refused (or restricted) is
+  /// settled, since listening can't happen and nothing more will be asked.
+  static func permissionsPending(mic: VoicePermission, speech: VoicePermission) -> Bool {
+    guard mic != .denied, speech != .denied else { return false }
+    return mic == .notDetermined || speech == .notDetermined
   }
 
   private func runAfterPermissions() {
@@ -334,6 +345,8 @@ final class VoiceControl {
   func setScreen(
     _ screen: VoiceScreen, canUpdate: (@MainActor () -> Bool)? = nil, handler: @escaping @MainActor (VoiceCommand) -> Bool
   ) {
+    // A yes/no question belongs to the screen that asked it.
+    if self.screen != screen { dismissPrompt(.confirm) }
     self.screen = screen
     self.handler = handler
     self.canUpdate = canUpdate
@@ -346,6 +359,7 @@ final class VoiceControl {
     self.screen = nil
     handler = nil
     canUpdate = nil
+    dismissPrompt(.confirm)
   }
 
   // MARK: Prompts
@@ -369,8 +383,22 @@ final class VoiceControl {
     prompts.contains { $0.id == id }
   }
 
-  /// A yes/no question ("Disconnect your glasses? Say yes or no."). Blocking until answered.
+  /// How long a yes/no question stays open. After that it lapses silently: a "yeah" minutes later
+  /// must not disconnect anything.
+  @ObservationIgnored var confirmTimeout: Duration = .seconds(15)
+  @ObservationIgnored private var confirmToken = 0
+
+  /// A yes/no question ("Disconnect your glasses? Say yes or no."). Blocking until answered, until
+  /// confirmTimeout, goodbye or a screen change.
   func confirm(_ question: String, onYes: @escaping @MainActor () -> Void, onNo: @escaping @MainActor () -> Void) {
+    confirmToken += 1
+    let token = confirmToken
+    let timeout = confirmTimeout
+    Task { [weak self] in
+      try? await Task.sleep(for: timeout)
+      guard let self, self.confirmToken == token else { return }
+      self.dismissPrompt(.confirm)
+    }
     // Only yes and no: "OK" could mean either.
     showPrompt(.confirm, accepts: [.yes, .no]) { [weak self] command in
       switch command {
@@ -394,10 +422,15 @@ final class VoiceControl {
     switch VoiceCommandParser.parse(transcript, context: context(on: screen)) {
     case .command(let command):
       accept(command, on: screen)
+    case .notUnderstood where activePrompt == .confirm:
+      environment.say(SpokenMessage.voiceSayYesOrNo, nil, true, nil)
     case .notUnderstood:
       environment.playEarcon(.uncertain)
       // Queued: "reader, mumble" shouldn't cut off the book.
       environment.say(SpokenMessage.voiceNotUnderstood, nil, false, nil)
+    case .ignored(.unavailableHere) where activePrompt == .confirm:
+      // A real command, held back by the question: say what's needed instead of nothing.
+      environment.say(SpokenMessage.voiceSayYesOrNo, nil, true, nil)
     case .ignored:
       break
     }
@@ -454,7 +487,8 @@ final class VoiceControl {
     case .slower:
       changeRate(by: -Self.rateStep)
     case .naturalVoiceOn, .naturalVoiceOff, .tipsOn, .tipsOff, .shorter, .moreDetail, .replaySetup:
-      environment.say(SpokenSettings.apply(command, preferences: preferences, hasCloudKey: environment.hasCloudKey()), nil, true, nil)
+      environment.say(SpokenSettings.apply(
+          command, preferences: preferences, hasCloudKey: environment.hasCloudKey(), keyRefused: environment.cloudKeyRefused()), nil, true, nil)
     case .glassesMic:
       listenThroughGlasses()
     default:
@@ -813,6 +847,7 @@ extension VoiceControl.Environment {
     setIdleTimerDisabled: { UIApplication.shared.isIdleTimerDisabled = $0 },
     glassesSpeechEnabled: { VoiceFeatureFlags.glassesSpeechEnabled() },
     hasCloudKey: { CloudReading.shared.hasKey },
+    cloudKeyRefused: { CloudReading.shared.keyRefused },
     now: { Date() }
   )
 }
@@ -825,11 +860,13 @@ extension VoiceControl.Environment {
 /// with VoiceControl and WearablesViewModel.
 @MainActor
 enum SpokenSettings {
-  static func apply(_ command: VoiceCommand, preferences: A11yPreferences, hasCloudKey: Bool) -> String {
+  static func apply(_ command: VoiceCommand, preferences: A11yPreferences, hasCloudKey: Bool, keyRefused: Bool = false) -> String {
     switch command {
     case .naturalVoiceOn:
+      // On is only "on" when it can be heard: say why when it can't.
       preferences.useNaturalVoice = true
-      return hasCloudKey ? SpokenMessage.readNaturalVoiceOn : SpokenMessage.readNaturalVoiceOnNoKey
+      if !hasCloudKey { return SpokenMessage.readNaturalVoiceOnNoKey }
+      return keyRefused ? SpokenMessage.readNaturalVoiceOnKeyRefused : SpokenMessage.readNaturalVoiceOn
     case .naturalVoiceOff:
       preferences.useNaturalVoice = false
       return SpokenMessage.readNaturalVoiceOff
