@@ -159,6 +159,7 @@ final class VoiceControl {
   @ObservationIgnored private var restartTask: Task<Void, Never>?
   @ObservationIgnored private var inBackground = false
   @ObservationIgnored private var interrupted = false
+  @ObservationIgnored private var inConversation = false
   @ObservationIgnored private var makeGlassesListener: (@MainActor () -> any SpeechListener)?
   @ObservationIgnored private var glassesMicGranted = false
   @ObservationIgnored private var glassesRequest: (@MainActor () async -> VoicePermission)?
@@ -251,6 +252,13 @@ final class VoiceControl {
 
   func noteInterruption(began: Bool) {
     interrupted = began
+    reconcile()
+  }
+
+  /// A Realtime conversation took the mic (true) or gave it back (false).
+  func noteConversation(_ active: Bool) {
+    guard active != inConversation else { return }
+    inConversation = active
     reconcile()
   }
 
@@ -491,6 +499,8 @@ final class VoiceControl {
           command, preferences: preferences, hasCloudKey: environment.hasCloudKey(), keyRefused: environment.cloudKeyRefused()), nil, true, nil)
     case .glassesMic:
       listenThroughGlasses()
+    case .talk:
+      Conversation.shared.start()
     default:
       break
     }
@@ -634,7 +644,7 @@ final class VoiceControl {
   private var policyInputs: VoiceListenerPolicy.Inputs {
     VoiceListenerPolicy.Inputs(
       enabled: preferences.voiceControlEnabled, asleep: isAsleep, inBackground: inBackground, interrupted: interrupted,
-      glassesAvailable: makeGlassesListener != nil, glassesMicGranted: glassesMicGranted,
+      inConversation: inConversation, glassesAvailable: makeGlassesListener != nil, glassesMicGranted: glassesMicGranted,
       glassesCoolingOff: glassesCoolOffUntil.map { environment.now() < $0 } ?? false,
       phoneMic: phoneMicPermission, speechRecognition: speechPermission, onDeviceRecognizerAvailable: phoneLocale != nil)
   }

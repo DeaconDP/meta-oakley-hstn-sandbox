@@ -75,6 +75,8 @@ enum VoiceCommand: String, CaseIterable, Sendable {
   case replaySetup
   /// Asks first: "Disconnect your glasses? Say yes or no."
   case disconnect
+  /// A spoken conversation about the page with OpenAI Realtime (Conversation).
+  case talk
 
   /// The word or phrase help offers for it, and the name the UI shows as the last command.
   var phrase: String {
@@ -107,6 +109,7 @@ enum VoiceCommand: String, CaseIterable, Sendable {
     case .glassesMic: "listen through glasses"
     case .replaySetup: "replay setup"
     case .disconnect: "disconnect"
+    case .talk: "talk"
     }
   }
 
@@ -167,6 +170,10 @@ enum VoiceCommandParser {
 
   /// Every phrase belongs to one command only (VoiceCommandParserTests checks).
   static let phrases: [VoiceCommand: [String]] = [
+    .talk: [
+      "talk", "lets talk", "talk to me", "can we talk", "can we talk about this", "talk about this", "talk about it",
+      "i have a question", "ask a question", "start a conversation",
+    ],
     .read: ["read", "read this", "read that", "read it", "read aloud", "read it aloud", "read this aloud", "read text", "read the text"],
     .stop: ["stop", "pause", "quiet", "be quiet", "stop reading", "stop talking", "hush"],
     .repeatLast: ["repeat", "repeat that", "repeat this", "again", "say again", "say that again", "what did you say"],
@@ -354,11 +361,11 @@ enum VoiceCommandParser {
     case .welcome:
       screen = [.connect, .tryAgain, .continueOn, .next, .yes, .no] + always
     case .home:
-      screen = [.connect, .tryAgain, .status] + always + settings
+      screen = [.connect, .tryAgain, .status, .talk] + always + settings
     case .camera:
       let update: [VoiceCommand] = context.canUpdate ? [.update] : []
       let reading: [VoiceCommand] = context.hasReadSentences ? [.continueOn, .next, .back, .resume] : []
-      screen = [.read, .status] + update + reading + always + settings
+      screen = [.read, .talk, .status] + update + reading + always + settings
     }
     return unique(screen + context.extraCommands)
   }

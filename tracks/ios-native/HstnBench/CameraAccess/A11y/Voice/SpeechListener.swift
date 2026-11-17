@@ -62,12 +62,15 @@ enum VoicePauseReason: String, Equatable, Sendable {
   case interrupted
   /// "Goodbye" was said.
   case asleep
+  /// A Realtime conversation owns the mic (Conversation).
+  case conversation
 
   var text: String {
     switch self {
     case .background: "Paused while the app is in the background."
     case .interrupted: "Paused by a call or another app."
     case .asleep: SpokenMessage.voiceAsleep
+    case .conversation: "Paused while you're talking with SpeakUp."
     }
   }
 }
@@ -90,6 +93,8 @@ enum VoiceListenerPolicy {
     var asleep = false
     var inBackground = false
     var interrupted = false
+    /// A Realtime conversation is running and has the mic.
+    var inConversation = false
     /// A device session is STARTED and Speech is allowed by the feature flag.
     var glassesAvailable = false
     /// The wearable MICROPHONE permission (a Meta AI grant, separate from the phone's).
@@ -107,6 +112,7 @@ enum VoiceListenerPolicy {
     if inputs.asleep { return .paused(.asleep) }
     if inputs.inBackground { return .paused(.background) }
     if inputs.interrupted { return .paused(.interrupted) }
+    if inputs.inConversation { return .paused(.conversation) }
     if inputs.glassesAvailable, inputs.glassesMicGranted, !inputs.glassesCoolingOff { return .glasses }
     if inputs.phoneMic == .denied || inputs.speechRecognition == .denied { return .denied }
     if inputs.phoneMic == .notDetermined || inputs.speechRecognition == .notDetermined { return .needsPermission }

@@ -64,6 +64,7 @@ struct CameraView: View {
               updateControls
             } else {
               readButton
+              TalkButton()
               if TextReader.shared.phase != .idle {
                 ReadPanel(isLargeText: isLargeText, onStatus: speakStatus)
                   .transition(.opacity)
