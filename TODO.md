@@ -39,7 +39,8 @@
 - [x] Ask about the text (2026-11-06, notes/ask-about-the-text.md: on-device, no cloud needed: bundled WordNet 3.0 definitions with inflections, British/American spellings, "did you mean" from the text and "spell it"; who-is mentions, recap (survives a restart, kept with the bookmark), find + "next"; question barge-in, then "carry on". Claude Haiku 5.5 optional for open questions, only with an API key in local.properties; untested live)
 - [x] Light and colour (brightness tone, colour naming with hedging) (2026-11-06, notes/light-and-colour.md: log-pitch probe tone with smoothing, relative levels, blink detection, OKLab colour naming with white balance, two-colour split and hedging)
 - [x] Home voice menu: the camera screen is usable by voice with no tool open (normal icon, after closing a tool): connects and listens by itself, "read my mail" / "main menu" / "what can I say" / "close the app" (2026-11-12, notes/tools-layer.md > Home voice menu; JVM 284/0; `HomeVoiceMenuTest` written but not yet run on the A26)
-- [ ] Run `HomeVoiceMenuTest`, `ToolsTest`, `VoiceFirstLaunchTest` on the A26 mock after the home voice menu change
+- [x] Run `HomeVoiceMenuTest`, `ToolsTest`, `VoiceFirstLaunchTest`, `SetupVoiceTest`, `RegistrationButtonTest` after the home voice menu change (2026-11-16, emulator `HSTN_Mock_API34`, the A26 wasn't reachable: 9/9 after fixing `ToolHub.isSpeakingAside`, a flag cleared by the first finished aside while the next was still queued, so "Connecting…" ending made the welcome look finished and "read my mail" was dropped as echo; JVM 301/0. `VoiceFirstLaunchTest` was flaky once before the fix)
+- [ ] Repeat those five on the A26
 - [ ] Voice: end the session / unregister by voice, with a spoken confirmation for unregistering
 - [ ] Offline eval harness: Mock Device Kit `setCameraFeed`/`setCapturedImage` + VizWiz/TextVQA subset, replay mode for CI
 - [ ] TalkBack pass + WCAG 2.2 AA check of the companion UI
@@ -49,3 +50,52 @@
   - [x] iOS: spoken tips. After a quiet spell, the app says what to say next for the current screen. Gaps are 8 s, 30 s, 1 min and 2 min, then it stops, and the tips fade as the user learns them. There's an off switch in settings (2026-11-16, notes/a11y-onboarding.md > Spoken tips; unit tests 179/0 on the iOS 27 simulator; not yet tried on the iPhone)
 - [ ] Real HSTN: check Meta AI registration and permission screens under VoiceOver, plus the open questions in notes/a11y-onboarding.md
 - [ ] Mention the accessibility focus in README once the first demo runs
+
+## Make it your own (notes/customisation-roadmap.md)
+- [ ] C0: one settings schema shared by both platforms (rate on one 0.5–3× scale, per-tool overrides); migrate the existing Android prefs and the iOS `A11yPreferences` keys; merge the book rate into "main rate + book override"
+- [ ] C0: one audio bus per platform (Android single AudioTrack mixer; iOS `AVSpeechSynthesizer.write` into the shared engine); check earcons still play within 100 ms
+- [ ] C0: settings grammar: slower/faster, shorter/more detail, "keep that", "undo", "what's my setup", "reset speech", "lock settings"
+- [ ] Fix the gap in notes/a11y-onboarding.md:69: iOS detail level and rate aren't in Settings; earcons can't be reached
+- [ ] C1: speech presets (Brisk/Normal/Gentle), voice choice by voice with samples, per-tool verbosity, earcon on/off/volume/earcons-only, Android settings screen
+- [ ] C2: balance, which ear for which sound, mono-aware cues (iOS `isMonoAudioEnabled`), Clear speech preset (DynamicsProcessing / AVAudioUnitEQ), conversation mode
+- [ ] C3: aliases + macros by voice with conflict check, home-menu show/hide/reorder, wake word choice, tip pacing Fewer/Normal/Off
+- [ ] C4 (Experimental): glasses controls map for `Capture`/`Select`/`Nav`, "what do my buttons do?", `LaunchApp` into a tool; find out whether Meta's press-and-hold shortcut can launch a DAT app
+- [ ] C5: profiles (Home / Out and about / Reading), switch by voice, optional announced triggers, learned suggestions
+- [ ] C6: detail dial + description preferences passed to the model
+- [ ] C7: export/import setup code, helper view, backup with the bookmarks
+- [ ] Real HSTN: per-temple stereo, OS mono/balance over A2DP, capture-button events, `KEY_PARAM_PAN` support
+
+- [ ] iOS hands-free: `DATGlassesDisplayMockTests.testTheCardRendersOnTheMockDisplay` fails every run ("The display didn't start", 50–73 s) on a fresh iOS 27 simulator (2026-11-18; the other 228 unit tests pass)
+
+## Everyday value (notes/value-strategy.md)
+- [ ] V0 Android: `PhoneCamera : PageCamera` (CameraX `ImageAnalysis` + `ImageCapture`), picked in `ToolHub.Factory` from a "glasses optional" setting
+- [ ] V0 Android: stop DAT types leaking from `PageCamera` (`deviceSession`, `connectAndStream(Permission)`); add a `motion` signal for book page turns
+- [ ] V0 Android: bypass the registration gate (`CameraAccessScaffold.kt:102`), make Bluetooth optional (`MainActivity.kt:85`), skip `GlassesWatch`, `bringUpLink`/`explainNoGlasses` and reconnect when glasses are off
+- [ ] V0: re-tune fps, resolution and framing checks for phone optics; lock AE/AWB for the light tool; re-run `experiments/book-reader-resolution` on phone frames
+- [ ] V0: "use the phone" / "use the glasses" by voice mid-task; phone framing guidance (distance, torch, haptics); big-text mirror of what's read
+- [ ] V0 iOS: `PhoneFrameSource : ReadFrameSource` (AVCaptureSession); bypass `registrationState` (`MainAppView.swift:34`); App Store target without the DAT SDK
+- [ ] V0 iOS: port mail, labels, watch-for-text and the book reader (iOS only has Read today)
+- [ ] V1: "deal with this letter": deadline reminder, "what's due this week", letters log + export, plain-English explain (text only, optional Haiku), explain in my language
+- [ ] V2: food check (expiry vs today, my allergens, cooking steps); recipe/manual "next step"
+- [ ] V3: carer mode: consented, per-item, revocable sharing of letter summaries and the medication log
+- [ ] V4: Quick Settings tile, widget, share target for images/PDFs; iOS Action Button / App Intents / Back Tap; job-first store copy and keywords
+- [ ] Make on-device speech the default; check OpenAI TTS shutdown date (reported 2027-01-06) and replacement price
+- [ ] Check whether the Play Store accepts the Android app with DAT linked
+- [ ] Business: list grants (Meta AI Glasses Impact Grants, Microsoft AI for Accessibility, Innovate UK), contact BVA / Vision Ireland / ACB about a glasses Beta, sound out one UK bank or energy firm about sponsoring "understand your letter"
+
+## Beyond reading (notes/use-cases.md)
+- [ ] U1: Reminders tool: "remind me in 20 minutes / at 6 to …", "what reminders do I have", done/snooze/repeat; spoken on the glasses when `donState` says worn, otherwise a phone notification
+- [ ] U1: Notes and "what was I doing?" (tool-action log + spoken notes, no frames)
+- [ ] U1: Medication log ("I took it" / "did I take my evening pill?"), never says a dose
+- [ ] U1: Routine checklists by voice ("leaving the house"), can call the Light tool
+- [ ] U1: Labels: expiry check against today, allergen check against the user's list, abstain when cut off
+- [ ] U1: Mail: scam-sign rules (urgent payment, gift cards, "final notice", bank details asked for)
+- [ ] U1: Check whether a TalkBack/VoiceOver-read phone notification reaches the glasses over A2DP when SpeakUp isn't running
+- [ ] U2: "Where am I" tool (GPS + reverse geocode + nearest junction); carve out the book reader's "where am I"
+- [ ] U2: Markers and "take me back" (clock-face bearing and distance on request)
+- [ ] U2: "Is this my bus?" (GTFS-realtime due time + watch-for-text confirmation); rideshare plate check
+- [ ] U3: "What did they say?" tool: rolling 60 s in-memory transcript on the phone mic, addressed commands in caption mode, numbers digit by digit with a hedge
+- [ ] U3: Name-called alert; sound recognition with MediaPipe YAMNet (phone mic GA, glasses PCM behind a flag)
+- [ ] U4: Display spike on the mock (`META_RAYBAN_DISPLAY`, DAM enabled): status card, large-print text pages; find out whether camera stream + display run in one session
+- [ ] U6: Head-height obstacle demo (Experimental), scored on misses, false alarms and latency
+- [ ] Add the "Awareness, not safety" first-use line and the reserved attention earcon to the audio UX layer
