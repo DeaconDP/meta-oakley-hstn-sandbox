@@ -1,5 +1,5 @@
 /*
- * VoiceIndicator - voice is the default input, so the screen always says how it's doing
+ * VoiceIndicator - the screen always says how listening is doing (hands-free, or push to talk)
  *
  * VoiceIndicatorModel is pure: VoiceControl's state in, words, a mascot mood and at most one fix out.
  * The view only binds to it. A bar beside the mascot is Listen Cyan while listening and Voice Coral
@@ -21,7 +21,7 @@ struct VoiceIndicatorModel: Equatable {
 
     var title: String {
       switch self {
-      case .turnOn: "Turn on"
+      case .turnOn: "Hands-free on"
       case .askPermission: "Allow"
       case .openSettings: "Open Settings"
       }
@@ -29,7 +29,7 @@ struct VoiceIndicatorModel: Equatable {
 
     var hint: String {
       switch self {
-      case .turnOn: "Turns voice control back on."
+      case .turnOn: "Turns hands-free on, so the app is always listening."
       case .askPermission: "Asks to use the microphone and speech recognition."
       case .openSettings: "Opens Settings for this app."
       }
@@ -87,7 +87,7 @@ struct VoiceIndicatorModel: Equatable {
       return VoiceIndicatorModel(title: "Listening paused", detail: reason, mood: .idle, fix: nil)
     case .off:
       return VoiceIndicatorModel(
-        title: "Voice control is off", detail: "Every button still works.", mood: .idle, fix: .turnOn)
+        title: "Hands-free is off", detail: "Tap the mic for one command.", mood: .idle, fix: .turnOn)
     case .unavailable:
       let denied = micPermission == .denied || speechPermission == .denied
       var fix: Fix?
@@ -183,7 +183,7 @@ struct VoiceIndicatorView: View {
   private func perform(_ fix: VoiceIndicatorModel.Fix) {
     switch fix {
     case .turnOn:
-      voice.setEnabled(true)
+      voice.setHandsFree(true)
     case .askPermission:
       Task { await voice.requestPermissions() }
     case .openSettings:

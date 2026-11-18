@@ -12,6 +12,9 @@ struct CameraNarration: ViewModifier {
   let viewModel: CameraViewModel
   let narrator: CameraNarrator
   let updateRequired: @MainActor () -> Bool
+  /// The camera permission prompt's Continue and Cancel, so the question can be answered by voice.
+  let permissionYes: @MainActor () -> Void
+  let permissionNo: @MainActor () -> Void
 
   func body(content: Content) -> some View {
     content
@@ -28,10 +31,17 @@ struct CameraNarration: ViewModifier {
         narrator.batteryChanged(from: old, to: new)
       }
       .onChange(of: viewModel.showError) { _, shown in
-        if shown { narrator.errorShown(viewModel) }
+        guard shown else { return }
+        narrator.errorShown(viewModel)
+        // Hands-free has no alert to dismiss; the action stays for "try again".
+        if A11yPreferences.shared.handsFree { viewModel.dismissError() }
       }
       .onChange(of: viewModel.showCameraPermissionRedirectConfirm) { _, shown in
-        if shown { narrator.cameraPermissionPromptShown() }
+        if shown {
+          narrator.cameraPermissionPromptShown(yes: permissionYes, no: permissionNo)
+        } else {
+          VoiceControl.shared.clearQuestion()
+        }
       }
       .onDisappear { narrator.screenDisappeared() }
   }

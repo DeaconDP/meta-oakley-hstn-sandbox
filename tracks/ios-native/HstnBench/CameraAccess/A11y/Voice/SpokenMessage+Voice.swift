@@ -31,8 +31,6 @@ extension SpokenMessage {
 
   static let voiceControlOnWakeWord = "Voice control is on. Say reader, help at any time."
 
-  static let voiceControlTurnedOff = "Voice control off."
-
   /// Before the system's microphone and speech recognition dialogs, on the first screen that's up.
   static let voiceControlExplanation =
     "You can run this app by speaking. It needs the microphone to hear you, and speech recognition to understand you. Both stay on your phone, and nothing you say is stored. You'll be asked to allow them next."

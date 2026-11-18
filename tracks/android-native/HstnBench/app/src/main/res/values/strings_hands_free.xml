@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hands-free mode and the toolbox (notes/hands-free-mode.md): ToolHub, HandsFreeStore, SetupVoice,
+     the camera and setup screens, the glasses display card, the launcher shortcut. -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <!-- Switching -->
+    <string name="hf_first_run" description="Said once on first run when TalkBack is on and hands-free started on">Hands-free is on. Say hands-free off for touch only.</string>
+    <string name="hf_turned_on" description="Said after turning hands-free on">Hands-free is on. I\'m listening. Say help at any time.</string>
+    <string name="hf_turned_off" description="Said after turning hands-free off">Hands-free is off. Tap the mic button to talk.</string>
+    <string name="hf_setup_off" description="Said on the setup screen after turning hands-free off">Hands-free is off. Tap Connect my glasses when you\'re ready, or tap the mic to talk.</string>
+    <string name="hf_already_on" description="Said when hands-free is asked for but already on">Hands-free is already on.</string>
+    <string name="hf_already_off" description="Said when hands-free off is asked for but it's already off">Hands-free is already off.</string>
+    <string name="hf_mode_hands_free" description="Part of where am I and settings">Hands-free is on.</string>
+    <string name="hf_mode_toolbox" description="Part of where am I and settings">Hands-free is off.</string>
+
+    <!-- Push to talk -->
+    <string name="hf_ptt_nothing" description="Push to talk heard nothing">I didn\'t hear anything. Tap the mic and try again.</string>
+    <string name="hf_ptt_no_mic" description="Push to talk can't use a microphone">I can\'t use a microphone. Allow the microphone for SpeakUp in Settings.</string>
+    <string name="hf_ptt_not_ready" description="Push to talk pressed before the screen is ready">One moment, I\'m still starting up.</string>
+
+    <!-- Navigation and help -->
+    <string name="hf_and" description="Joins the last two items of a spoken list">and</string>
+    <string name="hf_tools_list" description="List of tools; %1$d is how many, %2$s the names">There are <xliff:g id="count">%1$d</xliff:g> tools: <xliff:g id="names">%2$s</xliff:g>.</string>
+    <string name="hf_tools_say" description="After the list of tools, hands-free">Say one to open it.</string>
+    <string name="hf_tools_tap" description="After the list of tools, toolbox">Tap one, or tap the mic and say its name.</string>
+    <string name="hf_where_home" description="Where am I, in the main menu">You\'re in the main menu.</string>
+    <string name="hf_where_tool" description="Where am I, in a tool; %1$s is the tool name">You\'re in the <xliff:g id="tool">%1$s</xliff:g>.</string>
+    <string name="hf_back_at_home" description="Back said in the main menu">You\'re in the main menu already. Say close the app to leave.</string>
+    <string name="hf_help_toolbox" description="Help in the main menu with hands-free off (push to talk)">Tap a tool to open it. Or tap the mic and say read my book, read my mail, labels, watch for, light, connect, status, or hands-free on.</string>
+    <string name="hf_welcome_short" description="Main menu welcome with short answers">SpeakUp is ready.</string>
+
+    <!-- Connection -->
+    <string name="hf_link_streaming" description="Connection: streaming">Glasses connected, camera on.</string>
+    <string name="hf_link_connected" description="Connection: connected, no camera">Glasses connected, camera off. Say connect to turn it on.</string>
+    <string name="hf_link_connecting" description="Connection: connecting">Connecting to your glasses.</string>
+    <string name="hf_link_none" description="Connection: none">Glasses not connected. Say connect to try.</string>
+    <string name="hf_link_disconnected_by_user" description="Connection: user said disconnect">Glasses disconnected. Say connect to start again.</string>
+    <string name="hf_connected" description="Said when connect worked">Your glasses are connected.</string>
+    <string name="hf_already_connected" description="Connect said while connected">Your glasses are already connected.</string>
+    <string name="hf_disconnected" description="Said after disconnect">Glasses disconnected. Say connect to start again.</string>
+    <string name="hf_already_disconnected" description="Disconnect said with no session">The glasses aren\'t connected.</string>
+
+    <!-- Settings by voice -->
+    <string name="hf_verbosity_short" description="Answer length set or reported">Short answers.</string>
+    <string name="hf_verbosity_normal" description="Answer length set or reported">Normal answers.</string>
+    <string name="hf_verbosity_detailed" description="Answer length set or reported">Detailed answers.</string>
+    <string name="hf_setting_display_on" description="Settings report">Glasses display on.</string>
+    <string name="hf_setting_display_off" description="Settings report">Glasses display off.</string>
+    <string name="hf_display_on" description="Glasses display switched on">Glasses display on.</string>
+    <string name="hf_display_off" description="Glasses display switched off">Glasses display off. I\'ll keep talking as usual.</string>
+    <string name="hf_display_none" description="Glasses display switched on but these glasses have none">Glasses display on. These glasses don\'t have a display, so I\'ll keep to speech.</string>
+    <string name="hf_display_on_toolbox" description="Glasses display switched on in the toolbox">Glasses display on. It shows when hands-free is on.</string>
+    <string name="hf_display_failed" description="Said once when the glasses display stops working">The glasses display isn\'t working, so I\'ll keep to speech.</string>
+
+    <!-- Glasses display card (short: a glance) -->
+    <string name="hf_card_menu" description="Card heading in the main menu">Main menu</string>
+    <string name="hf_card_heard" description="Card: prefix for what was heard">Heard: </string>
+    <string name="hf_card_listening" description="Card state">Listening</string>
+    <string name="hf_card_ready" description="Card state">Ready</string>
+    <string name="hf_card_connecting" description="Card state">Connecting to glasses</string>
+    <string name="hf_card_disconnected" description="Card state">Glasses disconnected</string>
+    <string name="hf_hints_home" description="Card hint phrases in the main menu, separated by |; each must be a command">read my book|read my mail|help</string>
+    <string name="hf_hints_tool" description="Card hint phrases in a tool, separated by |; each must be a command">help|repeat|main menu</string>
+
+    <!-- Screens -->
+    <string name="hf_switch_label" description="Big switch on the home and setup screens">Hands-free</string>
+    <string name="hf_switch_on" description="Under the switch when on">On: I listen all the time. Say hands-free off to stop.</string>
+    <string name="hf_switch_off" description="Under the switch when off">Off: tap the tools, or tap the mic to say one thing.</string>
+    <string name="hf_display_switch_label" description="Switch in settings">Glasses display</string>
+    <string name="hf_display_switch_hint" description="Under the glasses display switch">A small card on glasses that have a display, in hands-free.</string>
+    <string name="hf_mic_button" description="Push-to-talk button label">Tap to talk</string>
+    <string name="hf_mic_button_listening" description="Push-to-talk button while listening">Listening… tap to cancel</string>
+    <string name="hf_mic_button_description" description="TalkBack: push-to-talk button">Talk. Listens for one command, like read my mail or status.</string>
+    <string name="hf_mic_button_description_listening" description="TalkBack: push-to-talk button while listening">Listening for one command. Double tap to cancel.</string>
+    <string name="hf_toolbox_heading" description="Heading of the toolbox home">Toolbox</string>
+    <string name="hf_toolbox_intro" description="Under the toolbox heading">Tools that use your glasses camera and speak the answer.</string>
+    <string name="hf_connect_button" description="Connect button in the toolbox home">Connect glasses</string>
+    <string name="hf_connect_button_description" description="TalkBack: connect button">Connect to your glasses and turn on the camera.</string>
+    <string name="hf_sdk_heading" description="Heading over the SDK features list">On the glasses</string>
+    <string name="hf_sdk_camera" description="SDK feature line">Camera: live video, photos and recording from your glasses.</string>
+    <string name="hf_sdk_speech" description="SDK feature line">Speech: the glasses hear you and the phone answers in your ears.</string>
+    <string name="hf_sdk_health" description="SDK feature line">Status: battery, worn or not, Bluetooth and heat.</string>
+    <string name="hf_sdk_display" description="SDK feature line">Display: a small card on Ray-Ban Display glasses.</string>
+    <string name="hf_settings_heading" description="Heading over the settings switches in the top bar menu">Settings</string>
+
+    <!-- Tool descriptions on the toolbox home -->
+    <string name="hf_tool_book" description="Toolbox: book reader description">Reads a printed book aloud, page by page.</string>
+    <string name="hf_tool_mail" description="Toolbox: mail reader description">Says who a letter is from and what it\'s about.</string>
+    <string name="hf_tool_watch" description="Toolbox: watch for text description">Tells you when a word or number comes into view.</string>
+    <string name="hf_tool_labels" description="Toolbox: label reader description">Barcodes, dates and labels, read out.</string>
+    <string name="hf_tool_light" description="Toolbox: light detector description">A tone for brightness, and the colour in front of you.</string>
+
+    <!-- Launcher shortcut -->
+    <string name="hf_shortcut_short" description="Launcher shortcut label (short)">Hands-free</string>
+    <string name="hf_shortcut_long" description="Launcher shortcut label (long)">Start SpeakUp hands-free</string>
+</resources>

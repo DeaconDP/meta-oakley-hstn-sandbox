@@ -67,6 +67,22 @@ struct RepeatLastIntent: AppIntent {
   }
 }
 
+/// Opens straight into hands-free mode and switches it on (notes/hands-free-mode.md section 2).
+/// Opens the app: listening needs it in front. The same as the URL speakup://handsfree.
+struct StartHandsFreeIntent: AppIntent {
+  static var title: LocalizedStringResource { "Start hands-free" }
+  static var description: IntentDescription {
+    IntentDescription("Opens SpeakUp in hands-free mode, so you can use it by voice alone.")
+  }
+  static var openAppWhenRun: Bool { true }
+
+  @MainActor
+  func perform() async throws -> some IntentResult & ProvidesDialog {
+    VoiceControl.shared.startHandsFreeFromLaunch()
+    return .result(dialog: "\(SpokenMessage.launchHandsFree)")
+  }
+}
+
 /// Phrases must include the app name (the bundle display name). Keep them short and natural;
 /// these are what people say to Siri and what Shortcuts lists for Back Tap and the Action Button.
 /// No phrase may fit two intents.
@@ -100,6 +116,16 @@ struct LaunchShortcuts: AppShortcutsProvider {
       ],
       shortTitle: "Repeat",
       systemImageName: "arrow.counterclockwise"
+    )
+    AppShortcut(
+      intent: StartHandsFreeIntent(),
+      phrases: [
+        "Start hands-free in \(.applicationName)",
+        "Start \(.applicationName) hands-free",
+        "\(.applicationName) hands-free",
+      ],
+      shortTitle: "Hands-free",
+      systemImageName: "mic.fill"
     )
   }
 }

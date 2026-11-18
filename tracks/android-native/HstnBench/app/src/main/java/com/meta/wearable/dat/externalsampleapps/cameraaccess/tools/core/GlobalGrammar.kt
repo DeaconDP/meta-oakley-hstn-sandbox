@@ -14,6 +14,10 @@
 //     "what happened last time"), parsed by tools/ask/AskGrammar and answered by AskAboutText.
 //  3. Commands every tool understands: pause/stop, carry on, repeat, faster/slower/speed, help,
 //     battery, close, "main menu" (back to the home voice menu) and "close the app" (leave the app).
+//  4. Hands-free mode (notes/hands-free-mode.md): "hands-free on/off" (also "voice mode", "touch
+//     mode", "stop listening for good"), "what tools are there", "where am I", "back", "connect",
+//     "disconnect", "status", "settings", "short/normal/detailed answers", "glasses display on/off".
+//     Tool grammars still run first, so the book reader keeps its own "where am I", "back", "status".
 //
 // [parseHome] is what the home voice menu (CameraScreen with no tool open) understands: everything
 // here plus bare tool names ("light", "book", "colour"), which are too short to be safe inside a
@@ -71,6 +75,38 @@ sealed interface GlobalCommand {
    */
   data class Ask(val question: String, val subject: String? = null) : GlobalCommand
 
+  // Hands-free mode (notes/hands-free-mode.md > What hands-free covers): everything a tap can do.
+
+  /** "What tools are there", "list tools": the tools, by name. */
+  data object ListTools : GlobalCommand
+
+  /** "Where am I": the screen or tool, what it's doing, and the glasses connection. */
+  data object WhereAmI : GlobalCommand
+
+  /** "Back", "go back": up one level (a tool closes to the menu; in the menu, says where you are). */
+  data object Back : GlobalCommand
+
+  /** "Connect", "connect my glasses": bring the session and camera up. */
+  data object Connect : GlobalCommand
+
+  /** "Disconnect", "end the session": stop the glasses session (the app stays registered). */
+  data object Disconnect : GlobalCommand
+
+  /** "Status": glasses, camera stream and battery. */
+  data object Status : GlobalCommand
+
+  /** "Settings": the current speed, answer length, glasses display and mode, spoken. */
+  data object Settings : GlobalCommand
+
+  /** "Short answers", "normal answers", "detailed answers". */
+  data class SetVerbosity(val verbosity: Verbosity) : GlobalCommand
+
+  /** "Glasses display on/off". */
+  data class GlassesDisplay(val on: Boolean) : GlobalCommand
+
+  /** "Hands-free on", "voice mode" / "hands-free off", "touch mode", "stop listening for good". */
+  data class HandsFree(val on: Boolean) : GlobalCommand
+
   companion object {
     const val STEP = 0.25f
     const val BIG_STEP = 0.5f
@@ -110,6 +146,61 @@ object GlobalGrammar {
   }
 
   private const val NUM = Phrases.NUM
+
+  /** "hands free", "hands-free", "handsfree" (the hyphen is already a space after Phrases.light). */
+  private const val HF = "(?:hands ?free|hands free)"
+
+  /** Switching the mode. Kept apart so the setup screen can use them too ([parseMode]). */
+  private val MODE_RULES: List<Rule> =
+      listOf(
+          // Before Pause: "stop listening for good" isn't a pause.
+          Rule("(?:$HF (?:off|mode off)|(?:turn|switch) off $HF(?: mode)?|(?:turn|switch) $HF(?: mode)? off|(?:stop|end|exit|leave|quit) $HF(?: mode)?|no more $HF|touch(?: only)? mode|(?:go |switch )?(?:back )?to touch(?: only)?(?: mode)?|stop listening for good|stop listening all the time)") {
+            GlobalCommand.HandsFree(false)
+          },
+          Rule("(?:$HF(?: mode)? on|(?:turn|switch) on $HF(?: mode)?|(?:turn|switch) $HF(?: mode)? on|(?:start|use|go|enter|begin) $HF(?: mode)?|$HF mode|$HF please|voice(?: only)? mode|(?:go |switch )?to voice(?: only)?(?: mode)?|listen all the time|keep listening)") {
+            GlobalCommand.HandsFree(true)
+          },
+      )
+
+  private val HANDS_FREE_RULES: List<Rule> =
+      listOf(
+          Rule("(?:(?:what|which) tools (?:are there|do (?:you|i) have|have you got|can i use|are available)|(?:list|name|tell me)(?: all)?(?: the| my)? tools|what tools|tools list|list of tools|what can (?:you|this app|it) do|(?:the |my )?tools)") {
+            GlobalCommand.ListTools
+          },
+          Rule("(?:where am i|where are we|what screen is this|which screen is this|what(?:'s| is) open|which tool is (?:this|open)|what tool is (?:this|open)|what am i in)") {
+            GlobalCommand.WhereAmI
+          },
+          Rule("(?:(?:go )?back|go back up|up one level|previous screen)") {
+            GlobalCommand.Back
+          },
+          Rule("(?:(?:re)?connect(?: to)?(?: (?:my|the))?(?: glasses)?|(?:start|begin) (?:the |a )?session|(?:turn|switch) on (?:the |my )?(?:glasses )?camera|(?:start|open) (?:the )?(?:glasses )?camera)") {
+            GlobalCommand.Connect
+          },
+          Rule("(?:disconnect(?: from)?(?: (?:my|the))?(?: glasses)?|(?:end|stop) (?:the |this )?session|(?:turn|switch) off (?:the |my )?(?:glasses )?camera|(?:stop|close) (?:the )?(?:glasses )?(?:camera|stream))") {
+            GlobalCommand.Disconnect
+          },
+          Rule("(?:status|(?:what(?:'s| is)|check) (?:the |my )?(?:status|connection)|connection(?: status)?|(?:are|is) (?:my |the )?glasses connected|am i connected|is it connected|are we connected|how are (?:my |the )?glasses)") {
+            GlobalCommand.Status
+          },
+          Rule("(?:settings|my settings|(?:what are|read) (?:my|the) settings|open (?:the )?settings|show (?:me )?(?:the )?settings)") {
+            GlobalCommand.Settings
+          },
+          Rule("(?:(?:give me |use |make (?:it|them) |make the answers? )?(?:short|shorter|brief|briefer|quick) (?:answers?|replies)(?: please)?|(?:be )?(?:brief|briefer|shorter)|(?:keep it|keep them) short|less detail)") {
+            GlobalCommand.SetVerbosity(Verbosity.SHORT)
+          },
+          Rule("(?:(?:give me |use )?(?:normal|regular|medium|standard) (?:answers?|replies|detail)|normal length)") {
+            GlobalCommand.SetVerbosity(Verbosity.NORMAL)
+          },
+          Rule("(?:(?:give me |use )?(?:detailed|long|longer|full|fuller) (?:answers?|replies)|more detail|(?:tell me )?in detail|be more detailed)") {
+            GlobalCommand.SetVerbosity(Verbosity.DETAILED)
+          },
+          Rule("(?:(?:the )?glasses display off|(?:turn|switch) off (?:the )?glasses display|(?:turn|switch) (?:the )?glasses display off|(?:the )?display off|(?:turn|switch) off the display|(?:stop|don'?t) show(?:ing)? (?:it )?on (?:the |my )?glasses|hide (?:the )?(?:glasses )?display)") {
+            GlobalCommand.GlassesDisplay(false)
+          },
+          Rule("(?:(?:the )?glasses display on|(?:turn|switch) on (?:the )?glasses display|(?:turn|switch) (?:the )?glasses display on|(?:the )?display on|(?:turn|switch) on the display|show (?:it )?on (?:the |my )?glasses|show (?:the )?(?:glasses )?display)") {
+            GlobalCommand.GlassesDisplay(true)
+          },
+      )
 
   private val RULES: List<Rule> =
       listOf(
@@ -165,6 +256,11 @@ object GlobalGrammar {
     if (text.isEmpty()) return null
     val light = Phrases.light(transcript).replace(Phrases.ANY_ADDRESS, "").trim()
     for (opener in OPENERS) opener(text, light)?.let { return GlobalCommand.Open(it) }
+    // Whole-phrase app commands before questions: "what's the status" isn't a question about a text.
+    for (rule in MODE_RULES + HANDS_FREE_RULES) {
+      val m = rule.regex.matchEntire(text) ?: continue
+      rule.build(m)?.let { return it }
+    }
     AskGrammar.parse(text, transcript)?.let { return it }
     for (rule in RULES) {
       val m = rule.regex.matchEntire(text) ?: continue
@@ -193,6 +289,20 @@ object GlobalGrammar {
     val text = Phrases.normalize(transcript)
     if (text.isEmpty()) return null
     for ((regex, request) in HOME_NAMES) if (regex.matches(text)) return GlobalCommand.Open(request)
+    return null
+  }
+
+  /**
+   * Only the mode switches ("hands-free on", "touch mode"), for screens with their own grammar (the
+   * setup screen) that still have to honour them.
+   */
+  fun parseMode(transcript: String): GlobalCommand.HandsFree? {
+    val text = Phrases.normalize(transcript)
+    if (text.isEmpty()) return null
+    for (rule in MODE_RULES) {
+      val m = rule.regex.matchEntire(text) ?: continue
+      (rule.build(m) as? GlobalCommand.HandsFree)?.let { return it }
+    }
     return null
   }
 

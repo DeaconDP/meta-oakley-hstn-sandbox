@@ -40,7 +40,11 @@ import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.PermState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.SetupVoice
+import android.view.accessibility.AccessibilityManager
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.HandsFreeStore
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolRegistry
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HandsFreeIntent
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HandsFreeLaunch
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.LaunchIntent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolLaunch
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.CameraAccessScaffold
@@ -64,6 +68,9 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
     // deterministic `adb forward`. Must match _DEFAULT_ANDROID_TEST_SERVER_PORT in the
     // plugin's mcp/target_resolver.py.
     private const val MOCK_TEST_SERVER_PORT = 8237
+
+    // Hands-free: speakup://handsfree, the "Hands-free" launcher shortcut, `--ez handsfree true`.
+    const val EXTRA_HANDS_FREE = HandsFreeLaunch.EXTRA
 
     // Voice-first tools ("Hey Google, open Book Reader" / "Mail Reader" / ...): each has a launcher
     // alias, a deep link hstnbench://<id> (?mode=..&arg=..) and an intent extra `--es tool <id>`
@@ -166,6 +173,7 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
         )
     Log.i(TAG, "launch tool=$launchTool")
     setupVoice.setLaunchedTool(launchTool?.let { getString(ToolRegistry.spec(it.tool).nameRes) })
+    applyHandsFreeLaunch()
     setContent {
       SpeakUpTheme {
         CameraAccessScaffold(
@@ -177,6 +185,33 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
       }
     }
   }
+
+  /**
+   * Hands-free mode (notes/hands-free-mode.md): the first run decides the default (TalkBack on ->
+   * hands-free on, said once), and speakup://handsfree, the "Hands-free" launcher shortcut and
+   * `--ez handsfree true` open straight into hands-free mode and switch it on.
+   */
+  private fun applyHandsFreeLaunch() {
+    val mode = HandsFreeStore.get(this)
+    mode.firstRun(screenReaderOn = isScreenReaderOn())
+    val launched =
+        HandsFreeLaunch.isHandsFree(
+            HandsFreeIntent(
+                handsFreeExtra = intent.getBooleanExtra(HandsFreeLaunch.EXTRA, false),
+                scheme = intent.data?.scheme,
+                host = intent.data?.host,
+            ),
+        )
+    if (launched) {
+      // Switched on by the launch: say so once, like the first run.
+      if (mode.setHandsFree(true)) mode.queueAnnouncement()
+      setupVoice.setVoiceFirstVisit(true)
+    }
+    Log.i(TAG, "hands-free=${mode.handsFree} launched=$launched")
+  }
+
+  private fun isScreenReaderOn(): Boolean =
+      (getSystemService(ACCESSIBILITY_SERVICE) as? AccessibilityManager)?.isTouchExplorationEnabled == true
 
   override fun onStart() {
     super.onStart()
@@ -203,7 +238,8 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
     askable.forEach { prefs.putBoolean("asked_$it", true) }
     prefs.apply()
     val launch = { permissionCheckLauncher.launch(askable.toTypedArray()) }
-    if (fromVoice) {
+    // The toolbox doesn't talk first: Android's dialog explains itself.
+    if (fromVoice || !setupVoice.talksFirst) {
       launch()
       return
     }

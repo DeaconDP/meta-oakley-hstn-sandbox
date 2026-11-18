@@ -6,7 +6,9 @@
 // (decorative), the status line in large Signal Yellow on a Dusk card, which microphone is listening
 // (icon + words), and what was last heard, with the tool's own controls below. Test tags:
 // "tool_screen_<id>", "tool_close", "tool_status", "tool_voice_mic", "tool_voice_heard".
-// AttachTool connects a tool's ViewModel to ToolHub while its screen is showing.
+// AttachTool connects a tool's ViewModel to ToolHub while its screen is showing. In the toolbox
+// (hands-free off) the camera screen provides LocalPushToTalk and the scaffold shows the mic button
+// under the status card: one command, the same grammar as hands-free.
 // Status changes aren't a live region: the tool already speaks them and TalkBack would repeat them.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools
@@ -36,6 +38,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.compositionLocalOf
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.PushToTalkButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,6 +60,18 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpColors
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.SpeakUpDimens
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.VoiceRibbon
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.VoiceState
+
+/** The toolbox's push-to-talk for tool screens: [listening] for one command; [onClick] starts/cancels. */
+class PushToTalk(val listening: Boolean, val onClick: () -> Unit)
+
+/** Provided by the camera screen in the toolbox; null in hands-free mode (the mic is always on). */
+val LocalPushToTalk = compositionLocalOf<PushToTalk?> { null }
+
+/** The push-to-talk button, if the toolbox provides one. */
+@Composable
+fun ToolPushToTalk() {
+  LocalPushToTalk.current?.let { PushToTalkButton(listening = it.listening, onClick = it.onClick) }
+}
 
 /** Signal Yellow: the accent for status lines and main tool buttons (Night text on it). */
 val ToolAccent = SpeakUpColors.SignalYellow
@@ -136,6 +152,7 @@ fun ToolScaffold(
         )
       }
     }
+    ToolPushToTalk()
     content()
   }
 }

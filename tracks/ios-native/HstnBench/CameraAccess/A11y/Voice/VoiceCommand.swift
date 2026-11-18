@@ -10,6 +10,10 @@
  * silence so nearby conversation doesn't trigger nagging; only "reader, ..." that isn't understood
  * gets a reply. `requiresWakeWord` asks for the wake word when idle too: VoiceOver's own speech
  * can't be detected, and a mic that can hear it would hear "Read text, button" (see VoiceControl).
+ *
+ * Hands-free mode (notes/hands-free-mode.md) adds navigation, connection, settings and the mode
+ * switch. The toolbox's push-to-talk button uses this same grammar; a press means the user is
+ * talking to the app, so `addressed` counts as the wake word.
  */
 
 import Foundation
@@ -33,6 +37,25 @@ enum VoiceCommand: String, CaseIterable, Sendable {
   case yes
   /// The first screen: not now, skip.
   case no
+  // Getting around
+  case mainMenu
+  case listTools
+  case openReader
+  case openSettings
+  /// Close settings, or go back to the main menu.
+  case close
+  case whereAmI
+  /// iOS doesn't let an app close itself, so this says how.
+  case closeApp
+  case disconnect
+  // Settings by voice
+  case shortAnswers
+  case normalAnswers
+  case detailedAnswers
+  case glassesDisplayOn
+  case glassesDisplayOff
+  case handsFreeOn
+  case handsFreeOff
 
   /// The word or phrase help offers for it, and the name the UI shows as the last command.
   var phrase: String {
@@ -50,6 +73,21 @@ enum VoiceCommand: String, CaseIterable, Sendable {
     case .back: "back"
     case .yes: "yes"
     case .no: "not now"
+    case .mainMenu: "main menu"
+    case .listTools: "list tools"
+    case .openReader: "open reader"
+    case .openSettings: "settings"
+    case .close: "close"
+    case .whereAmI: "where am I"
+    case .closeApp: "close the app"
+    case .disconnect: "disconnect"
+    case .shortAnswers: "short answers"
+    case .normalAnswers: "normal answers"
+    case .detailedAnswers: "detailed answers"
+    case .glassesDisplayOn: "glasses display on"
+    case .glassesDisplayOff: "glasses display off"
+    case .handsFreeOn: "hands-free on"
+    case .handsFreeOff: "hands-free off"
     }
   }
 }
@@ -72,6 +110,12 @@ struct VoiceContext: Equatable, Sendable {
   var requiresWakeWord = false
   /// A page has been read, so "next" and "back" move between its sentences.
   var hasReadSentences = false
+  /// Hands-free is on. Only changes which mode switch help offers.
+  var handsFree = false
+  /// Push to talk: the user pressed the mic, so what is heard is for the app, as with the wake word.
+  var addressed = false
+  /// A yes-or-no question is waiting (VoiceControl.ask), so yes, no and continue work here too.
+  var awaitingAnswer = false
 }
 
 enum VoiceParseResult: Equatable, Sendable {
@@ -109,6 +153,30 @@ enum VoiceCommandParser {
     .back: ["back", "go back", "previous", "previous sentence"],
     .yes: ["yes", "yeah", "yep", "yes please"],
     .no: ["no", "nope", "not now", "no thanks", "not yet", "later", "maybe later", "skip", "skip it", "skip this", "skip setup", "skip for now"],
+    .mainMenu: ["main menu", "menu", "home", "go home", "home screen", "go to the main menu", "go to main menu"],
+    .listTools: [
+      "list tools", "what tools are there", "what tools do you have", "tools", "list features", "what features are there",
+      "features", "what can this app do",
+    ],
+    .openReader: ["open reader", "open the reader", "open read text", "open reading"],
+    .openSettings: ["settings", "open settings", "open the settings", "show settings"],
+    .close: ["close", "close this", "close settings", "close the settings", "done"],
+    .whereAmI: ["where am i", "what screen is this", "what screen am i on", "where are we"],
+    .closeApp: ["close the app", "close app", "quit", "quit the app", "exit the app", "close speakup", "quit speakup"],
+    .disconnect: ["disconnect", "disconnect glasses", "disconnect my glasses", "disconnect the glasses"],
+    .shortAnswers: ["short answers", "shorter answers", "be brief", "brief answers"],
+    .normalAnswers: ["normal answers", "medium answers"],
+    .detailedAnswers: ["detailed answers", "long answers", "more detail", "longer answers"],
+    .glassesDisplayOn: ["glasses display on", "turn on the glasses display", "turn the glasses display on", "display on"],
+    .glassesDisplayOff: ["glasses display off", "turn off the glasses display", "turn the glasses display off", "display off"],
+    .handsFreeOn: [
+      "hands free on", "handsfree on", "start hands free", "start handsfree", "voice mode", "hands free mode", "handsfree mode",
+      "turn on hands free", "turn hands free on",
+    ],
+    .handsFreeOff: [
+      "hands free off", "handsfree off", "touch mode", "stop listening for good", "stop hands free", "turn off hands free",
+      "turn hands free off", "touch only",
+    ],
   ]
 
   private static let phraseLookup: [String: VoiceCommand] = {
@@ -131,7 +199,8 @@ enum VoiceCommandParser {
   static func parse(_ transcript: String, context: VoiceContext) -> VoiceParseResult {
     let tokens = normalize(transcript)
     guard !tokens.isEmpty else { return .ignored(.empty) }
-    let (hadWake, afterWake) = stripWakeWord(tokens)
+    let (saidWake, afterWake) = stripWakeWord(tokens)
+    let hadWake = saidWake || context.addressed
 
     if !hadWake, context.isSpeaking || context.requiresWakeWord { return .ignored(.needsWakeWord) }
     if overlaps(tokens, spoken: normalize(context.spokenText), hadWake: hadWake) { return .ignored(.overlapsSpeech) }
@@ -207,23 +276,51 @@ enum VoiceCommandParser {
 
   // MARK: What's valid where
 
-  static func availableCommands(context: VoiceContext) -> [VoiceCommand] {
-    let always: [VoiceCommand] = [.help, .stop, .repeatLast, .faster, .slower]
+  /// Speech control, the same on every screen.
+  static let speechCommands: [VoiceCommand] = [.help, .stop, .repeatLast, .faster, .slower]
+  /// Getting around, the same on every screen.
+  static let navigationCommands: [VoiceCommand] = [.mainMenu, .listTools, .whereAmI, .closeApp]
+  /// Settings by voice, the same on every screen.
+  static let settingsCommands: [VoiceCommand] = [
+    .shortAnswers, .normalAnswers, .detailedAnswers, .glassesDisplayOn, .glassesDisplayOff, .handsFreeOn, .handsFreeOff,
+  ]
+
+  /// What this screen adds to the commands that work everywhere.
+  static func screenCommands(context: VoiceContext) -> [VoiceCommand] {
+    let answers: [VoiceCommand] = context.awaitingAnswer ? [.yes, .no, .continueOn] : []
     switch context.screen {
     case .welcome:
-      return [.connect, .tryAgain, .continueOn, .yes, .no] + always
+      return [.connect, .tryAgain, .continueOn, .yes, .no]
     case .home:
-      return [.connect, .tryAgain, .status] + always
+      return [.connect, .tryAgain, .status, .disconnect, .openReader, .back, .close] + answers
     case .camera:
-      let reading: [VoiceCommand] = context.hasReadSentences ? [.continueOn, .back] : []
-      return [.read, .status] + reading + always
+      let reading: [VoiceCommand] = context.hasReadSentences ? [.continueOn] : []
+      return [.read, .status, .tryAgain, .openReader, .openSettings, .back, .close, .connect, .disconnect] + reading + answers
     }
   }
 
-  /// "You can say: read, status..." for the commands valid right now.
+  static func availableCommands(context: VoiceContext) -> [VoiceCommand] {
+    var seen = Set<VoiceCommand>()
+    return (screenCommands(context: context) + speechCommands + navigationCommands + settingsCommands)
+      .filter { seen.insert($0).inserted }
+  }
+
+  /// What help says, in short groups: this screen, getting around, speech, settings. Only the mode
+  /// switch that would change something is offered.
   static func helpLine(context: VoiceContext) -> String {
-    let words = availableCommands(context: context).filter { $0 != .help }.map(\.phrase).joined(separator: ", ")
-    let lead = context.requiresWakeWord || context.isSpeaking ? "Say reader first, then one of these" : "You can say"
-    return "\(lead): \(words)."
+    let quiet: Set<VoiceCommand> = [.back, .close, .yes, .no, .continueOn, .tryAgain, .disconnect, .openReader]
+    var here = screenCommands(context: context).filter { !quiet.contains($0) }.map(\.phrase)
+    if context.screen == .welcome { here.append(VoiceCommand.no.phrase) }
+    if context.hasReadSentences { here += ["next", "back"] }
+    if context.awaitingAnswer { here += ["yes", "no"] }
+    let mode: VoiceCommand = context.handsFree ? .handsFreeOff : .handsFreeOn
+    let groups = [
+      "Here: \(here.joined(separator: ", ")).",
+      "Anywhere: \([VoiceCommand.mainMenu, .listTools, .whereAmI].map(\.phrase).joined(separator: ", ")).",
+      "Speech: \([VoiceCommand.stop, .repeatLast, .faster, .slower].map(\.phrase).joined(separator: ", ")).",
+      "Settings: \([VoiceCommand.shortAnswers, .glassesDisplayOff, mode].map(\.phrase).joined(separator: ", ")).",
+    ]
+    let lead = context.requiresWakeWord || context.isSpeaking ? "Say reader first, then one of these." : "You can say these."
+    return ([lead] + groups).joined(separator: " ")
   }
 }

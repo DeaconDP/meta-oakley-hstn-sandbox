@@ -12,6 +12,7 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlobalCo
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlobalGrammar
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolId
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolRequest
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.Verbosity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -177,5 +178,120 @@ class GlobalGrammarTest {
         "what does ephemeral mean")) {
       assertNull(p, VoiceCommands.parse(p))
     }
+  }
+
+  // MARK: - Hands-free mode (notes/hands-free-mode.md > What hands-free covers)
+
+  @Test
+  fun handsFreeOnAndOff() {
+    for (p in listOf("hands-free on", "Hands free on", "handsfree on", "start hands-free", "turn on hands-free",
+        "switch hands free on", "voice mode", "hands-free mode", "go hands free", "Glasses, hands-free on please")) {
+      assertEquals(p, GlobalCommand.HandsFree(true), GlobalGrammar.parse(p))
+      assertEquals(p, GlobalCommand.HandsFree(true), GlobalGrammar.parseHome(p))
+      assertEquals(p, GlobalCommand.HandsFree(true), GlobalGrammar.parseMode(p))
+    }
+    for (p in listOf("hands-free off", "hands free off", "turn off hands-free", "stop hands free", "touch mode",
+        "stop listening for good", "go back to touch", "touch only mode")) {
+      assertEquals(p, GlobalCommand.HandsFree(false), GlobalGrammar.parse(p))
+      assertEquals(p, GlobalCommand.HandsFree(false), GlobalGrammar.parseMode(p))
+    }
+    // Only the mode phrases for the setup screen.
+    for (p in listOf("connect", "help", "stop", "main menu", "")) assertNull(p, GlobalGrammar.parseMode(p))
+  }
+
+  @Test
+  fun navigationPhrases() {
+    for (p in listOf("what tools are there", "list tools", "list the tools", "which tools do you have",
+        "what can this app do", "tools", "tell me the tools")) {
+      assertEquals(p, GlobalCommand.ListTools, GlobalGrammar.parse(p))
+    }
+    for (p in listOf("where am I", "Where am I?", "what screen is this", "which tool is this", "what's open")) {
+      assertEquals(p, GlobalCommand.WhereAmI, GlobalGrammar.parse(p))
+    }
+    for (p in listOf("back", "go back", "previous screen")) {
+      assertEquals(p, GlobalCommand.Back, GlobalGrammar.parse(p))
+      assertEquals(p, GlobalCommand.Back, GlobalGrammar.parseHome(p))
+    }
+    // The menu phrases with "back" in them still go home.
+    for (p in listOf("go back home", "back to menu", "go back to the menu")) {
+      assertEquals(p, GlobalCommand.Home, GlobalGrammar.parse(p))
+    }
+  }
+
+  @Test
+  fun connectionPhrases() {
+    for (p in listOf("connect", "connect my glasses", "reconnect", "connect to the glasses", "start the session",
+        "turn on the camera")) {
+      assertEquals(p, GlobalCommand.Connect, GlobalGrammar.parse(p))
+    }
+    for (p in listOf("disconnect", "disconnect my glasses", "end the session", "stop the camera", "turn off the camera")) {
+      assertEquals(p, GlobalCommand.Disconnect, GlobalGrammar.parse(p))
+    }
+    for (p in listOf("status", "what's the status", "connection status", "are my glasses connected", "am I connected")) {
+      assertEquals(p, GlobalCommand.Status, GlobalGrammar.parse(p))
+    }
+    // "End the app" is still leaving the app, not ending the session.
+    assertEquals(GlobalCommand.ExitApp, GlobalGrammar.parse("close the app"))
+  }
+
+  @Test
+  fun settingsPhrases() {
+    assertEquals(GlobalCommand.Settings, GlobalGrammar.parse("settings"))
+    assertEquals(GlobalCommand.Settings, GlobalGrammar.parse("what are my settings"))
+    for (p in listOf("short answers", "shorter answers", "give me short answers", "be brief", "keep it short")) {
+      assertEquals(p, GlobalCommand.SetVerbosity(Verbosity.SHORT), GlobalGrammar.parse(p))
+    }
+    for (p in listOf("normal answers", "regular answers")) {
+      assertEquals(p, GlobalCommand.SetVerbosity(Verbosity.NORMAL), GlobalGrammar.parse(p))
+    }
+    for (p in listOf("detailed answers", "long answers", "more detail")) {
+      assertEquals(p, GlobalCommand.SetVerbosity(Verbosity.DETAILED), GlobalGrammar.parse(p))
+    }
+    for (p in listOf("glasses display off", "turn off the glasses display", "display off", "stop showing it on my glasses")) {
+      assertEquals(p, GlobalCommand.GlassesDisplay(false), GlobalGrammar.parse(p))
+    }
+    for (p in listOf("glasses display on", "turn on the glasses display", "display on", "show it on my glasses")) {
+      assertEquals(p, GlobalCommand.GlassesDisplay(true), GlobalGrammar.parse(p))
+    }
+    // Speed stays where it was.
+    assertEquals(GlobalCommand.Faster(), GlobalGrammar.parse("faster"))
+    assertEquals(GlobalCommand.Slower(), GlobalGrammar.parse("slower"))
+  }
+
+  @Test
+  fun theEverydayCommandsKeepTheirMeaning() {
+    assertEquals(GlobalCommand.Pause, GlobalGrammar.parse("stop"))
+    assertEquals(GlobalCommand.Pause, GlobalGrammar.parse("stop talking"))
+    assertEquals(GlobalCommand.Resume, GlobalGrammar.parse("carry on"))
+    assertEquals(GlobalCommand.Repeat, GlobalGrammar.parse("say that again"))
+    assertEquals(GlobalCommand.Help, GlobalGrammar.parse("what can I say"))
+    assertEquals(GlobalCommand.Close, GlobalGrammar.parse("close"))
+    assertEquals(GlobalCommand.Battery, GlobalGrammar.parse("battery"))
+    // Room chatter with the new words in it is still nothing.
+    for (p in listOf("I left my glasses at home", "the display at the station was broken", "my status update",
+        "we went back to the shop", "the session ran late")) {
+      assertNull(p, GlobalGrammar.parse(p))
+    }
+  }
+
+  @Test
+  fun handsFreePhrasesDontClashWithToolGrammars() {
+    // Tool grammars run first. None may claim these, except the book reader's own "where am I",
+    // "back" and "status" (it answers them about the book), checked below.
+    val phrases = listOf("hands-free on", "hands-free off", "voice mode", "touch mode", "stop listening for good",
+        "what tools are there", "list tools", "connect", "disconnect", "settings", "short answers",
+        "detailed answers", "glasses display off", "glasses display on")
+    for (p in phrases) {
+      assertNull("book: $p", VoiceCommands.parse(p))
+      val n = com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.Phrases.normalize(p)
+      assertNull("mail: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.mail.MailGrammar.parse(n))
+      assertNull("watch: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.watch.WatchGrammar.parse(n, n))
+      assertNull("labels: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.labels.LabelsGrammar.parse(n))
+      assertNull("light: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.light.LightGrammar.parse(n))
+      // ...and none of them opens a tool.
+      assertTrue(p, GlobalGrammar.parse(p) !is GlobalCommand.Open)
+    }
+    assertEquals(VoiceCommand.WhereAmI, VoiceCommands.parse("where am I"))
+    assertEquals(VoiceCommand.WhereAmI, VoiceCommands.parse("status"))
   }
 }

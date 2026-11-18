@@ -17,6 +17,7 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess
 
 import android.content.Context
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.HandsFreeStore
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
@@ -57,6 +58,8 @@ object ToolTestKit {
     for (prefs in listOf("book_reader", "tools")) {
       context.getSharedPreferences(prefs, Context.MODE_PRIVATE).edit().clear().commit()
     }
+    // These tests drive the app by voice: hands-free on (the default is the touch toolbox).
+    HandsFreeStore.get(context).setHandsFree(true)
   }
 
   /** Call in @After. */

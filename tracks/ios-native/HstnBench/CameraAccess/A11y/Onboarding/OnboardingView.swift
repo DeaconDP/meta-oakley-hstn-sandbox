@@ -150,7 +150,10 @@ struct OnboardingView: View {
     // Before setScreen: if voice control still needs permission, its one-sentence explanation and
     // the system dialogs queue behind this line instead of cutting it off.
     speakKeyLine(welcomeLine)
-    VoiceControl.shared.setScreen(.welcome, handler: handleVoice)
+    VoiceControl.shared.setScreen(.welcome, describe: { [wearablesViewModel] in
+      wearablesViewModel.registrationState == .registered ? SpokenMessage.welcomeAlreadyConnected : SpokenMessage.welcomeConnect
+    }, handler: handleVoice)
+    HandsFreeSurface.shared.publish(screen: .welcome, state: "Connect your glasses", hints: [.connect, .no, .help])
     VoiceCoach.shared.provide(for: .welcome) { [wearablesViewModel] in
       // Nothing to suggest while Meta AI is being opened or waited for.
       if wearablesViewModel.isConnecting { return nil }
@@ -224,11 +227,12 @@ struct OnboardingView: View {
     }
   }
 
-  /// Speaks a line of this screen, queued, only without VoiceOver. With VoiceOver, focus moves to
-  /// the title and VoiceOver reads the screen in the user's own voice; speaking as well would be
-  /// cut off by, or talk over, VoiceOver.
+  /// Speaks a line of this screen, queued, only in hands-free and without VoiceOver. The toolbox has
+  /// no start-up narration (notes/hands-free-mode.md). With VoiceOver, focus moves to the title and
+  /// VoiceOver reads the screen in the user's own voice; speaking as well would be cut off by, or
+  /// talk over, VoiceOver.
   private func speakKeyLine(_ text: String) {
-    guard !UIAccessibility.isVoiceOverRunning else { return }
+    guard preferences.handsFree, !UIAccessibility.isVoiceOverRunning else { return }
     Announcer.shared.say(text, interrupt: false)
   }
 }

@@ -117,9 +117,18 @@ final class VoicePreferenceMigrationTests: XCTestCase {
     XCTAssertTrue(A11yPreferences(defaults: defaults).useVoiceOverVoice)
   }
 
-  func testVoiceControlOffSwitchPersists() {
-    A11yPreferences(defaults: defaults).voiceControlEnabled = false
-    XCTAssertFalse(A11yPreferences(defaults: defaults).voiceControlEnabled)
+  func testHandsFreeSwitchPersists() {
+    A11yPreferences(defaults: defaults).handsFree = true
+    let reloaded = A11yPreferences(defaults: defaults)
+    XCTAssertTrue(reloaded.handsFree)
+    XCTAssertTrue(reloaded.hasHandsFreeChoice)
+  }
+
+  /// The old always-on switch doesn't carry over: everyone starts from the new default.
+  func testOldVoiceControlSwitchIsDropped() {
+    defaults.set(true, forKey: "a11y.voiceControlEnabled")
+    XCTAssertFalse(A11yPreferences(defaults: defaults).handsFree)
+    XCTAssertNil(defaults.object(forKey: "a11y.voiceControlEnabled"))
   }
 
   func testOutputRouting() {
@@ -226,7 +235,8 @@ final class VoiceCommandParserTests: XCTestCase {
     XCTAssertEqual(parse("read", VoiceContext(screen: .home)), .ignored(.unavailableHere))
     XCTAssertEqual(parse("connect", VoiceContext(screen: .home)), .command(.connect))
     // The main screen has no camera steps: reading starts the camera, and photos are gone.
-    XCTAssertEqual(parse("connect", camera), .ignored(.unavailableHere))
+    // "connect" is answered there ("already connected"), for hands-free.
+    XCTAssertEqual(parse("connect", camera), .command(.connect))
     XCTAssertEqual(parse("take a photo", camera), .ignored(.unrecognized))
 
     XCTAssertEqual(parse("next", camera), .ignored(.unavailableHere))
@@ -236,8 +246,8 @@ final class VoiceCommandParserTests: XCTestCase {
   func testHelpListsOnlyWhatIsValidNow() {
     let cameraHelp = VoiceCommandParser.helpLine(context: camera)
     XCTAssertTrue(cameraHelp.contains("read"))
-    XCTAssertFalse(cameraHelp.contains("connect"))
     XCTAssertFalse(cameraHelp.contains("not now"))
+    XCTAssertFalse(cameraHelp.contains("next"), "next only once a page has been read")
     let welcomeHelp = VoiceCommandParser.helpLine(context: VoiceContext(screen: .welcome))
     XCTAssertTrue(welcomeHelp.contains("connect"))
     XCTAssertTrue(welcomeHelp.contains("not now"))
@@ -456,6 +466,9 @@ final class VoiceControlTests: XCTestCase {
     suiteName = "VoiceControlTests.\(UUID().uuidString)"
     defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
     preferences = A11yPreferences(defaults: defaults)
+    // These are about the always-listening loop, which is hands-free's (HandsFreeTests covers the
+    // toolbox and push to talk).
+    preferences.handsFree = true
     harness = Harness()
     control = VoiceControl(environment: harness.environment(), preferences: preferences)
   }
@@ -510,11 +523,15 @@ final class VoiceControlTests: XCTestCase {
 
   func testOffSwitch() {
     let listener = beginListening()
-    control.setEnabled(false)
+    harness.lines = []
+    harness.earcons = []
+    control.setHandsFree(false)
     XCTAssertEqual(control.status, .off)
     XCTAssertEqual(listener.stops, 1)
-    XCTAssertFalse(preferences.voiceControlEnabled)
+    XCTAssertFalse(preferences.handsFree)
     XCTAssertFalse(harness.idleTimerDisabled)
+    XCTAssertEqual(harness.lines, [SpokenMessage.handsFreeOff])
+    XCTAssertEqual(harness.earcons, [.disconnected])
   }
 
   func testEarconComesBeforeTheActionAndCommandIsRemembered() {
@@ -759,6 +776,199 @@ final class VoiceControlTests: XCTestCase {
     XCTAssertNil(VoiceControl.shared.activeListener)
     XCTAssertNotEqual(VoiceControl.shared.status, .listening)
     XCTAssertEqual(AVAudioSession.sharedInstance().category == .record, false)
+  }
+}
+
+// MARK: - The toolbox, push to talk and hands-free commands
+
+@MainActor
+final class HandsFreeVoiceControlTests: XCTestCase {
+  private var suiteName = ""
+  private var defaults = UserDefaults()
+  private var preferences: A11yPreferences!
+  private var harness: Harness!
+  private var control: VoiceControl!
+
+  override func setUp() async throws {
+    try await super.setUp()
+    suiteName = "HandsFreeVoiceControlTests.\(UUID().uuidString)"
+    defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    preferences = A11yPreferences(defaults: defaults)
+    harness = Harness()
+    control = VoiceControl(environment: harness.environment(), preferences: preferences)
+  }
+
+  override func tearDown() async throws {
+    defaults.removePersistentDomain(forName: suiteName)
+    control = nil
+    harness = nil
+    try await super.tearDown()
+  }
+
+  private func settle() async {
+    for _ in 0..<5 { await Task.yield() }
+    try? await Task.sleep(for: .milliseconds(20))
+  }
+
+  func testToolboxDoesNotListenPromptOrSpeakOnLaunch() async {
+    harness.phoneMic = .notDetermined
+    harness.speech = .notDetermined
+    control.begin()
+    control.setScreen(.camera) { _ in false }
+    await settle()
+    XCTAssertEqual(control.status, .off)
+    XCTAssertEqual(harness.phoneListeners.count, 0)
+    XCTAssertEqual(harness.requested, 0, "no permission prompt until the mic is tapped")
+    XCTAssertEqual(harness.lines, [])
+    XCTAssertFalse(harness.idleTimerDisabled)
+  }
+
+  func testPushToTalkListensForOneCommandThenStops() {
+    control.begin()
+    var handled: [VoiceCommand] = []
+    control.setScreen(.camera) { command in
+      handled.append(command)
+      return true
+    }
+    control.pushToTalk()
+    XCTAssertTrue(control.isPushToTalkActive)
+    let listener = harness.phoneListeners.last!
+    listener.onEvent?(.started)
+    XCTAssertEqual(control.status, .listening)
+    XCTAssertEqual(harness.earcons, [.listening])
+    XCTAssertEqual(harness.lines, [], "no intro line in the toolbox")
+
+    listener.onEvent?(.transcript("read this"))
+    XCTAssertEqual(handled, [.read])
+    XCTAssertFalse(control.isPushToTalkActive)
+    XCTAssertEqual(control.status, .off)
+    XCTAssertEqual(listener.stops, 1)
+  }
+
+  func testPushToTalkStopsTheAppTalking() {
+    control.begin()
+    control.setScreen(.camera) { _ in true }
+    control.pushToTalk()
+    XCTAssertEqual(harness.stopSpeechCalls, 1)
+  }
+
+  /// A press means the user is talking to the app: what isn't a command gets a reply.
+  func testPushToTalkAnswersWhatItDidNotUnderstand() {
+    control.begin()
+    control.setScreen(.camera) { _ in true }
+    control.pushToTalk()
+    harness.phoneListeners.last!.onEvent?(.started)
+    harness.lines = []
+    harness.phoneListeners.last!.onEvent?(.transcript("make me a sandwich"))
+    XCTAssertEqual(harness.lines, [SpokenMessage.pushToTalkNotUnderstood])
+    XCTAssertFalse(control.isPushToTalkActive)
+  }
+
+  func testPushToTalkWithMicDeniedSaysWhyEveryPress() {
+    harness.phoneMic = .denied
+    control.begin()
+    control.setScreen(.camera) { _ in true }
+    control.pushToTalk()
+    control.pushToTalk()
+    XCTAssertEqual(harness.lines, [SpokenMessage.voicePermissionDenied, SpokenMessage.voicePermissionDenied])
+    XCTAssertFalse(control.isPushToTalkActive)
+  }
+
+  func testHandsFreeOnByPushToTalkKeepsTheMicOpen() {
+    control.begin()
+    control.setScreen(.camera) { _ in false }
+    control.pushToTalk()
+    harness.phoneListeners.last!.onEvent?(.started)
+    harness.lines = []
+    harness.phoneListeners.last!.onEvent?(.transcript("start hands free"))
+    XCTAssertTrue(preferences.handsFree)
+    XCTAssertEqual(harness.lines, [SpokenMessage.handsFreeOn])
+    XCTAssertNotEqual(control.status, .off)
+    XCTAssertTrue(preferences.voiceControlIntroHeard, "the switch line stands in for the intro")
+  }
+
+  func testHandsFreeOffByVoice() {
+    preferences.handsFree = true
+    control.begin()
+    control.setScreen(.camera) { _ in false }
+    harness.phoneListeners.last!.onEvent?(.started)
+    harness.lines = []
+    control.inject(transcript: "touch mode")
+    XCTAssertFalse(preferences.handsFree)
+    XCTAssertEqual(control.status, .off)
+    XCTAssertEqual(harness.lines, [SpokenMessage.handsFreeOff])
+  }
+
+  func testSwitchingToTheSameModeSaysSo() {
+    control.setHandsFree(false)
+    XCTAssertEqual(harness.lines, [SpokenMessage.handsFreeAlreadyOff])
+  }
+
+  func testSettingsByVoice() {
+    preferences.handsFree = true
+    control.begin()
+    control.setScreen(.camera) { _ in false }
+    control.inject(transcript: "short answers")
+    XCTAssertEqual(preferences.verbosity, .short)
+    control.inject(transcript: "detailed answers")
+    XCTAssertEqual(preferences.verbosity, .detailed)
+    control.inject(transcript: "glasses display off")
+    XCTAssertFalse(preferences.glassesDisplayEnabled)
+    control.inject(transcript: "glasses display on")
+    XCTAssertTrue(preferences.glassesDisplayEnabled)
+    XCTAssertEqual(harness.lines.last, SpokenMessage.glassesDisplayOn)
+  }
+
+  func testWhereAmIUsesTheScreensDescription() {
+    preferences.handsFree = true
+    control.begin()
+    control.setScreen(.camera, describe: { "Ready to read." }) { _ in false }
+    control.inject(transcript: "where am I")
+    XCTAssertEqual(harness.lines.last, "You're on the main menu, with the reader. Ready to read.")
+  }
+
+  func testListToolsAndCloseTheApp() {
+    preferences.handsFree = true
+    control.begin()
+    control.setScreen(.home) { _ in false }
+    control.inject(transcript: "what tools are there")
+    XCTAssertEqual(harness.lines.last, SpokenMessage.toolsListNotConnected)
+    control.inject(transcript: "close the app")
+    XCTAssertEqual(harness.lines.last, SpokenMessage.closeAppNeedsATouch)
+    control.inject(transcript: "main menu")
+    XCTAssertEqual(harness.lines.last, SpokenMessage.mainMenuHome)
+  }
+
+  func testQuestionsAreAnsweredByVoiceBeforeTheScreen() {
+    preferences.handsFree = true
+    control.begin()
+    var screenGot: [VoiceCommand] = []
+    control.setScreen(.camera) { command in
+      screenGot.append(command)
+      return true
+    }
+    var answers: [String] = []
+    control.ask(yes: { answers.append("yes") }, no: { answers.append("no") })
+    XCTAssertTrue(control.availableCommands.contains(.yes))
+    control.inject(transcript: "yes please")
+    XCTAssertEqual(answers, ["yes"])
+    XCTAssertFalse(control.isAwaitingAnswer)
+    XCTAssertEqual(screenGot, [])
+    // With no question waiting, yes means nothing on the main screen.
+    control.inject(transcript: "yes")
+    XCTAssertEqual(screenGot, [])
+  }
+
+  func testHelpIsGroupedAndOffersTheRightModeSwitch() {
+    preferences.handsFree = true
+    control.begin()
+    control.setScreen(.camera) { _ in false }
+    control.inject(transcript: "help")
+    let line = harness.lines.last ?? ""
+    XCTAssertTrue(line.contains("Here: read"))
+    XCTAssertTrue(line.contains("Anywhere: main menu"))
+    XCTAssertTrue(line.contains("hands-free off"))
+    XCTAssertFalse(line.contains("hands-free on"))
   }
 }
 

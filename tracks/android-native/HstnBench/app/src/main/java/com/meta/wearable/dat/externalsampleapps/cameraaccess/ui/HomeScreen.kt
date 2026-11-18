@@ -11,7 +11,8 @@
 // Shown until the app is connected to Meta AI. A hero with the SpeakUp mark, wordmark and tagline;
 // the voice ribbon and a status card showing that the screen is talking and listening (SetupVoice);
 // three short tips; and the big yellow "Connect my glasses" button, which does the same as saying
-// "connect".
+// "connect". The hands-free switch is here too (notes/hands-free-mode.md); with it off the screen
+// doesn't talk first, and the mic button listens for one command (SetupVoice.listenOnce).
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
@@ -41,6 +42,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.HandsFreeStore
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -123,6 +126,12 @@ fun HomeScreen(
         }
     VoiceRibbon(state = voiceState, height = 72.dp)
     SetupVoiceCard(voiceUi)
+    val modeStore = remember { HandsFreeStore.get(context) }
+    val modeSettings by modeStore.settings.collectAsStateWithLifecycle()
+    HandsFreeSwitch(on = modeSettings.handsFree, onChange = { setupVoice.setHandsFree(it) })
+    if (!modeSettings.handsFree) {
+      PushToTalkButton(listening = voiceUi.pushToTalk, onClick = { setupVoice.listenOnce() })
+    }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(18.dp),

@@ -10,6 +10,11 @@
  *   camera", so the steps on the way (session up, stream up) get earcons, not words.
  * - The same line within a couple of seconds is said once (a pause can arrive as both a session
  *   and a stream change, and a doff as both a pause and a DeviceState change).
+ * - Hands-free mode (notes/hands-free-mode.md) narrates start-up and every state change. The
+ *   toolbox keeps the earcons but doesn't say the start-up status, connection changes or battery
+ *   in words (narrate). What happens to the camera while it is in use (paused, removed, folded,
+ *   off) is the reader's own result, so it is said in both modes. In hands-free there are no dialogs: errors are always spoken, and
+ *   the camera permission question is put aloud and answered with yes or no.
  */
 
 import MWDATCore
@@ -47,7 +52,10 @@ final class CameraNarrator {
     guard !Task.isCancelled else { return }
     let action = takeLaunchAction()
     switch action {
-    case nil, .status:
+    case nil:
+      // Start-up narration is hands-free only.
+      if isHandsFree { viewModel.speakStatus(updateRequired: updateRequired(), interrupt: false) }
+    case .status:
       viewModel.speakStatus(updateRequired: updateRequired(), interrupt: false)
     case .some(let action):
       runLaunchAction(action)
@@ -80,10 +88,10 @@ final class CameraNarrator {
 
     switch new {
     case .noDevice:
-      say(SpokenMessage.glassesNotConnected, earcon: .disconnected)
+      narrate(SpokenMessage.glassesNotConnected, earcon: .disconnected)
     case .idle:
       if old == .noDevice {
-        say(SpokenMessage.glassesConnected, earcon: .connected)
+        narrate(SpokenMessage.glassesConnected, earcon: .connected)
       } else {
         // The camera went off by itself; folding is the common cause, so name it when DAT says so.
         say(viewModel.hingeState == .closed ? SpokenMessage.glassesFolded : SpokenMessage.cameraEnded, earcon: .disconnected)
@@ -129,18 +137,30 @@ final class CameraNarrator {
     announcedBatteryThreshold = threshold
     // The first reading, or before the first status line: that line mentions the battery itself.
     guard settled, old != nil else { return }
-    say(SpokenMessage.batteryLow(percent: level), earcon: .attention, interrupt: false)
+    narrate(SpokenMessage.batteryLow(percent: level), earcon: .attention, interrupt: false)
   }
 
   // MARK: Errors and prompts
 
   func errorShown(_ viewModel: CameraViewModel) {
     earcons.stopWorkingTick(owner: Self.tickOwner)
-    speakUnlessVoiceOver(viewModel.errorMessage, earcon: .error)
+    if isHandsFree {
+      // No alert in hands-free: the words are the only way to hear it. "Try again" runs its action.
+      let next = viewModel.errorAction.map { _ in " Say try again." } ?? ""
+      say(viewModel.errorMessage + next, earcon: .error)
+    } else {
+      speakUnlessVoiceOver(viewModel.errorMessage, earcon: .error)
+    }
   }
 
-  func cameraPermissionPromptShown() {
-    speakUnlessVoiceOver(SpokenMessage.cameraPermissionBeforeRedirect, earcon: .attention)
+  /// `yes` / `no`: what the dialog's Continue and Cancel do, for answering by voice.
+  func cameraPermissionPromptShown(yes: @escaping @MainActor () -> Void, no: @escaping @MainActor () -> Void) {
+    VoiceControl.shared.ask(yes: yes, no: no)
+    if isHandsFree {
+      say(SpokenMessage.cameraPermissionQuestion, earcon: .attention)
+    } else {
+      speakUnlessVoiceOver(SpokenMessage.cameraPermissionBeforeRedirect, earcon: .attention)
+    }
   }
 
   func cameraPermissionPromptCancelled() {
@@ -155,6 +175,17 @@ final class CameraNarrator {
       earcons.play(earcon)
     } else {
       say(text, earcon: earcon)
+    }
+  }
+
+  private var isHandsFree: Bool { A11yPreferences.shared.handsFree }
+
+  /// A state change nobody asked about: words in hands-free, the earcon alone in the toolbox.
+  private func narrate(_ text: String, earcon: Earcon?, interrupt: Bool = true) {
+    if isHandsFree {
+      say(text, earcon: earcon, interrupt: interrupt)
+    } else if let earcon {
+      earcons.play(earcon)
     }
   }
 

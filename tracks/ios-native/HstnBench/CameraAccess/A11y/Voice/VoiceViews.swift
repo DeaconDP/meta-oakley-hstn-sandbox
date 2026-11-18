@@ -20,22 +20,25 @@ struct VoiceSettingsRows: View {
       .settingsLabel(id: "voice_status_label")
     Text(AppVoice.shared.displayString)
       .settingsLabel(id: "voice_name_label")
-    CustomButton(
-      title: voice.isEnabled ? "Turn voice control off" : "Turn voice control on", style: .secondary, isDisabled: false
-    ) {
-      voice.setEnabled(!voice.isEnabled)
-    }
-    .accessibilityHint("Runs the app by speaking. Buttons always work.")
-    .accessibilityIdentifier("voice_control_toggle")
+    HandsFreeToggle()
     CustomButton(
       title: preferences.voiceTipsEnabled ? "Turn spoken tips off" : "Turn spoken tips on", style: .secondary,
-      isDisabled: !voice.isEnabled
+      isDisabled: !voice.isHandsFree
     ) {
       preferences.voiceTipsEnabled.toggle()
       Announcer.shared.say(preferences.voiceTipsEnabled ? SpokenMessage.voiceTipsOn : SpokenMessage.voiceTipsOff)
     }
-    .accessibilityHint("After a quiet spell, says what you can say next. Needs voice control.")
+    .accessibilityHint("After a quiet spell, says what you can say next. Needs hands-free.")
     .accessibilityIdentifier("voice_tips_toggle")
+    CustomButton(
+      title: preferences.glassesDisplayEnabled ? "Turn glasses display off" : "Turn glasses display on", style: .secondary,
+      isDisabled: false
+    ) {
+      preferences.glassesDisplayEnabled.toggle()
+      Announcer.shared.say(preferences.glassesDisplayEnabled ? SpokenMessage.glassesDisplayOn : SpokenMessage.glassesDisplayOff)
+    }
+    .accessibilityHint("In hands-free, shows a small card on glasses that have a display.")
+    .accessibilityIdentifier("glasses_display_toggle")
     CustomButton(
       title: preferences.useVoiceOverVoice ? "Use the British voice" : "Use VoiceOver's voice", style: .secondary,
       isDisabled: false

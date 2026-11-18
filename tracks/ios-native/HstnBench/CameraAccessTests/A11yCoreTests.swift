@@ -34,7 +34,10 @@ final class A11yPreferencesTests: XCTestCase {
     XCTAssertEqual(preferences.verbosity, .normal)
     XCTAssertEqual(preferences.speechRate, AVSpeechUtteranceDefaultSpeechRate)
     XCTAssertFalse(preferences.useVoiceOverVoice)
-    XCTAssertTrue(preferences.voiceControlEnabled)
+    // The toolbox by default (notes/hands-free-mode.md); the glasses display on where there is one.
+    XCTAssertFalse(preferences.handsFree)
+    XCTAssertFalse(preferences.hasHandsFreeChoice)
+    XCTAssertTrue(preferences.glassesDisplayEnabled)
     XCTAssertFalse(preferences.voiceDownloadNoticeHeard)
     XCTAssertTrue(preferences.earconsEnabled)
     XCTAssertFalse(preferences.onboardingCompleted)

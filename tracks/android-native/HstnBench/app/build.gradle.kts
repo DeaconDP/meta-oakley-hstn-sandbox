@@ -83,6 +83,8 @@ dependencies {
   implementation(libs.mwdat.camera)
   // Book reader voice control: on-glasses speech recognition (Experimental in DAT 1.0).
   implementation(libs.mwdat.speech)
+  // Hands-free mode: a compact card on glasses with a display (Ray-Ban Display). GA in DAT 1.0.1.
+  implementation(libs.mwdat.display)
   implementation(libs.mwdat.mockdevice)
   // Book reader: on-device OCR, Latin script, model bundled in the APK (no Play Services download).
   implementation(libs.mlkit.text.recognition)

@@ -130,7 +130,7 @@ final class AccessibilityAuditUITests: XCTestCase {
     XCTAssertTrue(settings.waitForExistence(timeout: 10))
     reveal(settings)
     settings.tap()
-    XCTAssertTrue(app.buttons["voice_control_toggle"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.switches["hands_free_toggle"].waitForExistence(timeout: 5))
     try audit(screen: screen)
   }
 

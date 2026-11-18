@@ -28,6 +28,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>hstnbench</string>
+				<string>speakup</string>
 			</array>
 		</dict>
 	</array>

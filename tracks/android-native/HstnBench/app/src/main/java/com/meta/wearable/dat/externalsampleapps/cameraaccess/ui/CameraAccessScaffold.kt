@@ -86,8 +86,9 @@ fun CameraAccessScaffold(
   val context = LocalContext.current
   val setupVoice: SetupVoice = viewModel()
 
-  // Observe recent errors and show snackbar. Errors are also spoken: with TalkBack on, TalkBack
-  // reads the snackbar (a polite live region), so we don't speak it a second time.
+  // Observe recent errors and show snackbar. In hands-free mode errors are also spoken (SetupVoice
+  // .announce only speaks then): with TalkBack on, TalkBack reads the snackbar (a polite live
+  // region), so we don't speak it a second time.
   LaunchedEffect(uiState.recentError?.id) {
     uiState.recentError?.let { error ->
       if (!isTouchExplorationOn(context)) setupVoice.announce(error.message)

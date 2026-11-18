@@ -6,7 +6,8 @@
  * the coach names words ("Hold some text in front of you and say read"). Same idea as
  * the Android track's IdleNudge (notes/tools-layer.md > Silence reminders).
  *
- * When: only while voice control is listening (the tips are all "say ..."), the tips setting is on,
+ * When: only in hands-free mode (the toolbox has no idle reminders, notes/hands-free-mode.md), only
+ * while voice control is listening (the tips are all "say ..."), the tips setting is on,
  * and nothing is being said or read. Quiet means quiet on both sides: while the app speaks or
  * reads the gap restarts without using up a tip. The first tip comes 8 s into the quiet, then 30 s,
  * 1 min and 2 min later; the last one says it will stop, and then it stays quiet until the user
@@ -197,7 +198,7 @@ extension CameraViewModel {
 
 @MainActor
 final class VoiceCoach {
-  static let shared = VoiceCoach(environment: .live)
+  static let shared: VoiceCoach = VoiceCoach(environment: .live)
 
   struct Environment {
     /// Tests and UI tests: never runs its own clock or speaks unless ticked.
@@ -300,11 +301,12 @@ final class VoiceCoach {
 }
 
 extension VoiceCoach.Environment {
-  static let live = VoiceCoach.Environment(
+  static let live: VoiceCoach.Environment = VoiceCoach.Environment(
     isInert: LaunchOptions.isAutomatedTest,
     now: { Date() },
-    tipsEnabled: { A11yPreferences.shared.voiceTipsEnabled },
-    isListening: { VoiceControl.shared.status == .listening },
+    tipsEnabled: { A11yPreferences.shared.voiceTipsEnabled && A11yPreferences.shared.handsFree },
+    // Push to talk listens too, but only for the one command the user is about to say.
+    isListening: { VoiceControl.shared.status == .listening && !VoiceControl.shared.isPushToTalkActive },
     isBusy: { Announcer.shared.isSpeaking || TextReader.shared.isActive },
     screen: { VoiceControl.shared.screen },
     lastCommandAt: { VoiceControl.shared.lastCommandAt },

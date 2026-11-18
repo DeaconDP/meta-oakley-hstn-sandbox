@@ -19,6 +19,11 @@
 // all one scroll in reading order: status, Read text, the reading card. The reader's actions are
 // also VoiceOver actions on every element (cameraQuickActions).
 //
+// Hands-free (notes/hands-free-mode.md): the switch and, in the toolbox, the push-to-talk button sit
+// under the status, and a short tools list follows Read text. In hands-free the alerts are replaced
+// by spoken lines and yes/no questions (CameraNarrator), and the screen publishes its card to
+// HandsFreeSurface for a glasses display.
+//
 
 import MWDATCore
 import SwiftUI
@@ -60,8 +65,11 @@ struct CameraView: View {
           VStack(alignment: .leading, spacing: 16) {
             FlowingVoiceIndicator()
             topBar
+            // Settings has its own copy of the switch.
             if showSettingsMenu {
               settingsPanel
+            } else {
+              HandsFreeControls()
             }
             if isUpdateRequired {
               updateControls
@@ -70,6 +78,7 @@ struct CameraView: View {
               if TextReader.shared.phase != .idle {
                 ReadPanel(isLargeText: isLargeText, onStatus: speakStatus)
               }
+              ToolboxList(tools: [.status, .settings], perform: performTool)
             }
           }
           .padding(.horizontal, 20)
@@ -85,7 +94,8 @@ struct CameraView: View {
     .accessibilityAction(.magicTap) { performPrimaryAction() }
     // Two-finger scrub closes the settings menu.
     .accessibilityAction(.escape) { setSettingsMenu(open: false) }
-    .alert(viewModel.errorTitle.isEmpty ? "Couldn't do that" : viewModel.errorTitle, isPresented: $viewModel.showError) {
+    // No dialogs in hands-free: CameraNarrator says the error and "try again" runs its action.
+    .alert(viewModel.errorTitle.isEmpty ? "Couldn't do that" : viewModel.errorTitle, isPresented: unlessHandsFree($viewModel.showError)) {
       // One next step, then OK. VoiceOver reads title, message and both buttons.
       if let action = viewModel.errorAction {
         Button(action.title) {
@@ -97,14 +107,28 @@ struct CameraView: View {
     } message: {
       Text(viewModel.errorMessage)
     }
-    .alert("Allow camera access", isPresented: $viewModel.showCameraPermissionRedirectConfirm) {
+    .alert("Allow camera access", isPresented: unlessHandsFree($viewModel.showCameraPermissionRedirectConfirm)) {
       // The Read that asked for access carries on once it's allowed.
-      Button("Continue") { Task { await viewModel.confirmCameraPermissionRedirect { TextReader.shared.read() } } }
-      Button("Cancel", role: .cancel) { narrator.cameraPermissionPromptCancelled() }
+      Button("Continue") {
+        VoiceControl.shared.clearQuestion()
+        confirmCameraPermission()
+      }
+      Button("Cancel", role: .cancel) {
+        VoiceControl.shared.clearQuestion()
+        narrator.cameraPermissionPromptCancelled()
+      }
     } message: {
       Text(SpokenMessage.cameraPermissionBeforeRedirect)
     }
-    .modifier(CameraNarration(viewModel: viewModel, narrator: narrator, updateRequired: { wearablesVM.requiresFirmwareUpdate }))
+    .modifier(
+      CameraNarration(
+        viewModel: viewModel, narrator: narrator, updateRequired: { wearablesVM.requiresFirmwareUpdate },
+        permissionYes: confirmCameraPermission, permissionNo: declineCameraPermission))
+    // The card a glasses display shows (HandsFreeSurface), from the same state the screen shows.
+    .task(id: cardState) {
+      HandsFreeSurface.shared.publish(screen: .camera, state: cardState, hints: cardHints)
+    }
+    .onChange(of: A11yPreferences.shared.handsFree) { _, _ in viewModel.hostDisplaySessionIfNeeded() }
     // Siri / Shortcuts / Back Tap. Cold launch: the intent parked the action before this view existed.
     // The appear sequence (CameraNarrator.screenAppeared) waits for the device stream first, so a
     // cold-launch "Read" or "Status" sees the real glasses state; it then speaks the status line
@@ -129,7 +153,7 @@ struct CameraView: View {
         viewModel.statusLine(updateRequired: wearablesVM.requiresFirmwareUpdate)
       }
       TextReader.shared.source = viewModel
-      VoiceControl.shared.setScreen(.camera, handler: handleVoice)
+      VoiceControl.shared.setScreen(.camera, describe: describeForVoice, handler: handleVoice)
       // Spoken tips after a quiet spell ("Hold some text in front of you and say read").
       VoiceCoach.shared.provide(for: .camera) { [viewModel, wearablesVM] in
         viewModel.coachSituation(
@@ -189,7 +213,8 @@ struct CameraView: View {
   }
 
   /// A voice command: the same calls as Siri, Magic Tap and the actions rotor. Returns false for
-  /// what VoiceControl handles the same way on every screen (help, faster, slower).
+  /// what VoiceControl handles the same way on every screen (help, faster, slower, settings by
+  /// voice, tools, where am I).
   private func handleVoice(_ command: VoiceCommand) -> Bool {
     let reader = TextReader.shared
     switch command {
@@ -201,10 +226,92 @@ struct CameraView: View {
     case .repeatLast:
       if reader.hasSentences { reader.repeatSentence() } else { runLaunchAction(.repeatLast) }
     case .continueOn: reader.next()
-    case .back: reader.previous()
+    case .back:
+      // Sentences first, as before; then out of settings; then the main menu line.
+      if reader.hasSentences {
+        reader.previous()
+      } else if showSettingsMenu {
+        closeSettings()
+      } else {
+        return false
+      }
+    case .close:
+      guard showSettingsMenu else { return false }
+      closeSettings()
+    case .mainMenu:
+      setSettingsMenu(open: false)
+      if reader.isActive { reader.stop() }
+      return false  // VoiceControl says where that is
+    case .openSettings:
+      setSettingsMenu(open: true)
+      Announcer.shared.say(SpokenMessage.settingsOpened)
+    case .openReader:
+      setSettingsMenu(open: false)
+      return false
+    case .tryAgain:
+      if let action = viewModel.errorAction {
+        viewModel.errorAction = nil
+        perform(action)
+      } else {
+        TextReader.shared.read()
+      }
+    case .connect:
+      Announcer.shared.say(SpokenMessage.alreadyConnected)
+    case .disconnect:
+      wearablesVM.disconnectGlasses()
     default: return false
     }
     return true
+  }
+
+  private func closeSettings() {
+    setSettingsMenu(open: false)
+    Announcer.shared.say(SpokenMessage.settingsClosed)
+  }
+
+  /// "Where am I": settings if open, then the status line.
+  private func describeForVoice() -> String? {
+    let status = viewModel.statusLine(updateRequired: isUpdateRequired)
+    return showSettingsMenu ? "Settings are open. \(status)" : status
+  }
+
+  private func performTool(_ tool: HandsFreeTool) {
+    switch tool {
+    case .reader: TextReader.shared.read()
+    case .status: speakStatus()
+    case .settings: setSettingsMenu(open: !showSettingsMenu)
+    }
+  }
+
+  private func confirmCameraPermission() {
+    Task { await viewModel.confirmCameraPermissionRedirect { TextReader.shared.read() } }
+  }
+
+  private func declineCameraPermission() {
+    viewModel.showCameraPermissionRedirectConfirm = false
+    narrator.cameraPermissionPromptCancelled()
+  }
+
+  /// An alert binding that stays down in hands-free, where the narrator speaks instead.
+  private func unlessHandsFree(_ binding: Binding<Bool>) -> Binding<Bool> {
+    Binding(get: { binding.wrappedValue && !A11yPreferences.shared.handsFree }, set: { binding.wrappedValue = $0 })
+  }
+
+  // MARK: - The glasses display card
+
+  /// One line: what the reader is doing, else the status title.
+  private var cardState: String {
+    let reader = TextReader.shared
+    if reader.phase != .idle { return reader.statusText }
+    if showSettingsMenu { return "Settings" }
+    return status.title
+  }
+
+  private var cardHints: [VoiceCommand] {
+    if TextReader.shared.isActive { return [.stop, .continueOn, .mainMenu] }
+    if TextReader.shared.hasSentences { return [.read, .continueOn, .back] }
+    if showSettingsMenu { return [.faster, .slower, .close] }
+    return [.read, .status, .help]
   }
 
   private func perform(_ action: CameraErrorAction) {

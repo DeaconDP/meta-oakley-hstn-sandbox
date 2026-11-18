@@ -3,8 +3,10 @@
  *
  * Observable so settings and onboarding screens update live. Defaults: the app's own British
  * voice (AppVoice), including with VoiceOver running, unless the user opts to follow VoiceOver's;
- * voice control on; spoken tips on; earcons on; normal verbosity; the system default speech rate; and
- * the natural (OpenAI) reading voice whenever a key is set (CloudReading).
+ * hands-free off (the app is a touch toolbox, notes/hands-free-mode.md), except on a first run with
+ * VoiceOver (HandsFreeMode); the glasses display on where there is one; spoken tips on; earcons on;
+ * normal verbosity; the system default speech rate; and the natural (OpenAI) reading voice whenever
+ * a key is set (CloudReading).
  */
 
 import AVFoundation
@@ -39,7 +41,12 @@ final class A11yPreferences {
     /// The old "useAppVoice" flag, default false. No build ever wrote it from the UI (only tests
     /// set it), so a stored value can't be a user's choice. Dropped on load; see init.
     static let legacyUseAppVoice = "a11y.useAppVoice"
-    static let voiceControlEnabled = "a11y.voiceControlEnabled"
+    /// The old always-listening switch (default on). Hands-free replaces it; dropped on load.
+    static let legacyVoiceControlEnabled = "a11y.voiceControlEnabled"
+    /// Written on the first run and on every switch, so its presence means the first-run choice has
+    /// been made (HandsFreeMode.firstRunDefault).
+    static let handsFree = "a11y.handsFree"
+    static let glassesDisplayEnabled = "a11y.glassesDisplayEnabled"
     static let voiceControlIntroHeard = "a11y.voiceControlIntroHeard"
     static let voiceDownloadNoticeHeard = "a11y.voiceDownloadNoticeHeard"
     static let earconsEnabled = "a11y.earconsEnabled"
@@ -75,9 +82,20 @@ final class A11yPreferences {
     didSet { defaults.set(useVoiceOverVoice, forKey: Key.useVoiceOverVoice) }
   }
 
-  /// Run the app by speaking. On by default; listening starts once permissions are granted.
-  var voiceControlEnabled: Bool {
-    didSet { defaults.set(voiceControlEnabled, forKey: Key.voiceControlEnabled) }
+  /// Hands-free mode (notes/hands-free-mode.md): always listening, narrated, no dialogs, no screen
+  /// needed. Off by default: the app is a touch toolbox with a push-to-talk mic button. Every voice
+  /// auto-start and narration path checks this.
+  var handsFree: Bool {
+    didSet { defaults.set(handsFree, forKey: Key.handsFree) }
+  }
+
+  /// False until hands-free has been set once, by the first-run rule or by the user.
+  var hasHandsFreeChoice: Bool { defaults.object(forKey: Key.handsFree) != nil }
+
+  /// Mirror the hands-free card on a glasses display (Ray-Ban Display) when there is one. On by
+  /// default; "glasses display off" turns it off. Glasses without a display ignore it.
+  var glassesDisplayEnabled: Bool {
+    didSet { defaults.set(glassesDisplayEnabled, forKey: Key.glassesDisplayEnabled) }
   }
 
   /// "Voice control is on. Say help at any time." has been spoken to the end.
@@ -109,7 +127,7 @@ final class A11yPreferences {
     didSet { defaults.set(disclaimerHeard, forKey: Key.disclaimerHeard) }
   }
 
-  /// VoiceCoach: say what can be said next after a quiet spell. On by default; needs voice control.
+  /// VoiceCoach: say what can be said next after a quiet spell. On by default; needs hands-free.
   var voiceTipsEnabled: Bool {
     didSet { defaults.set(voiceTipsEnabled, forKey: Key.voiceTipsEnabled) }
   }
@@ -132,7 +150,9 @@ final class A11yPreferences {
     speechRate = Self.clampRate((defaults.object(forKey: Key.speechRate) as? NSNumber)?.floatValue ?? AVSpeechUtteranceDefaultSpeechRate)
     defaults.removeObject(forKey: Key.legacyUseAppVoice)
     useVoiceOverVoice = defaults.bool(forKey: Key.useVoiceOverVoice)
-    voiceControlEnabled = defaults.object(forKey: Key.voiceControlEnabled) as? Bool ?? true
+    defaults.removeObject(forKey: Key.legacyVoiceControlEnabled)
+    handsFree = defaults.object(forKey: Key.handsFree) as? Bool ?? false
+    glassesDisplayEnabled = defaults.object(forKey: Key.glassesDisplayEnabled) as? Bool ?? true
     voiceControlIntroHeard = defaults.bool(forKey: Key.voiceControlIntroHeard)
     voiceDownloadNoticeHeard = defaults.bool(forKey: Key.voiceDownloadNoticeHeard)
     earconsEnabled = defaults.object(forKey: Key.earconsEnabled) as? Bool ?? true
@@ -146,7 +166,7 @@ final class A11yPreferences {
 
   /// Starts onboarding over, e.g. "replay setup" in Settings. The disclaimer is part of
   /// onboarding, so it is heard again too, and spoken tips come back early as for a new user.
-  /// Voice, rate, verbosity, earcon and tips on/off choices are kept.
+  /// Voice, rate, verbosity, earcon, tips, hands-free and glasses display choices are kept.
   func resetOnboarding() {
     onboardingCompleted = false
     onboardingStep = nil

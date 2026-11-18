@@ -40,21 +40,43 @@ struct MainAppView: View {
     }
     .safeAreaInset(edge: .top, spacing: 0) { VoiceDownloadNoticeBanner() }
     .onAppear {
+      applyFirstRunMode()
       VoiceControl.shared.begin()
       VoiceCoach.shared.begin()
     }
-    // After setup, and behind the first status line: say once how to get a British voice.
+    // What a glasses display may show depends on both.
+    .onChange(of: preferences.handsFree) { _, _ in HandsFreeSurface.shared.refresh() }
+    .onChange(of: preferences.glassesDisplayEnabled) { _, _ in HandsFreeSurface.shared.refresh() }
+    // After setup, and behind the first status line: say once how to get a British voice. The
+    // toolbox only shows it.
     .task(id: preferences.onboardingCompleted) {
       guard preferences.onboardingCompleted else { return }
       try? await Task.sleep(for: .seconds(4))
       guard !Task.isCancelled else { return }
-      AppVoice.shared.offerDownloadIfNeeded()
+      AppVoice.shared.offerDownloadIfNeeded(speak: preferences.handsFree)
     }
     .preferredColorScheme(LaunchOptions.forcesDarkMode ? .dark : nil)
     #if DEBUG
     // An inset, not an overlay: it must not sit on top of a page's pinned buttons.
     .safeAreaInset(edge: .bottom, spacing: 0) { VoiceInjectionOverlay() }
     #endif
+  }
+
+  /// The first run with VoiceOver running starts in hands-free and says so once
+  /// (notes/hands-free-mode.md section 1). Otherwise the toolbox. UI tests choose with --hands-free.
+  private func applyFirstRunMode() {
+    if LaunchOptions.isUITesting {
+      preferences.handsFree = LaunchOptions.startsHandsFree
+      return
+    }
+    guard !LaunchOptions.isAutomatedTest,
+      let on = HandsFreeMode.firstRunChoice(
+        hasChoice: preferences.hasHandsFreeChoice, voiceOverRunning: UIAccessibility.isVoiceOverRunning)
+    else { return }
+    preferences.handsFree = on
+    guard on else { return }
+    preferences.voiceControlIntroHeard = true
+    Announcer.shared.announce(SpokenMessage.handsFreeOnForVoiceOver, earcon: .listening, interrupt: false)
   }
 }
 
@@ -80,4 +102,6 @@ enum LaunchOptions {
   /// With --ui-testing, for the screenshot tour: shows "Listening" and the "Say ..." hints, which a
   /// UI test otherwise can't, since nothing listens. Display only: VoiceControl is unaffected.
   static let previewsListening = isUITesting && ProcessInfo.processInfo.arguments.contains("--preview-listening")
+  /// With --ui-testing: start in hands-free mode instead of the toolbox. Nothing listens either way.
+  static let startsHandsFree = isUITesting && ProcessInfo.processInfo.arguments.contains("--hands-free")
 }

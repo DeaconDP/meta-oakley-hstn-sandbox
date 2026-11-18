@@ -30,9 +30,17 @@ struct HomeScreenView: View {
   var body: some View {
     content
       .onAppear {
-        VoiceControl.shared.setScreen(.home, handler: handleVoice)
+        VoiceControl.shared.setScreen(.home, describe: { SpokenMessage.voiceHomeStatus }, handler: handleVoice)
         // Spoken tips after a quiet spell: "say connect". Not while Meta AI is being opened.
         VoiceCoach.shared.provide(for: .home) { [viewModel] in viewModel.isConnecting ? nil : .notLinked }
+        // Hands-free narrates each screen change; the toolbox doesn't.
+        if A11yPreferences.shared.handsFree {
+          Announcer.shared.announce(SpokenMessage.mainMenuHome, earcon: .attention, interrupt: false)
+        }
+      }
+      .task(id: viewModel.isConnecting) {
+        HandsFreeSurface.shared.publish(
+          screen: .home, state: viewModel.isConnecting ? "Connecting" : "Glasses not connected", hints: [.connect, .help])
       }
       .onDisappear {
         VoiceControl.shared.clearScreen { $0 == .home }
@@ -40,7 +48,8 @@ struct HomeScreenView: View {
       }
   }
 
-  /// Help, stop, repeat, faster and slower are VoiceControl's own.
+  /// Help, stop, repeat, faster, slower, tools, where am I and settings by voice are VoiceControl's
+  /// own, as are main menu, back, close and disconnect here (there is nowhere further to go).
   private func handleVoice(_ command: VoiceCommand) -> Bool {
     switch command {
     case .connect, .tryAgain: viewModel.connectGlasses()
@@ -81,6 +90,8 @@ struct HomeScreenView: View {
         if let notice = viewModel.connectionNotice {
           ConnectionNoticeView(text: notice)
         }
+
+        HandsFreeControls()
       } footer: {
         // Title kept: the UI tests find this button by "Connect my glasses".
         Button(viewModel.isConnecting ? "Connecting…" : "Connect my glasses") {

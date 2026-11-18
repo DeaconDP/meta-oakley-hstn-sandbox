@@ -284,7 +284,7 @@ class CameraViewModel(
    * stream-state collector observes (see [onStreamTerminated]) to stop recording and release stream
    * resources.
    */
-  fun endSession() {
+  override fun endSession() {
     val current = session ?: return
     _uiState.update { it.copy(sessionState = DeviceSessionState.STOPPING) }
     current.stop()

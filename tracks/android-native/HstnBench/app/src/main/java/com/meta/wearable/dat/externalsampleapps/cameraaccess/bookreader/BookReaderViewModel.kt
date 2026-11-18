@@ -662,6 +662,9 @@ class BookReaderViewModel(
         if (_uiState.value.phase == ReaderPhase.READING) pause()
         return false
       }
+      // Hands-free commands ("status", "connect", "hands-free off"...): ToolHub's. The book's own
+      // "where am I" and "back" are caught by its grammar before these.
+      else -> return false
     }
     return true
   }

@@ -11,6 +11,12 @@
  * change of input calls it. The background or a call pauses listening; the background also
  * matters for privacy.
  *
+ * Hands-free mode (notes/hands-free-mode.md, A11yPreferences.handsFree) is the only thing that
+ * keeps the mic open. Off (the default toolbox), nothing listens until pushToTalk(), which listens
+ * for one command with the same grammar and then stops. Commands that are the same on every screen
+ * (help, stop, repeat, faster, slower, tools, where am I, settings by voice, the mode switch) live
+ * here. ask(yes:no:) lets a question be answered by voice instead of a dialog.
+ *
  * Privacy: on-device recognition only. Transcripts are parsed and dropped. Only command names are
  * kept (`lastCommand`) or logged.
  *
@@ -29,7 +35,7 @@ import os
 @MainActor
 @Observable
 final class VoiceControl {
-  static let shared = VoiceControl(environment: .live, preferences: .shared)
+  static let shared: VoiceControl = VoiceControl(environment: .live, preferences: .shared)
 
   enum Status: String, Sendable {
     case off
@@ -61,6 +67,8 @@ final class VoiceControl {
     var setIdleTimerDisabled: @MainActor (Bool) -> Void
     var glassesSpeechEnabled: @MainActor () -> Bool
     var now: @MainActor () -> Date
+    /// A command was understood (for the glasses display card's "last heard").
+    var noteCommand: @MainActor (VoiceCommand) -> Void = { _ in }
   }
 
   // MARK: State for the UI
@@ -80,7 +88,14 @@ final class VoiceControl {
   /// Glasses Speech could be used if the wearable mic were allowed (a Meta AI grant).
   private(set) var canRequestGlassesMicrophone = false
 
-  var isEnabled: Bool { preferences.voiceControlEnabled }
+  /// Hands-free: always listening. Off is the touch toolbox with push to talk.
+  var isHandsFree: Bool { preferences.handsFree }
+
+  /// Push to talk is listening for its one command.
+  private(set) var isPushToTalkActive = false
+
+  /// A yes-or-no question is waiting for a spoken answer.
+  var isAwaitingAnswer: Bool { question != nil }
 
   /// What can be said right now, for "help" and the UI.
   var availableCommands: [VoiceCommand] {
@@ -91,14 +106,14 @@ final class VoiceControl {
   /// Bare commands aren't safe right now, so prompts should say "reader, ..." (see VoiceCommand).
   var needsWakeWord: Bool { environment.micHearsVoiceOver(activeListener) }
 
-  /// For settings: "Voice control: listening".
+  /// For settings: "Listening: on".
   var statusText: String {
     switch status {
-    case .off: "Voice control: off"
-    case .starting: "Voice control: starting"
-    case .listening: "Voice control: listening"
-    case .paused: "Voice control: paused"
-    case .unavailable: "Voice control: not available"
+    case .off: "Listening: off until you tap the mic"
+    case .starting: "Listening: starting"
+    case .listening: "Listening: on"
+    case .paused: "Listening: paused"
+    case .unavailable: "Listening: not available"
     }
   }
 
@@ -126,12 +141,17 @@ final class VoiceControl {
   @ObservationIgnored private var spokenReasons: Set<String> = []
   @ObservationIgnored private var hasBegun = false
   @ObservationIgnored private var observers: [NSObjectProtocol] = []
+  @ObservationIgnored private var describeScreen: (@MainActor () -> String?)?
+  @ObservationIgnored private var question: (yes: @MainActor () -> Void, no: @MainActor () -> Void)?
+  @ObservationIgnored private var pushToTalkTimeout: Task<Void, Never>?
 
   private static let logger = Logger(subsystem: "com.deaco.hstnbench", category: "VoiceControl")
   private static let glassesCoolOff: TimeInterval = 60
   /// After this many failed restarts in a row, say so. A blip stays quiet; an outage doesn't.
   private static let troubledAfter = 3
   private static let rateStep: Float = 0.05
+  /// How long push to talk waits for a command once the mic is open.
+  static let pushToTalkWindow: TimeInterval = 8
 
   init(environment: Environment, preferences: A11yPreferences) {
     self.environment = environment
@@ -187,17 +207,96 @@ final class VoiceControl {
     reconcile()
   }
 
-  // MARK: Settings
+  // MARK: The mode
 
-  func setEnabled(_ enabled: Bool) {
-    guard enabled != preferences.voiceControlEnabled else { return }
-    preferences.voiceControlEnabled = enabled
-    if !enabled {
-      environment.say(SpokenMessage.voiceControlTurnedOff, .disconnected, true, nil)
+  /// Turns hands-free on or off, persisted. Each switch plays an earcon and is announced, in both
+  /// modes. `announce: false` is for callers that say something of their own (the first-run line).
+  func setHandsFree(_ on: Bool, announce: Bool = true) {
+    let changed = on != preferences.handsFree
+    preferences.handsFree = on
+    if on {
+      // "Hands-free on. I'm listening. Say help at any time." stands in for the old intro line.
+      preferences.voiceControlIntroHeard = true
+      endPushToTalk(nothingHeard: false)
     }
+    if announce {
+      if changed {
+        environment.say(on ? SpokenMessage.handsFreeOn : SpokenMessage.handsFreeOff, on ? .listening : .disconnected, true, nil)
+      } else {
+        environment.say(on ? SpokenMessage.handsFreeAlreadyOn : SpokenMessage.handsFreeAlreadyOff, nil, true, nil)
+      }
+    }
+    guard changed else { return }
+    if !on { question = nil }
     spokenReasons.removeAll()
     refreshPermissions()
     reconcile()
+  }
+
+  /// Opened by the "Start hands-free" shortcut or speakup://handsfree: switch it on, or, if it was
+  /// already on, just cue that the app is listening.
+  func startHandsFreeFromLaunch() {
+    if preferences.handsFree {
+      environment.playEarcon(.listening)
+      reconcile()
+    } else {
+      setHandsFree(true)
+    }
+  }
+
+  // MARK: Push to talk
+
+  /// The toolbox's mic button: stops the app talking, listens for one command, then stops. A second
+  /// press while listening cancels. In hands-free mode the mic is already open, so it only cues.
+  func pushToTalk() {
+    if preferences.handsFree {
+      environment.stopSpeech()
+      environment.playEarcon(.listening)
+      return
+    }
+    if isPushToTalkActive {
+      endPushToTalk(nothingHeard: false)
+      return
+    }
+    environment.stopSpeech()
+    isPushToTalkActive = true
+    cueDue = true
+    spokenReasons.removeAll()
+    refreshPermissions()
+    // Couldn't listen (denied, no recogniser): reconcile says why and ends the press (unavailable).
+    reconcile()
+  }
+
+  private func endPushToTalk(nothingHeard: Bool) {
+    pushToTalkTimeout?.cancel()
+    pushToTalkTimeout = nil
+    guard isPushToTalkActive else { return }
+    isPushToTalkActive = false
+    if nothingHeard { environment.say(SpokenMessage.pushToTalkNothingHeard, .uncertain, false, nil) }
+    reconcile()
+  }
+
+  private func armPushToTalkTimeout() {
+    pushToTalkTimeout?.cancel()
+    let window = Self.pushToTalkWindow
+    pushToTalkTimeout = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(window))
+      guard !Task.isCancelled else { return }
+      self?.endPushToTalk(nothingHeard: true)
+    }
+  }
+
+  // MARK: Questions
+
+  /// A yes-or-no question that voice can answer, so hands-free never needs a dialog's buttons. The
+  /// caller says the question. "yes" and "continue" run `yes`; "no" and "not now" run `no`.
+  func ask(yes: @escaping @MainActor () -> Void, no: @escaping @MainActor () -> Void) {
+    question = (yes, no)
+  }
+
+  /// The question was answered some other way (a tap).
+  func clearQuestion() {
+    question = nil
   }
 
   // MARK: Permissions
@@ -232,9 +331,15 @@ final class VoiceControl {
 
   // MARK: Screens and commands
 
-  func setScreen(_ screen: VoiceScreen, handler: @escaping @MainActor (VoiceCommand) -> Bool) {
+  /// `describe` gives the screen's state for "where am I" (connection, what's going on).
+  func setScreen(
+    _ screen: VoiceScreen, describe: (@MainActor () -> String?)? = nil, handler: @escaping @MainActor (VoiceCommand) -> Bool
+  ) {
+    let changed = self.screen != screen
     self.screen = screen
     self.handler = handler
+    describeScreen = describe
+    if changed { question = nil }
     reconcile()
   }
 
@@ -243,27 +348,43 @@ final class VoiceControl {
     guard let screen, matches(screen) else { return }
     self.screen = nil
     handler = nil
+    describeScreen = nil
   }
 
   /// A finished utterance from a listener, or from a test. The seam for injecting transcripts.
   func inject(transcript: String) {
     guard let screen else { return }
+    let pushToTalk = isPushToTalkActive
     switch VoiceCommandParser.parse(transcript, context: context(on: screen)) {
     case .command(let command):
+      // Push to talk ends before the command runs, so "hands-free on" keeps the mic open.
+      if pushToTalk { endPushToTalk(nothingHeard: false) }
       accept(command, on: screen)
     case .notUnderstood:
       environment.playEarcon(.uncertain)
-      // Queued: "reader, mumble" shouldn't cut off the book.
-      environment.say(SpokenMessage.voiceNotUnderstood, nil, false, nil)
+      if pushToTalk {
+        endPushToTalk(nothingHeard: false)
+        environment.say(SpokenMessage.pushToTalkNotUnderstood, nil, true, nil)
+      } else {
+        // Queued: "reader, mumble" shouldn't cut off the book.
+        environment.say(SpokenMessage.voiceNotUnderstood, nil, false, nil)
+      }
     case .ignored:
       break
     }
   }
 
+  /// Runs a command as if it had been heard: the glasses display's buttons and the tools list.
+  func perform(_ command: VoiceCommand) {
+    guard let screen else { return }
+    accept(command, on: screen)
+  }
+
   private func context(on screen: VoiceScreen) -> VoiceContext {
     VoiceContext(
       screen: screen, isSpeaking: environment.isSpeaking(), spokenText: environment.textBeingSpoken(),
-      requiresWakeWord: environment.micHearsVoiceOver(activeListener), hasReadSentences: environment.hasReadSentences())
+      requiresWakeWord: environment.micHearsVoiceOver(activeListener), hasReadSentences: environment.hasReadSentences(),
+      handsFree: preferences.handsFree, addressed: isPushToTalkActive, awaitingAnswer: question != nil)
   }
 
   private func accept(_ command: VoiceCommand, on screen: VoiceScreen) {
@@ -271,15 +392,38 @@ final class VoiceControl {
     environment.playEarcon(.heard)
     lastCommand = command
     lastCommandAt = environment.now()
+    environment.noteCommand(command)
     Self.logger.info("command \(command.rawValue, privacy: .public)")
+    if answer(command) { return }
     if handler?(command) == true { return }
     performCommon(command, on: screen)
   }
 
+  /// A waiting question takes yes and no first.
+  private func answer(_ command: VoiceCommand) -> Bool {
+    guard let question else { return false }
+    switch command {
+    case .yes, .continueOn:
+      self.question = nil
+      question.yes()
+    case .no:
+      self.question = nil
+      question.no()
+    default:
+      return false
+    }
+    return true
+  }
+
+  private func say(_ line: String) {
+    environment.say(line, nil, true, nil)
+  }
+
+  /// What is the same on every screen, and what a screen's handler leaves to the defaults.
   private func performCommon(_ command: VoiceCommand, on screen: VoiceScreen) {
     switch command {
     case .help:
-      environment.say(VoiceCommandParser.helpLine(context: context(on: screen)), nil, true, nil)
+      say(VoiceCommandParser.helpLine(context: context(on: screen)))
     case .stop:
       environment.stopSpeech()
     case .repeatLast:
@@ -288,9 +432,39 @@ final class VoiceControl {
       changeRate(by: Self.rateStep)
     case .slower:
       changeRate(by: -Self.rateStep)
+    case .whereAmI:
+      say(SpokenMessage.whereAmI(screen: screen.spokenName, state: describeScreen?()))
+    case .listTools:
+      say(screen == .camera ? SpokenMessage.toolsList : SpokenMessage.toolsListNotConnected)
+    case .mainMenu, .back, .close:
+      say(screen.mainMenuLine)
+    case .openReader:
+      say(screen == .camera ? SpokenMessage.readerOpen : SpokenMessage.readerNeedsGlasses)
+    case .disconnect:
+      say(SpokenMessage.notConnectedNothingToDisconnect)
+    case .closeApp:
+      say(SpokenMessage.closeAppNeedsATouch)
+    case .shortAnswers:
+      setVerbosity(.short)
+    case .normalAnswers:
+      setVerbosity(.normal)
+    case .detailedAnswers:
+      setVerbosity(.detailed)
+    case .glassesDisplayOn, .glassesDisplayOff:
+      preferences.glassesDisplayEnabled = command == .glassesDisplayOn
+      say(command == .glassesDisplayOn ? SpokenMessage.glassesDisplayOn : SpokenMessage.glassesDisplayOff)
+    case .handsFreeOn:
+      setHandsFree(true)
+    case .handsFreeOff:
+      setHandsFree(false)
     default:
       break
     }
+  }
+
+  private func setVerbosity(_ verbosity: Verbosity) {
+    preferences.verbosity = verbosity
+    say(SpokenMessage.verbositySet(verbosity))
   }
 
   private func changeRate(by delta: Float) {
@@ -374,7 +548,7 @@ final class VoiceControl {
 
   private var policyInputs: VoiceListenerPolicy.Inputs {
     VoiceListenerPolicy.Inputs(
-      enabled: preferences.voiceControlEnabled, inBackground: inBackground, interrupted: interrupted,
+      enabled: preferences.handsFree || isPushToTalkActive, inBackground: inBackground, interrupted: interrupted,
       glassesAvailable: makeGlassesListener != nil, glassesMicGranted: glassesMicGranted,
       glassesCoolingOff: glassesCoolOffUntil.map { environment.now() < $0 } ?? false,
       phoneMic: phoneMicPermission, speechRecognition: speechPermission, onDeviceRecognizerAvailable: phoneLocale != nil)
@@ -390,8 +564,9 @@ final class VoiceControl {
   /// The single place listening is started and stopped.
   private func reconcile() {
     if environment.isInert {
-      status = preferences.voiceControlEnabled ? .unavailable : .off
-      reason = preferences.voiceControlEnabled ? "Voice control doesn't listen during tests." : nil
+      let enabled = preferences.handsFree || isPushToTalkActive
+      status = enabled ? .unavailable : .off
+      reason = enabled ? "Voice control doesn't listen during tests." : nil
       return
     }
     let decision = VoiceListenerPolicy.decide(policyInputs)
@@ -428,9 +603,16 @@ final class VoiceControl {
     reason = newReason
   }
 
-  /// Says why it can't listen, once per launch for each reason. Never silence (ROADMAP).
+  /// Says why it can't listen, once per launch for each reason (every press for push to talk, which
+  /// then ends). Never silence (ROADMAP).
   private func unavailable(_ line: String) {
     enter(.unavailable, reason: line)
+    if isPushToTalkActive, !preferences.handsFree {
+      pushToTalkTimeout?.cancel()
+      isPushToTalkActive = false
+      environment.say(line, .attention, false, nil)
+      return
+    }
     guard spokenReasons.insert(line).inserted else { return }
     environment.say(line, .attention, false, nil)
   }
@@ -510,9 +692,10 @@ final class VoiceControl {
     // starting and failing doesn't repeat it on every cycle (scheduleRestart clears it).
     spokenReasons.formIntersection([SpokenMessage.voiceControlTroubled])
     enter(.listening, reason: nil)
+    if isPushToTalkActive, !preferences.handsFree { armPushToTalkTimeout() }
     guard wasCueDue else { return }
     environment.playEarcon(.listening)
-    guard !preferences.voiceControlIntroHeard else { return }
+    guard preferences.handsFree, !preferences.voiceControlIntroHeard else { return }
     let line = environment.micHearsVoiceOver(activeListener) ? SpokenMessage.voiceControlOnWakeWord : SpokenMessage.voiceControlOn
     environment.say(line, nil, false) { [weak self] finished in
       if finished { self?.preferences.voiceControlIntroHeard = true }
@@ -545,7 +728,7 @@ final class VoiceControl {
 // MARK: - Live environment
 
 extension VoiceControl.Environment {
-  static let live = VoiceControl.Environment(
+  static let live: VoiceControl.Environment = VoiceControl.Environment(
     isInert: LaunchOptions.isAutomatedTest,
     makePhoneListener: { PhoneSpeechListener(localeIdentifier: $0) },
     phoneLocale: {
@@ -588,7 +771,8 @@ extension VoiceControl.Environment {
     followsVoiceOverRate: { A11yPreferences.shared.useVoiceOverVoice && UIAccessibility.isVoiceOverRunning },
     setIdleTimerDisabled: { UIApplication.shared.isIdleTimerDisabled = $0 },
     glassesSpeechEnabled: { VoiceFeatureFlags.glassesSpeechEnabled() },
-    now: { Date() }
+    now: { Date() },
+    noteCommand: { HandsFreeSurface.shared.noteHeard($0) }
   )
 }
 

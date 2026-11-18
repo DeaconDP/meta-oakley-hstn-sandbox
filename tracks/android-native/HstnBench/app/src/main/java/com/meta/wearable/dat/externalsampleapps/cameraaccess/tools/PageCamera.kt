@@ -81,4 +81,7 @@ interface PageCamera {
    * [requestPermission] is called (it opens the Meta AI app).
    */
   fun connectAndStream(requestPermission: suspend (Permission) -> PermissionStatus)
+
+  /** Ends the glasses session ("disconnect" in hands-free mode). The app stays registered. */
+  fun endSession()
 }

@@ -59,6 +59,18 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="hstnbench" />
             </intent-filter>
+            <!-- speakup://handsfree opens straight into hands-free mode and switches it on
+                 (notes/hands-free-mode.md; the "Hands-free" launcher shortcut uses it too). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="speakup" android:host="handsfree" />
+            </intent-filter>
+            <!-- Launcher shortcut (long-press the icon): "Hands-free". -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <!-- Voice-first entry point: its own launcher name so a blind user can say
