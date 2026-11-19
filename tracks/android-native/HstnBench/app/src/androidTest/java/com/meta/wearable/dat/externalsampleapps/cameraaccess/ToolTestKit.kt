@@ -18,6 +18,7 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess
 
 import android.content.Context
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.HandsFreeStore
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.CameraSourceSetting
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
@@ -60,6 +61,9 @@ object ToolTestKit {
     }
     // These tests drive the app by voice: hands-free on (the default is the touch toolbox).
     HandsFreeStore.get(context).setHandsFree(true)
+    // The camera choice back to the default: AUTO (glasses once registered), setup not skipped.
+    HandsFreeStore.get(context).setCameraSource(CameraSourceSetting.AUTO)
+    HandsFreeStore.get(context).setPhoneChosen(false)
   }
 
   /** Call in @After. */

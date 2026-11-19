@@ -53,12 +53,18 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
   interface Host {
     fun startRegistration()
 
+    /** "Use my phone's camera": leave setup for the tools, no Meta AI (notes/phone-camera.md). */
+    fun usePhone()
+
     fun quitApp()
 
     fun openAppSettings()
 
-    /** Ask for the launch permissions again (the user said "connect" with Nearby devices off). */
-    fun askAppPermissions()
+    /**
+     * Ask for the launch permissions again: the mic (push to talk without it), or with
+     * [forGlasses] Nearby devices too (the user said "connect" with it off).
+     */
+    fun askAppPermissions(forGlasses: Boolean = false)
   }
 
   data class Ui(
@@ -247,6 +253,12 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
     run(flow.heard(text, now()))
   }
 
+  /** The "Use my phone's camera" button was pressed: stop talking, the tools open. */
+  fun usePhoneTapped() {
+    stopSpeaking()
+    stopListening()
+  }
+
   /** The Connect button was pressed (TalkBack or sighted help): register now, no speech first. */
   fun connectTapped() {
     stopSpeaking()
@@ -310,11 +322,12 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
     val h = host ?: return
     when (next) {
       Next.LISTEN -> startListening()
+      Next.USE_PHONE -> h.usePhone()
       Next.START_REGISTRATION -> {
         flow.registrationStarted(now())
         h.startRegistration()
       }
-      Next.ASK_PERMISSIONS -> h.askAppPermissions()
+      Next.ASK_PERMISSIONS -> h.askAppPermissions(forGlasses = true)
       Next.OPEN_SETTINGS -> h.openAppSettings()
       Next.QUIT -> h.quitApp()
     }
@@ -338,6 +351,7 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
   private fun resFor(line: SetupLine): Int =
       when (line) {
         SetupLine.WELCOME -> R.string.setup_welcome
+        SetupLine.USING_PHONE -> R.string.setup_using_phone
         SetupLine.WELCOME_NO_MIC -> R.string.setup_welcome_no_mic
         SetupLine.WELCOME_NO_BLUETOOTH -> R.string.setup_welcome_no_bluetooth
         SetupLine.RESUMED -> R.string.setup_resumed

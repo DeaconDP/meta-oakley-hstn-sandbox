@@ -34,9 +34,9 @@ extension SpokenMessage {
 
   static let mainMenuCamera = "Main menu. Say read, status, or list tools."
 
-  static let mainMenuHome = "Main menu. Your glasses aren't connected. Say connect."
+  static let mainMenuHome = "Main menu. Your glasses aren't connected. Say connect, or use the phone."
 
-  static let mainMenuWelcome = "This is setup. Say connect, or not now."
+  static let mainMenuWelcome = "This is setup. Say phone, or connect."
 
   static let closeAppNeedsATouch =
     "Apps can't close themselves on iPhone. Swipe up from the bottom of the screen, or just lock the phone."

@@ -1,8 +1,10 @@
 /*
  * OnboardingView - the one screen before the app (notes/a11y-onboarding.md, "One screen", 2026-11-17)
  *
- * The mascot says what SpeakUp does, one safety sentence, and what happens next. One big Connect
- * glasses button starts registration with Meta AI straight away. Not now goes to the app.
+ * The mascot says what SpeakUp does, one safety sentence, and what happens next. Two choices
+ * (V0 "Glasses optional"): Use my iPhone's camera goes straight to the main screen with no Meta AI
+ * and no registration; Connect glasses starts registration with Meta AI. "Not now" by voice is the
+ * phone choice. Glasses can be connected later from Settings or the camera switch.
  *
  * Coming back from Meta AI: WearablesViewModel says "Connected to …. Hold up a page and say read."
  * and this screen hands over to the main screen. If it didn't finish, the view model says why, the
@@ -15,7 +17,7 @@
  * sentence (VoiceControl.promptForPermissions), queued behind the welcome line.
  *
  * MainAppView shows it while A11yPreferences.onboardingCompleted is false, so "Replay setup" is
- * `A11yPreferences.shared.resetOnboarding()`. Reaching the main screen, or Not now, marks it done.
+ * `A11yPreferences.shared.resetOnboarding()`. Reaching the main screen either way marks it done.
  */
 
 import MWDATCore
@@ -104,19 +106,19 @@ struct OnboardingView: View {
         .accessibilityHint("Goes to the main screen.")
         .accessibilityIdentifier("onboarding_start_button")
     } else {
+      Button("Use my iPhone's camera", action: usePhone)
+        .buttonStyle(.a11yPrimary)
+        .sayHint(.usePhone)
+        .accessibilityHint("Starts reading with this iPhone's camera. No glasses or Meta AI needed.")
+        .accessibilityIdentifier("onboarding_use_phone_button")
       // Identifier shared with the home screen's button, so tests find either the same way.
       Button(connectTitle, action: connect)
-        .buttonStyle(.a11yPrimary)
+        .buttonStyle(.a11ySecondary)
         .sayHint(notice == nil ? .connect : .tryAgain)
         .disabled(wearablesViewModel.isConnecting)
         .accessibilityHint(
           wearablesViewModel.isConnecting ? "" : "Opens the Meta AI app. Choose Connect there, then come back.")
         .accessibilityIdentifier("connect_glasses_button")
-      Button("Not now", action: notNow)
-        .buttonStyle(.a11ySecondary)
-        .sayHint(.no)
-        .accessibilityHint("Goes to the app without connecting. You can connect from there.")
-        .accessibilityIdentifier("onboarding_not_now_button")
     }
   }
 
@@ -153,7 +155,7 @@ struct OnboardingView: View {
     VoiceControl.shared.setScreen(.welcome, describe: { [wearablesViewModel] in
       wearablesViewModel.registrationState == .registered ? SpokenMessage.welcomeAlreadyConnected : SpokenMessage.welcomeConnect
     }, handler: handleVoice)
-    HandsFreeSurface.shared.publish(screen: .welcome, state: "Connect your glasses", hints: [.connect, .no, .help])
+    HandsFreeSurface.shared.publish(screen: .welcome, state: "Phone or glasses", hints: [.usePhone, .connect, .help])
     VoiceCoach.shared.provide(for: .welcome) { [wearablesViewModel] in
       // Nothing to suggest while Meta AI is being opened or waited for.
       if wearablesViewModel.isConnecting { return nil }
@@ -166,6 +168,8 @@ struct OnboardingView: View {
     // The failure alert, if it is still up, would sit over Meta AI's return.
     wearablesViewModel.dismissError()
     preferences.onboardingStep = Self.connectingMarker
+    // Once linked, auto reads with the glasses (and falls back to the phone without them).
+    if preferences.cameraSource == .phone { preferences.cameraSource = .auto }
     wearablesViewModel.connectGlasses()
   }
 
@@ -174,9 +178,11 @@ struct OnboardingView: View {
     finishConnected(alreadySpoken: false)
   }
 
-  private func notNow() {
+  /// The iPhone's camera: no Meta AI, no registration. Straight to the main screen, Read enabled.
+  private func usePhone() {
     wearablesViewModel.dismissError()
-    Announcer.shared.say(SpokenMessage.setupNotNow)
+    preferences.cameraSource = .phone
+    Announcer.shared.announce(SpokenMessage.setupUsePhone, earcon: .ready)
     complete()
   }
 
@@ -204,10 +210,10 @@ struct OnboardingView: View {
   /// help, stop, faster and slower are VoiceControl's own.
   private func handleVoice(_ command: VoiceCommand) -> Bool {
     switch command {
-    case .connect, .tryAgain, .yes, .continueOn:
+    case .connect, .tryAgain, .yes, .continueOn, .useGlasses:
       if isRegistered { startReading() } else { connect() }
-    case .no:
-      notNow()
+    case .usePhone, .no:
+      usePhone()
     case .repeatLast:
       // Repeat this screen's words, even with VoiceOver: the user asked out loud.
       let line = notice.map { "\($0) \(SpokenMessage.welcomeRetry)" } ?? welcomeLine

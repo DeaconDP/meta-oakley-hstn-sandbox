@@ -6,7 +6,7 @@
  * hands-free off (the app is a touch toolbox, notes/hands-free-mode.md), except on a first run with
  * VoiceOver (HandsFreeMode); the glasses display on where there is one; spoken tips on; earcons on;
  * normal verbosity; the system default speech rate; and the natural (OpenAI) reading voice whenever
- * a key is set (CloudReading).
+ * a key is set (CloudReading); and the automatic camera source (CameraSource).
  */
 
 import AVFoundation
@@ -56,6 +56,13 @@ final class A11yPreferences {
     static let voiceTipsEnabled = "a11y.voiceTipsEnabled"
     static let voiceTipsHeard = "a11y.voiceTipsHeard"
     static let useNaturalVoice = "a11y.useNaturalVoice"
+    static let cameraSource = "a11y.cameraSource"
+  }
+
+  /// Which camera reads (CameraSource): auto (default) is the phone until glasses are linked, then
+  /// the glasses with the phone as a fallback. "use the phone" / "use the glasses" set it.
+  var cameraSource: CameraSourcePreference {
+    didSet { defaults.set(cameraSource.rawValue, forKey: Key.cameraSource) }
   }
 
   @ObservationIgnored private let defaults: UserDefaults
@@ -162,6 +169,7 @@ final class A11yPreferences {
     voiceTipsEnabled = defaults.object(forKey: Key.voiceTipsEnabled) as? Bool ?? true
     voiceTipsHeard = defaults.dictionary(forKey: Key.voiceTipsHeard) as? [String: Int] ?? [:]
     useNaturalVoice = defaults.object(forKey: Key.useNaturalVoice) as? Bool ?? true
+    cameraSource = defaults.string(forKey: Key.cameraSource).flatMap(CameraSourcePreference.init(rawValue:)) ?? .auto
   }
 
   /// Starts onboarding over, e.g. "replay setup" in Settings. The disclaimer is part of

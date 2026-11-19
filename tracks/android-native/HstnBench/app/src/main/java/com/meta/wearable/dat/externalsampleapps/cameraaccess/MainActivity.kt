@@ -10,8 +10,9 @@
 //
 // This is the main entry point for the CameraAccess sample application that demonstrates how to use
 // the Meta Wearables Device Access Toolkit (DAT) to:
-// - Initialize the DAT SDK
-// - Handle device permissions (Bluetooth, Internet)
+// - Initialize the DAT SDK (only on the glasses path: the phone camera needs no Bluetooth, no Meta
+//   AI; notes/phone-camera.md)
+// - Handle device permissions (Bluetooth, Internet; Camera for the phone camera)
 // - Request camera permissions from wearable devices (Ray-Ban Meta glasses)
 // - Stream video and capture photos from connected wearable devices
 
@@ -19,6 +20,7 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess
 
 import android.Manifest.permission.BLUETOOTH
 import android.Manifest.permission.BLUETOOTH_CONNECT
+import android.Manifest.permission.CAMERA
 import android.Manifest.permission.INTERNET
 import android.Manifest.permission.RECORD_AUDIO
 import android.content.Intent
@@ -43,6 +45,7 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.SetupVoice
 import android.view.accessibility.AccessibilityManager
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.HandsFreeStore
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolRegistry
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.CameraSourceRules
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HandsFreeIntent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HandsFreeLaunch
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.LaunchIntent
@@ -83,9 +86,6 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
 
     // Required Android permissions for the DAT SDK to function properly
     val PERMISSIONS: Array<String> = arrayOf(BLUETOOTH, BLUETOOTH_CONNECT, INTERNET)
-    // Asked for at launch with the above, so the setup screen can listen (voice setup). Refusing it
-    // doesn't block the DAT SDK: the screen says how to fix it and the button still works.
-    private val LAUNCH_PERMISSIONS: List<String> = PERMISSIONS.toList() + RECORD_AUDIO
     private const val SETUP_PREFS = "setup_voice"
   }
 
@@ -95,6 +95,20 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
   // Permissions refused in this run: not asked again on every onStart (each return from Meta AI or
   // Settings is an onStart). Saying "connect" asks again; Android itself stops asking after two.
   private val refusedThisRun = mutableSetOf<String>()
+
+  // The user asked for the glasses this run ("connect my glasses", the button): Nearby devices is
+  // asked for from now on. Until then a launch only asks for the microphone, so choosing the phone
+  // never meets a Bluetooth dialog.
+  private var glassesAsked = false
+  // Registration waits for Nearby devices to be granted (asked for by the connect button).
+  private var registrationPending = false
+
+  /** Launch permissions: the mic (voice), plus Nearby devices on the glasses path. */
+  private fun launchPermissions(): List<String> {
+    val mode = HandsFreeStore.get(this).settings.value
+    val glasses = CameraSourceRules.needsBluetooth(mode.cameraSource, glassesAsked)
+    return (if (glasses) PERMISSIONS.toList() else emptyList()) + RECORD_AUDIO
+  }
 
   private val permissionCheckLauncher =
       registerForActivityResult(RequestMultiplePermissions()) { permissionsResult ->
@@ -131,6 +145,32 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
         audioPermissionContinuation?.resume(granted)
         audioPermissionContinuation = null
       }
+
+  private var cameraPermissionContinuation: CancellableContinuation<Boolean>? = null
+  private val cameraPermissionLauncher =
+      registerForActivityResult(RequestPermission()) { granted ->
+        cameraPermissionContinuation?.resume(granted)
+        cameraPermissionContinuation = null
+      }
+
+  /**
+   * The phone camera's permission (ToolHub says why first, in hands-free mode). A permanent refusal
+   * isn't asked again: BLOCKED, and ToolHub says how to fix it in Settings.
+   */
+  suspend fun requestCameraPermission(): PermState {
+    if (isGranted(CAMERA)) return PermState.GRANTED
+    if (isBlocked(CAMERA)) return PermState.BLOCKED
+    getSharedPreferences(SETUP_PREFS, MODE_PRIVATE).edit().putBoolean("asked_$CAMERA", true).apply()
+    val granted =
+        permissionMutex.withLock {
+          suspendCancellableCoroutine { continuation ->
+            cameraPermissionContinuation = continuation
+            continuation.invokeOnCancellation { cameraPermissionContinuation = null }
+            cameraPermissionLauncher.launch(CAMERA)
+          }
+        }
+    return if (granted) PermState.GRANTED else permState(CAMERA)
+  }
 
   // Requests RECORD_AUDIO for sound-in-video. Returns true if granted (already or just now); false
   // if denied, so recording can proceed video-only instead of being blocked.
@@ -226,7 +266,7 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
    */
   private fun checkPermissions(fromVoice: Boolean) {
     val askable =
-        LAUNCH_PERMISSIONS.filter {
+        launchPermissions().filter {
           !isGranted(it) && !isBlocked(it) && (fromVoice || it !in refusedThisRun)
         }
     // Normal (install-time) permissions are always granted; only the runtime ones need a dialog.
@@ -255,10 +295,19 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
   }
 
   private fun deliverPermissions() {
-    viewModel.onPermissionsResult(PERMISSIONS.associateWith { isGranted(it) }) {
-      // Initialize the DAT SDK once the permissions are granted
-      // This is REQUIRED before using any Wearables APIs
-      Wearables.initialize(this)
+    val bluetooth = PERMISSIONS.all { isGranted(it) }
+    // On the phone path with Nearby devices off, the DAT SDK isn't started and nothing complains:
+    // the app isn't registered, so AUTO uses the phone camera.
+    if (bluetooth || CameraSourceRules.needsBluetooth(HandsFreeStore.get(this).settings.value.cameraSource, glassesAsked)) {
+      viewModel.onPermissionsResult(PERMISSIONS.associateWith { isGranted(it) }) {
+        // Initialize the DAT SDK once the permissions are granted
+        // This is REQUIRED before using any Wearables APIs
+        Wearables.initialize(this)
+      }
+    }
+    if (bluetooth && registrationPending) {
+      registrationPending = false
+      viewModel.startRegistration(this)
     }
     setupVoice.onPermissions(
         bluetooth = permState(BLUETOOTH_CONNECT),
@@ -284,7 +333,23 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
 
   // SetupVoice.Host: what the spoken setup screen can do.
 
-  override fun startRegistration() = viewModel.startRegistration(this)
+  /** The connect button or "connect": Nearby devices first if it isn't granted yet, then Meta AI. */
+  override fun startRegistration() {
+    glassesAsked = true
+    if (PERMISSIONS.all { isGranted(it) }) {
+      if (!viewModel.uiState.value.canRegister) deliverPermissions()
+      viewModel.startRegistration(this)
+    } else {
+      registrationPending = true
+      checkPermissions(fromVoice = true)
+    }
+  }
+
+  /** "Use my phone's camera" on the setup screen: the tools open on the phone camera. */
+  override fun usePhone() {
+    Log.i(TAG, "setup: use the phone camera")
+    HandsFreeStore.get(this).setPhoneChosen(true)
+  }
 
   override fun quitApp() {
     moveTaskToBack(true)
@@ -296,7 +361,10 @@ class MainActivity : ComponentActivity(), SetupVoice.Host {
     )
   }
 
-  override fun askAppPermissions() = checkPermissions(fromVoice = true)
+  override fun askAppPermissions(forGlasses: Boolean) {
+    if (forGlasses) glassesAsked = true
+    checkPermissions(fromVoice = true)
+  }
 
   // Debug-only: when launched with `--ez mwdat_ui_testing true`, enable MockDeviceKit and start its
   // local HTTP test server so an out-of-process MCP client can drive the app without real glasses.

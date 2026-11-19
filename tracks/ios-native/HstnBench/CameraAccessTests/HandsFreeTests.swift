@@ -82,7 +82,7 @@ final class HandsFreeGrammarTests: XCTestCase {
 
   func testHelpIsInShortGroups() {
     let line = VoiceCommandParser.helpLine(context: VoiceContext(screen: .home))
-    XCTAssertTrue(line.hasPrefix("You can say these. Here: connect, status."))
+    XCTAssertTrue(line.hasPrefix("You can say these. Here: connect, use the phone, status."), line)
     XCTAssertTrue(line.contains("Anywhere: main menu, list tools, where am I."))
     XCTAssertTrue(line.contains("hands-free on"), "the toolbox is offered hands-free on")
   }

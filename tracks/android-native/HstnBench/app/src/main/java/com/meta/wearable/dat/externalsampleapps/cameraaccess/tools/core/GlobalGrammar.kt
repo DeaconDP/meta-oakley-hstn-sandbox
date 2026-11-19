@@ -18,6 +18,8 @@
 //     mode", "stop listening for good"), "what tools are there", "where am I", "back", "connect",
 //     "disconnect", "status", "settings", "short/normal/detailed answers", "glasses display on/off".
 //     Tool grammars still run first, so the book reader keeps its own "where am I", "back", "status".
+//  5. Glasses optional (notes/phone-camera.md): "use the phone", "use the phone camera", "use the
+//     glasses", "which camera", "torch on/off".
 //
 // [parseHome] is what the home voice menu (CameraScreen with no tool open) understands: everything
 // here plus bare tool names ("light", "book", "colour"), which are too short to be safe inside a
@@ -107,6 +109,17 @@ sealed interface GlobalCommand {
   /** "Hands-free on", "voice mode" / "hands-free off", "touch mode", "stop listening for good". */
   data class HandsFree(val on: Boolean) : GlobalCommand
 
+  // Glasses optional (notes/phone-camera.md).
+
+  /** "Use the phone", "use the phone camera" / "use the glasses": switch the camera now. */
+  data class UseCamera(val source: CameraSource) : GlobalCommand
+
+  /** "Which camera": says which camera is in use and whether it's on. */
+  data object WhichCamera : GlobalCommand
+
+  /** "Torch on" / "torch off": the phone's light (phone camera only). */
+  data class Torch(val on: Boolean) : GlobalCommand
+
   companion object {
     const val STEP = 0.25f
     const val BIG_STEP = 0.5f
@@ -162,8 +175,26 @@ object GlobalGrammar {
           },
       )
 
+  private const val TORCH = "(?:torch|flashlight|flash ?light|flash)"
+
   private val HANDS_FREE_RULES: List<Rule> =
       listOf(
+          // Glasses optional: before Connect, which owns "turn on the camera".
+          Rule("(?:(?:use|switch to|change to|go to|swap to|try)(?: the| my| this)? phone(?:'s)?(?: camera)?(?: instead)?|(?:the |my )?phone(?:'s)? camera(?: instead)?|(?:use|switch to)(?: the| my)? phone(?:'s)? camera instead)") {
+            GlobalCommand.UseCamera(CameraSource.PHONE)
+          },
+          Rule("(?:(?:use|switch to|change to|go to|swap to|switch back to|go back to)(?: the| my)? glasses(?: camera)?(?: instead)?)") {
+            GlobalCommand.UseCamera(CameraSource.GLASSES)
+          },
+          Rule("(?:(?:which|what) camera(?: is (?:this|on|it|in use|being used)| are (?:you|we) using| am i using| is that)?|is it the phone or the glasses|am i using the phone or the glasses)") {
+            GlobalCommand.WhichCamera
+          },
+          Rule("(?:(?:the )?$TORCH on|(?:turn|switch|put) on (?:the |my )?$TORCH|(?:turn|switch|put) (?:the |my )?$TORCH on)") {
+            GlobalCommand.Torch(true)
+          },
+          Rule("(?:(?:the )?$TORCH off|(?:turn|switch|put) off (?:the |my )?$TORCH|(?:turn|switch) (?:the |my )?$TORCH off)") {
+            GlobalCommand.Torch(false)
+          },
           Rule("(?:(?:what|which) tools (?:are there|do (?:you|i) have|have you got|can i use|are available)|(?:list|name|tell me)(?: all)?(?: the| my)? tools|what tools|tools list|list of tools|what can (?:you|this app|it) do|(?:the |my )?tools)") {
             GlobalCommand.ListTools
           },

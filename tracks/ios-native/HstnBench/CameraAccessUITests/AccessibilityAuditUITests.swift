@@ -117,11 +117,11 @@ final class AccessibilityAuditUITests: XCTestCase {
 
   private static let largestText = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
 
-  /// Setup is one screen: the welcome, with Connect glasses and Not now.
+  /// Setup is one screen: the welcome, with Use my iPhone's camera and Connect glasses.
   private func auditSetupScreen(size: String) throws {
     XCTAssertTrue(app.descendants(matching: .any)["onboarding_welcome"].waitForExistence(timeout: 10), "Expected the setup screen")
     XCTAssertTrue(app.buttons["connect_glasses_button"].waitForExistence(timeout: 10))
-    XCTAssertTrue(app.buttons["onboarding_not_now_button"].exists)
+    XCTAssertTrue(app.buttons["onboarding_use_phone_button"].exists)
     try audit(screen: "setup at \(size)")
   }
 

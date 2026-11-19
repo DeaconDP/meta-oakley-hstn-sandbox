@@ -94,4 +94,19 @@ class SetupGrammarTest {
         "close the door behind you when you leave the kitchen please",
     )
   }
+
+  @Test
+  fun usingThePhoneInsteadOfGlasses() {
+    for (p in listOf("use my phone", "use the phone", "Use my phone's camera.", "phone camera", "phone",
+        "I don't have glasses", "no glasses", "without glasses", "let's use the phone", "the phone please")) {
+      assertEquals(p, SetupCommand.USE_PHONE, SetupGrammar.parse(p))
+    }
+    for (p in listOf("don't use the phone", "not the phone")) {
+      assertEquals(p, SetupCommand.DECLINE, SetupGrammar.parse(p))
+    }
+    // The glasses phrases keep their meaning.
+    assertEquals(SetupCommand.CONNECT, SetupGrammar.parse("connect my glasses"))
+    assertEquals(SetupCommand.DECLINE, SetupGrammar.parse("don't connect"))
+    assertEquals(null, SetupGrammar.parse("my phone rang while I was cooking dinner tonight"))
+  }
 }

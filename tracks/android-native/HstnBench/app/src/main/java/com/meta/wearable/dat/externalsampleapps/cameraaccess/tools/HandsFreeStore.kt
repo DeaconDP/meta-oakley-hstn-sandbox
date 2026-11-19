@@ -1,5 +1,8 @@
 // HandsFreeStore - the one persisted, observable mode setting (and the settings hands-free changes)
 //
+// Also the camera source (AUTO / PHONE / GLASSES) and whether the setup screen's "use my phone" was
+// chosen (notes/phone-camera.md).
+//
 // notes/hands-free-mode.md. One per process (the setup screen, the camera screen and MainActivity
 // share it). `handsFree` defaults to false: SpeakUp is a toolbox unless the user turns hands-free on
 // (switch, voice, speakup://handsfree, the "Hands-free" shortcut, `--ez handsfree true`), or TalkBack
@@ -12,6 +15,7 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.CameraSourceSetting
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.FirstRun
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HandsFreePolicy
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HandsFreeRules
@@ -30,6 +34,8 @@ class HandsFreeStore private constructor(context: Context) {
     private const val KEY_HANDS_FREE = "hands_free"
     private const val KEY_DISPLAY = "glasses_display"
     private const val KEY_VERBOSITY = "verbosity"
+    private const val KEY_CAMERA_SOURCE = "camera_source"
+    private const val KEY_PHONE_CHOSEN = "phone_chosen"
 
     @Volatile private var instance: HandsFreeStore? = null
 
@@ -45,6 +51,8 @@ class HandsFreeStore private constructor(context: Context) {
               handsFree = prefs.getBoolean(KEY_HANDS_FREE, false),
               glassesDisplay = prefs.getBoolean(KEY_DISPLAY, true),
               verbosity = Verbosity.fromName(prefs.getString(KEY_VERBOSITY, null)),
+              cameraSource = CameraSourceSetting.fromName(prefs.getString(KEY_CAMERA_SOURCE, null)),
+              phoneChosen = prefs.getBoolean(KEY_PHONE_CHOSEN, false),
           ),
       )
   val settings: StateFlow<ModeSettings> = _settings.asStateFlow()
@@ -103,6 +111,19 @@ class HandsFreeStore private constructor(context: Context) {
   fun setVerbosity(v: Verbosity) {
     prefs.edit().putString(KEY_VERBOSITY, v.name).apply()
     _settings.update { it.copy(verbosity = v) }
+  }
+
+  /** The saved camera choice (settings menu): AUTO, PHONE or GLASSES. */
+  fun setCameraSource(setting: CameraSourceSetting) {
+    prefs.edit().putString(KEY_CAMERA_SOURCE, setting.name).commit()
+    _settings.update { it.copy(cameraSource = setting) }
+  }
+
+  /** "Use my phone's camera" on the setup screen (true), or back to choosing (false, tests). */
+  fun setPhoneChosen(chosen: Boolean) {
+    // commit: the scaffold reads it at once to leave the setup screen.
+    prefs.edit().putBoolean(KEY_PHONE_CHOSEN, chosen).commit()
+    _settings.update { it.copy(phoneChosen = chosen) }
   }
 
   private fun write(on: Boolean) {

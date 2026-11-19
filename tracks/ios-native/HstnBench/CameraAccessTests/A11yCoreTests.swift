@@ -129,7 +129,14 @@ final class SpokenMessageTests: XCTestCase {
       SpokenMessage.welcomeRetry,
       SpokenMessage.connectedNext,
       SpokenMessage.setupConnected,
-      SpokenMessage.setupNotNow,
+      SpokenMessage.setupUsePhone,
+      SpokenMessage.phoneReady,
+      SpokenMessage.phoneCameraOn,
+      SpokenMessage.phoneCameraUnavailable,
+      SpokenMessage.phoneCameraSetupFailed,
+      SpokenMessage.phoneCameraStopped,
+      SpokenMessage.glassesFallbackToPhone,
+      SpokenMessage.glassesBackFromFallback,
       SpokenMessage.readyToRead,
       SpokenMessage.cameraOn,
       SpokenMessage.cameraEnded,
@@ -164,6 +171,9 @@ final class SpokenMessageTests: XCTestCase {
   func testWelcomeSaysWhatToSayAndTap() {
     XCTAssertTrue(SpokenMessage.welcomeConnect.contains("Say connect"))
     XCTAssertTrue(SpokenMessage.welcomeConnect.contains("tap Connect glasses"))
+    // The iPhone's camera is the other first-class choice (V0).
+    XCTAssertTrue(SpokenMessage.welcomeConnect.contains("say phone"))
+    XCTAssertTrue(SpokenMessage.welcomeConnect.contains("tap Use my iPhone's camera"))
     XCTAssertTrue(SpokenMessage.welcomeRetry.contains("Say try again"))
     XCTAssertTrue(SpokenMessage.welcomeAlreadyConnected.contains("Say continue"))
   }

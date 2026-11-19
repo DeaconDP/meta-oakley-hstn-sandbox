@@ -12,8 +12,9 @@
 // Welcome screen that guides users through the DAT SDK registration process.
 // This view is displayed when the app is not yet registered.
 //
-// HstnBench: first run uses OnboardingView instead. This is where the user lands after choosing
-// Not now there, or after the glasses are disconnected later.
+// HstnBench: first run uses OnboardingView instead. Since V0 ("Glasses optional") the main screen
+// works with the iPhone's camera, so this shows only when the camera setting is "glasses" and they
+// aren't linked. "Use my iPhone's camera" (or "use the phone") goes back to the main screen.
 //
 // HstnBench: made usable with VoiceOver and low vision (notes/a11y-onboarding.md): icons are
 // decorative, text uses Dynamic Type styles, the page scrolls instead of truncating at large sizes,
@@ -53,6 +54,7 @@ struct HomeScreenView: View {
   private func handleVoice(_ command: VoiceCommand) -> Bool {
     switch command {
     case .connect, .tryAgain: viewModel.connectGlasses()
+    case .usePhone: CameraSourceRouter.shared.choose(.phone)
     case .status: Announcer.shared.announce(SpokenMessage.voiceHomeStatus, earcon: .attention)
     default: return false
     }
@@ -102,6 +104,13 @@ struct HomeScreenView: View {
         .disabled(viewModel.isConnecting)
         .accessibilityHint(viewModel.isConnecting ? "" : "Opens the Meta AI app to confirm.")
         .accessibilityIdentifier("connect_glasses_button")
+        Button("Use my iPhone's camera") {
+          CameraSourceRouter.shared.choose(.phone)
+        }
+        .buttonStyle(.a11ySecondary)
+        .sayHint(.usePhone)
+        .accessibilityHint("Reads with this iPhone's camera instead. No glasses needed.")
+        .accessibilityIdentifier("home_use_phone_button")
       }
     }
     .background(Theme.page.ignoresSafeArea())

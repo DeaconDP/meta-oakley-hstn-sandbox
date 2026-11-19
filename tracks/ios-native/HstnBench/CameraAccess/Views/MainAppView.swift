@@ -13,8 +13,9 @@
 // When unregistered, shows the registration flow. When registered, shows the main reading screen.
 //
 // HstnBench: until onboarding is completed, its one screen (OnboardingView) comes first. It
-// connects the glasses itself, so a first run goes from there straight to the main screen; Not now
-// lands on HomeScreenView. Resetting it (A11yPreferences.shared.resetOnboarding()) shows it again,
+// connects the glasses itself, or chooses the iPhone's camera; either way a first run goes from
+// there straight to the main screen. HomeScreenView (connect) shows only when the camera setting
+// is "glasses" and they aren't linked (CameraSourcePolicy.showsCameraScreen). Resetting it (A11yPreferences.shared.resetOnboarding()) shows it again,
 // which is how "Replay setup" works. UI tests skip it unless launched with --onboarding.
 //
 
@@ -31,10 +32,13 @@ struct MainAppView: View {
     Group {
       if !preferences.onboardingCompleted, !LaunchOptions.skipsOnboarding {
         OnboardingView(wearablesViewModel: viewModel)
-      } else if viewModel.registrationState == .registered {
+      } else if CameraSourcePolicy.showsCameraScreen(
+        CameraSourceRouter.shared.preference, registered: viewModel.registrationState == .registered)
+      {
+        // Linked glasses, or the phone camera (V0 "Glasses optional": no glasses needed).
         CameraView(wearables: wearables, wearablesVM: viewModel)
       } else {
-        // User not registered - show registration/onboarding flow
+        // The user asked for the glasses and they aren't linked yet: the connect screen.
         HomeScreenView(viewModel: viewModel)
       }
     }
@@ -104,4 +108,8 @@ enum LaunchOptions {
   static let previewsListening = isUITesting && ProcessInfo.processInfo.arguments.contains("--preview-listening")
   /// With --ui-testing: start in hands-free mode instead of the toolbox. Nothing listens either way.
   static let startsHandsFree = isUITesting && ProcessInfo.processInfo.arguments.contains("--hands-free")
+  /// With --ui-testing: the camera source follows the setting (auto: the phone until glasses are
+  /// linked). Without it, UI tests keep the glasses-only screens they were written for
+  /// (CameraSourceRouter.preference).
+  static let usesPhoneCamera = isUITesting && ProcessInfo.processInfo.arguments.contains("--phone-camera")
 }

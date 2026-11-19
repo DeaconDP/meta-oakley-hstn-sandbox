@@ -68,12 +68,16 @@
 - [ ] iOS hands-free: `DATGlassesDisplayMockTests.testTheCardRendersOnTheMockDisplay` fails every run ("The display didn't start", 50–73 s) on a fresh iOS 27 simulator (2026-11-18; the other 228 unit tests pass)
 
 ## Everyday value (notes/value-strategy.md)
-- [ ] V0 Android: `PhoneCamera : PageCamera` (CameraX `ImageAnalysis` + `ImageCapture`), picked in `ToolHub.Factory` from a "glasses optional" setting
-- [ ] V0 Android: stop DAT types leaking from `PageCamera` (`deviceSession`, `connectAndStream(Permission)`); add a `motion` signal for book page turns
-- [ ] V0 Android: bypass the registration gate (`CameraAccessScaffold.kt:102`), make Bluetooth optional (`MainActivity.kt:85`), skip `GlassesWatch`, `bringUpLink`/`explainNoGlasses` and reconnect when glasses are off
-- [ ] V0: re-tune fps, resolution and framing checks for phone optics; lock AE/AWB for the light tool; re-run `experiments/book-reader-resolution` on phone frames
-- [ ] V0: "use the phone" / "use the glasses" by voice mid-task; phone framing guidance (distance, torch, haptics); big-text mirror of what's read
-- [ ] V0 iOS: `PhoneFrameSource : ReadFrameSource` (AVCaptureSession); bypass `registrationState` (`MainAppView.swift:34`); App Store target without the DAT SDK
+- [x] V0 Android: phone camera mode (2026-11-19, notes/phone-camera.md): `PhoneCamera` (CameraX 1.5.3) behind a DAT-free `PageCamera`, glasses-only parts moved to `GlassesLink`, `CameraSourceSelector` switches at runtime, `cameraSource` AUTO/PHONE/GLASSES with a spoken fallback after the 20 s link wait, frame-difference `motion` for page turns, first-run "Use my phone's camera", Bluetooth only asked for glasses, phone pitfalls (permission, camera in use, too dark), torch and camera switch by voice. JVM 350/0. **Instrumentation not run** (emulator overloaded, adb killed by Unity's adb)
+- [x] V0 iOS: phone camera mode (2026-11-19, notes/phone-camera-ios.md): `PhoneFrameSource` + `CameraSourceRouter`, setup leads with "Use my iPhone's camera", camera card with preview and torch, voice phrases, phone pitfalls. Unit tests 258 passed, 1 failed (the known display mock test). Not tried on a real iPhone
+- [ ] V0: run `PhoneCameraTest` and the six launch/tool suites (`HomeVoiceMenuTest`, `ToolsTest`, `VoiceFirstLaunchTest`, `SetupVoiceTest`, `RegistrationButtonTest`, `HandsFreeModeTest`) on a healthy emulator or the A26; measure capture and frame timings
+- [ ] V0: real-iPhone pass: camera start, preview, photo resolution, rotation, focus, torch, permission prompt, interruptions, VoiceOver and large text on the camera card
+- [ ] V0: decide whether a spoken camera switch is saved (iOS saves it, Android keeps it for the run; the customisation rule says "keep that" saves) and whether AUTO switches back when glasses connect (iOS does, Android doesn't); make both match
+- [ ] V0: OCR quality at 30 cm and the darkness threshold on real phones; re-run `experiments/book-reader-resolution` on phone frames
+- [ ] V0: tools' own lines still say "glasses" in places; reword for the phone (Android ToolHub only rewrites connect/ready/lost/back)
+- [ ] V0: haptics for framing; big-text mirror of what's read; iOS dark warning before reading
+- [ ] V0: store builds without the DAT SDK: iOS second target (18 files import DAT, ~2–3 days, plan in notes/phone-camera-ios.md); Android product flavour
+- [ ] V0: TalkBack and VoiceOver walk-through of the new camera switch and setup buttons, ideally with blind and low-vision testers
 - [ ] V0 iOS: port mail, labels, watch-for-text and the book reader (iOS only has Read today)
 - [ ] V1: "deal with this letter": deadline reminder, "what's due this week", letters log + export, plain-English explain (text only, optional Haiku), explain in my language
 - [ ] V2: food check (expiry vs today, my allergens, cooking steps); recipe/manual "next step"

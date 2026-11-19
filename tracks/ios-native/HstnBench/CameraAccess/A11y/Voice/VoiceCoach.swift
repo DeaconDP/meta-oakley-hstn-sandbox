@@ -44,6 +44,10 @@ enum CoachSituation: Equatable, Sendable {
   /// A page has been read.
   case afterReading
   case paused
+  /// The phone camera reads (V0), nothing read yet.
+  case readyWithPhone
+  /// The phone camera can't be used (permission, no camera). The fix is in Settings, not a command.
+  case phoneCameraBlocked
 
   /// Stable key for counting how often a tip was heard.
   var key: String {
@@ -57,6 +61,8 @@ enum CoachSituation: Equatable, Sendable {
     case .ready: "ready"
     case .afterReading: "afterReading"
     case .paused: "paused"
+    case .readyWithPhone: "readyWithPhone"
+    case .phoneCameraBlocked: "phoneCameraBlocked"
     }
   }
 }
@@ -136,14 +142,14 @@ enum VoiceCoachLines {
     switch situation {
     case .welcome:
       return short
-        ? "\(w.sayFirst("connect")), or \(w.say("not now"))."
-        : "To connect your glasses, \(w.say("connect")). I'll open the Meta AI app so you can approve it. "
-          + "Or \(w.say("not now"))."
+        ? "\(w.sayFirst("phone")), or \(w.say("connect"))."
+        : "To read with your iPhone's camera, \(w.say("phone")). To connect Meta glasses, \(w.say("connect")), "
+          + "and I'll open the Meta AI app so you can approve it."
     case .welcomeRetry:
       return short
-        ? "\(w.sayFirst("try again")), or \(w.say("not now"))."
+        ? "\(w.sayFirst("try again")), or \(w.say("phone"))."
         : "Your glasses aren't connected yet. \(w.sayFirst("try again")), and I'll open the Meta AI app again. "
-          + "Or \(w.say("not now"))."
+          + "Or \(w.say("phone")) to use your iPhone's camera."
     case .welcomeConnected:
       return short
         ? "\(w.sayFirst("continue")) to start."
@@ -151,7 +157,8 @@ enum VoiceCoachLines {
     case .notLinked:
       return short
         ? "\(w.sayFirst("connect")) to link your glasses."
-        : "Your glasses aren't linked to SpeakUp yet. \(w.sayFirst("connect")), and I'll open the Meta AI app so you can approve it."
+        : "Your glasses aren't linked to SpeakUp yet. \(w.sayFirst("connect")), and I'll open the Meta AI app so you can approve it. "
+          + "Or \(w.say("use the phone")) to read with your iPhone's camera."
     case .noGlasses:
       return short
         ? "Glasses not found. \(w.sayFirst("status")) to check again."
@@ -170,11 +177,31 @@ enum VoiceCoachLines {
           + "and \(w.say("repeat")) says one again."
     case .paused:
       return "Paused. Tap your glasses to carry on, or \(w.say("status"))."
+    case .readyWithPhone:
+      return short
+        ? "Hold the phone over some text and \(w.say("read"))."
+        : "Want me to read something? Hold the phone flat, about 30 centimetres above a page, a letter or a label, "
+          + "and \(w.say("read")). In a dark room, \(w.say("torch on"))."
+    case .phoneCameraBlocked:
+      return short
+        ? "The camera is off. \(w.sayFirst("status")) to hear how to fix it."
+        : "I can't use the phone camera yet. \(w.sayFirst("status")) to hear how to fix it."
     }
   }
 }
 
 // MARK: - The main screen's situation
+
+extension CoachSituation {
+  /// The main screen with the phone as the camera. Interruptions pass by themselves, so no tip.
+  static func forPhone(problem: PhoneCameraProblem?, hasReadSentences: Bool) -> CoachSituation? {
+    switch problem {
+    case nil: return hasReadSentences ? .afterReading : .readyWithPhone
+    case .permissionDenied?, .permissionRestricted?, .noCamera?: return .phoneCameraBlocked
+    case .interrupted?, .stoppedWithError?, .setupFailed?: return nil
+    }
+  }
+}
 
 extension CameraViewModel {
   /// What a tip should be about on the main screen, or nil when nothing should be suggested.

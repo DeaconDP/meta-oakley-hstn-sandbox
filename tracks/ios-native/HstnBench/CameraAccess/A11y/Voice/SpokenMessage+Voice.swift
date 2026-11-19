@@ -45,7 +45,7 @@ extension SpokenMessage {
 
   static let voiceNotUnderstood = "Sorry, I didn't catch that. Say reader, help."
 
-  static let voiceHomeStatus = "Your glasses aren't connected to this app yet. Say connect."
+  static let voiceHomeStatus = "Your glasses aren't connected to this app yet. Say connect, or say use the phone."
 
   static let voiceGlassesMicNeedsMetaAI =
     "To listen through your glasses, you'll switch to the Meta AI app to allow their microphone, then come back here."

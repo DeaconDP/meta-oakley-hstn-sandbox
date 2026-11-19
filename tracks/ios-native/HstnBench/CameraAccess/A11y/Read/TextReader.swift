@@ -30,6 +30,9 @@
  *    the next one's audio is fetched (CloudSpeechClip), so there are no gaps. If the voice fails:
  *    one short line, then the rest is read with the phone's voice.
  *
+ * The camera is the phone's or the glasses' (CameraSourceRouter, V0 "Glasses optional"); the
+ * pipeline is the same, only the guidance wording follows `ReadFrameSource.cameraKind`.
+ *
  * Metrics (BenchClock, picked up by bench.sh): `trigger_to_first_word` from the trigger to the
  * first line of the response being heard, whatever that line is (detail `first=` says whether it
  * was text, guidance or a fallback notice; `source=` is frame, photo, cloud or cloud_fallback);
@@ -57,7 +60,8 @@ enum ReadStreamReadiness: Equatable {
   case unavailable(String)
 }
 
-/// What the reader needs from the camera screen. CameraViewModel implements it.
+/// What the reader needs from a camera. CameraViewModel (glasses) and PhoneFrameSource implement
+/// it; CameraSourceRouter picks between them and is what the camera screen hands the reader.
 @MainActor
 protocol ReadFrameSource: AnyObject {
   var latestReadFrame: ReadFrame? { get }
@@ -65,6 +69,15 @@ protocol ReadFrameSource: AnyObject {
   func prepareStreamForReading() -> ReadStreamReadiness
   /// An in-stream photo for reading only: no preview sheet, no photo reply. nil on failure.
   func captureStillForReading() async -> UIImage?
+  /// Which camera this is, so guidance fits it ("turn your head" or "move the phone").
+  var cameraKind: CameraKind { get }
+  /// Another camera took over: stop streaming (the session may stay).
+  func stopReadingStream()
+}
+
+extension ReadFrameSource {
+  var cameraKind: CameraKind { .glasses }
+  func stopReadingStream() {}
 }
 
 /// Shown under the sentence and used by the UI test; the same numbers go to the log.
@@ -373,7 +386,7 @@ final class TextReader {
       .filter { !$0.chunks.isEmpty }
 
     let effective = rendered.isEmpty && !verdict.blocksReading ? FramingVerdict.noText : verdict
-    let guidance = SpokenMessage.readGuidance(effective, verbosity: preferences.verbosity)
+    let guidance = SpokenMessage.readGuidance(effective, verbosity: preferences.verbosity, camera: cameraKind)
     if effective.blocksReading {
       return finish(guidance: guidance ?? SpokenMessage.readFailed, earcon: .attention, myGeneration)
     }
@@ -555,7 +568,8 @@ final class TextReader {
     if sentences.isEmpty {
       // The model's own hint (SPEAKUP_NOTE), or ours when it sent nothing readable.
       clock.note("read cloud no_text note=\(note != nil)")
-      let guidance = note ?? SpokenMessage.readGuidance(.noText, verbosity: preferences.verbosity) ?? SpokenMessage.readFailed
+      let guidance =
+        note ?? SpokenMessage.readGuidance(.noText, verbosity: preferences.verbosity, camera: cameraKind) ?? SpokenMessage.readFailed
       return finish(guidance: guidance, earcon: .attention, generation)
     }
     clock.note("read cloud sentences=\(sentences.count)")
@@ -663,6 +677,9 @@ final class TextReader {
   }
 
   // MARK: Helpers
+
+  /// The camera being read from, for guidance wording.
+  private var cameraKind: CameraKind { source?.cameraKind ?? .glasses }
 
   private func isCurrent(_ myGeneration: Int) -> Bool {
     myGeneration == generation && !Task.isCancelled

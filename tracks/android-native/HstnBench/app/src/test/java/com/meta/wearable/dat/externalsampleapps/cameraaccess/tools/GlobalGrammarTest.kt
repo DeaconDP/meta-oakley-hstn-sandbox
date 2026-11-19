@@ -8,6 +8,7 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools
 
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.VoiceCommand
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.VoiceCommands
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.CameraSource
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlobalCommand
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlobalGrammar
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolId
@@ -293,5 +294,61 @@ class GlobalGrammarTest {
     }
     assertEquals(VoiceCommand.WhereAmI, VoiceCommands.parse("where am I"))
     assertEquals(VoiceCommand.WhereAmI, VoiceCommands.parse("status"))
+  }
+
+  // MARK: - Glasses optional (notes/phone-camera.md)
+
+  @Test
+  fun cameraSwitchPhrases() {
+    val phone = GlobalCommand.UseCamera(CameraSource.PHONE)
+    for (p in listOf("use the phone", "Use the phone camera", "use my phone", "switch to the phone", "phone camera",
+        "use the phone's camera", "use the phone instead", "Glasses, use the phone")) {
+      assertEquals(p, phone, GlobalGrammar.parse(p))
+      assertEquals(p, phone, GlobalGrammar.parseHome(p))
+    }
+    val glasses = GlobalCommand.UseCamera(CameraSource.GLASSES)
+    for (p in listOf("use the glasses", "use my glasses", "switch to the glasses", "switch back to the glasses",
+        "use the glasses camera", "use the glasses instead")) {
+      assertEquals(p, glasses, GlobalGrammar.parse(p))
+    }
+    for (p in listOf("which camera", "Which camera?", "what camera are you using", "which camera is on",
+        "is it the phone or the glasses")) {
+      assertEquals(p, GlobalCommand.WhichCamera, GlobalGrammar.parse(p))
+    }
+    for (p in listOf("torch on", "turn on the torch", "turn the torch on", "flashlight on", "switch on the flashlight")) {
+      assertEquals(p, GlobalCommand.Torch(true), GlobalGrammar.parse(p))
+    }
+    for (p in listOf("torch off", "turn off the torch", "turn the torch off", "flashlight off")) {
+      assertEquals(p, GlobalCommand.Torch(false), GlobalGrammar.parse(p))
+    }
+  }
+
+  @Test
+  fun cameraPhrasesDontClashWithOtherPhrases() {
+    val phrases = listOf("use the phone", "use the phone camera", "use the glasses", "which camera", "torch on", "torch off")
+    for (p in phrases) {
+      // Tool grammars run first: none may claim them, and none of them opens a tool.
+      assertNull("book: $p", VoiceCommands.parse(p))
+      val n = com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.Phrases.normalize(p)
+      assertNull("mail: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.mail.MailGrammar.parse(n))
+      assertNull("watch: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.watch.WatchGrammar.parse(n, n))
+      assertNull("labels: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.labels.LabelsGrammar.parse(n))
+      assertNull("light: $p", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.light.LightGrammar.parse(n))
+      assertTrue(p, GlobalGrammar.parse(p) !is GlobalCommand.Open)
+      assertNull("setup mode: $p", GlobalGrammar.parseMode(p))
+    }
+    // The old phrases keep their meaning.
+    assertEquals(GlobalCommand.Connect, GlobalGrammar.parse("turn on the camera"))
+    assertEquals(GlobalCommand.Connect, GlobalGrammar.parse("connect my glasses"))
+    assertEquals(GlobalCommand.Disconnect, GlobalGrammar.parse("turn off the camera"))
+    assertEquals(GlobalCommand.Status, GlobalGrammar.parse("are my glasses connected"))
+    assertEquals(GlobalCommand.HandsFree(true), GlobalGrammar.parse("use hands-free"))
+    // A question about a torch in view is the light tool's, never the phone torch.
+    assertTrue(GlobalGrammar.parse("is the torch on") !is GlobalCommand.Torch)
+    // Chatter with the new words is still nothing.
+    for (p in listOf("my phone is in my bag", "the glasses are on the table", "I need a torch for the garden",
+        "the camera was expensive")) {
+      assertNull(p, GlobalGrammar.parse(p))
+    }
   }
 }

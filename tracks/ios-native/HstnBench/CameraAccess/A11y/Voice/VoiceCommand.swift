@@ -56,6 +56,14 @@ enum VoiceCommand: String, CaseIterable, Sendable {
   case glassesDisplayOff
   case handsFreeOn
   case handsFreeOff
+  // Camera source (V0 "Glasses optional", CameraSourceRouter)
+  /// Read with the iPhone's camera. On the first screen: set up without glasses.
+  case usePhone
+  /// Read with the glasses' camera. On the first screen: connect them.
+  case useGlasses
+  case whichCamera
+  case torchOn
+  case torchOff
 
   /// The word or phrase help offers for it, and the name the UI shows as the last command.
   var phrase: String {
@@ -88,6 +96,11 @@ enum VoiceCommand: String, CaseIterable, Sendable {
     case .glassesDisplayOff: "glasses display off"
     case .handsFreeOn: "hands-free on"
     case .handsFreeOff: "hands-free off"
+    case .usePhone: "use the phone"
+    case .useGlasses: "use the glasses"
+    case .whichCamera: "which camera"
+    case .torchOn: "torch on"
+    case .torchOff: "torch off"
     }
   }
 }
@@ -176,6 +189,24 @@ enum VoiceCommandParser {
     .handsFreeOff: [
       "hands free off", "handsfree off", "touch mode", "stop listening for good", "stop hands free", "turn off hands free",
       "turn hands free off", "touch only",
+    ],
+    .usePhone: [
+      "phone", "use the phone", "use phone", "use my phone", "use the phone camera", "use my phones camera", "phone camera",
+      "use the iphone", "use my iphone", "use the iphone camera", "use my iphones camera", "iphone camera", "switch to the phone",
+      "switch to the phone camera",
+    ],
+    .useGlasses: [
+      "use the glasses", "use glasses", "use my glasses", "use the glasses camera", "glasses camera", "switch to the glasses",
+      "switch to the glasses camera",
+    ],
+    .whichCamera: [
+      "which camera", "which camera is on", "which camera am i using", "what camera", "what camera am i using",
+      "which camera is it",
+    ],
+    .torchOn: ["torch on", "turn on the torch", "turn the torch on", "flashlight on", "turn on the flashlight", "light on", "turn on the light"],
+    .torchOff: [
+      "torch off", "turn off the torch", "turn the torch off", "flashlight off", "turn off the flashlight", "light off",
+      "turn off the light",
     ],
   ]
 
@@ -290,12 +321,13 @@ enum VoiceCommandParser {
     let answers: [VoiceCommand] = context.awaitingAnswer ? [.yes, .no, .continueOn] : []
     switch context.screen {
     case .welcome:
-      return [.connect, .tryAgain, .continueOn, .yes, .no]
+      return [.usePhone, .connect, .useGlasses, .tryAgain, .continueOn, .yes, .no]
     case .home:
-      return [.connect, .tryAgain, .status, .disconnect, .openReader, .back, .close] + answers
+      return [.connect, .usePhone, .tryAgain, .status, .disconnect, .openReader, .back, .close] + answers
     case .camera:
       let reading: [VoiceCommand] = context.hasReadSentences ? [.continueOn] : []
-      return [.read, .status, .tryAgain, .openReader, .openSettings, .back, .close, .connect, .disconnect] + reading + answers
+      let camera: [VoiceCommand] = [.whichCamera, .usePhone, .useGlasses, .torchOn, .torchOff]
+      return [.read, .status, .tryAgain, .openReader, .openSettings, .back, .close, .connect, .disconnect] + camera + reading + answers
     }
   }
 
@@ -308,7 +340,9 @@ enum VoiceCommandParser {
   /// What help says, in short groups: this screen, getting around, speech, settings. Only the mode
   /// switch that would change something is offered.
   static func helpLine(context: VoiceContext) -> String {
-    let quiet: Set<VoiceCommand> = [.back, .close, .yes, .no, .continueOn, .tryAgain, .disconnect, .openReader]
+    let quiet: Set<VoiceCommand> = [
+      .back, .close, .yes, .no, .continueOn, .tryAgain, .disconnect, .openReader, .useGlasses, .torchOff,
+    ]
     var here = screenCommands(context: context).filter { !quiet.contains($0) }.map(\.phrase)
     if context.screen == .welcome { here.append(VoiceCommand.no.phrase) }
     if context.hasReadSentences { here += ["next", "back"] }

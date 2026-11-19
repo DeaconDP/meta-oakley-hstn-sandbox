@@ -32,6 +32,10 @@ data class ModeSettings(
     /** The glasses display card, when the glasses have a display ("glasses display off"). */
     val glassesDisplay: Boolean = true,
     val verbosity: Verbosity = Verbosity.NORMAL,
+    /** Which camera the tools use (notes/phone-camera.md). */
+    val cameraSource: CameraSourceSetting = CameraSourceSetting.AUTO,
+    /** "Use my phone's camera" was chosen on the setup screen: skip Meta AI registration. */
+    val phoneChosen: Boolean = false,
 )
 
 /** What a mode means for each behaviour that used to be always on. */

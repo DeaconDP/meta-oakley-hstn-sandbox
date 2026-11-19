@@ -19,6 +19,11 @@
 // all one scroll in reading order: status, Read text, the reading card. The reader's actions are
 // also VoiceOver actions on every element (cameraQuickActions).
 //
+// Glasses optional (V0, notes/phone-camera-ios.md): the reader reads through CameraSourceRouter,
+// which picks the iPhone's camera or the glasses. With the phone, the screen shows its preview, a
+// labelled camera switch and the torch, the status line is the phone's, and the glasses' folded /
+// removed / battery narration is skipped.
+//
 // Hands-free (notes/hands-free-mode.md): the switch and, in the toolbox, the push-to-talk button sit
 // under the status, and a short tools list follows Read text. In hands-free the alerts are replaced
 // by spoken lines and yes/no questions (CameraNarrator), and the screen publishes its card to
@@ -37,6 +42,7 @@ struct CameraView: View {
   @State private var showSettingsMenu: Bool = false
   @State private var isLaunchingUpdate: Bool = false
   @State private var narrator = CameraNarrator()
+  private var router: CameraSourceRouter { CameraSourceRouter.shared }
 
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -71,7 +77,8 @@ struct CameraView: View {
             } else {
               HandsFreeControls()
             }
-            if isUpdateRequired {
+            CameraSourceCard(router: router, connectGlasses: connectGlasses)
+            if isUpdateRequired, !usingPhone {
               updateControls
             } else {
               readButton
@@ -124,6 +131,14 @@ struct CameraView: View {
       CameraNarration(
         viewModel: viewModel, narrator: narrator, updateRequired: { wearablesVM.requiresFirmwareUpdate },
         permissionYes: confirmCameraPermission, permissionNo: declineCameraPermission))
+    // The router follows the glasses' link and presence to pick the camera.
+    .onChange(of: wearablesVM.registrationState) { _, state in router.registered = state == .registered }
+    .onChange(of: viewModel.hasActiveDevice) { _, connected in router.glassesConnected = connected }
+    // Problems while the phone camera is in use: said in both modes, like the glasses' pauses.
+    .onChange(of: router.phoneProblem) { old, new in
+      guard usingPhone else { return }
+      narrator.phoneProblemChanged(from: old, to: new)
+    }
     // The card a glasses display shows (HandsFreeSurface), from the same state the screen shows.
     .task(id: cardState) {
       HandsFreeSurface.shared.publish(screen: .camera, state: cardState, hints: cardHints)
@@ -136,7 +151,8 @@ struct CameraView: View {
     .task {
       await narrator.screenAppeared(
         viewModel,
-        updateRequired: { wearablesVM.requiresFirmwareUpdate },
+        router: router,
+        speakStatus: { interrupt in speakStatus(interrupt: interrupt) },
         takeLaunchAction: { LaunchActionRouter.shared.consume() },
         runLaunchAction: { runLaunchAction($0) }
       )
@@ -149,14 +165,21 @@ struct CameraView: View {
     }
     // Lets StatusIntent answer through Siri without opening the app.
     .onAppear {
-      LaunchActionRouter.shared.statusProvider = { [viewModel, wearablesVM] in
-        viewModel.statusLine(updateRequired: wearablesVM.requiresFirmwareUpdate)
+      router.glasses = viewModel
+      router.registered = wearablesVM.registrationState == .registered
+      router.glassesConnected = viewModel.hasActiveDevice
+      narrator.glassesInUse = { [router] in router.active == .glasses }
+      LaunchActionRouter.shared.statusProvider = { [viewModel, wearablesVM, router] in
+        router.phoneStatusLine ?? viewModel.statusLine(updateRequired: wearablesVM.requiresFirmwareUpdate)
       }
-      TextReader.shared.source = viewModel
+      TextReader.shared.source = router
       VoiceControl.shared.setScreen(.camera, describe: describeForVoice, handler: handleVoice)
       // Spoken tips after a quiet spell ("Hold some text in front of you and say read").
-      VoiceCoach.shared.provide(for: .camera) { [viewModel, wearablesVM] in
-        viewModel.coachSituation(
+      VoiceCoach.shared.provide(for: .camera) { [viewModel, wearablesVM, router] in
+        if router.active == .phone {
+          return CoachSituation.forPhone(problem: router.phoneProblem, hasReadSentences: TextReader.shared.hasSentences)
+        }
+        return viewModel.coachSituation(
           updateRequired: wearablesVM.requiresFirmwareUpdate, hasReadSentences: TextReader.shared.hasSentences)
       }
     }
@@ -165,10 +188,12 @@ struct CameraView: View {
       VoiceCoach.shared.stopProviding(for: .camera)
       LaunchActionRouter.shared.statusProvider = nil
       let reader = TextReader.shared
-      if reader.source === viewModel {
+      if reader.source === router {
         if reader.isActive { reader.stop() }
         reader.source = nil
       }
+      router.screenDisappeared()
+      if router.glasses === viewModel { router.glasses = nil }
     }
     .navigationBarHidden(true)
   }
@@ -186,8 +211,27 @@ struct CameraView: View {
     }
   }
 
+  private var usingPhone: Bool { router.active == .phone }
+
+  /// The phone's status line while it is the camera, otherwise the glasses'.
   private func speakStatus() {
-    viewModel.speakStatus(updateRequired: isUpdateRequired)
+    speakStatus(interrupt: true)
+  }
+
+  private func speakStatus(interrupt: Bool) {
+    if let line = router.phoneStatusLine {
+      let earcon: Earcon = router.phoneProblem == nil ? .ready : .attention
+      Announcer.shared.announce(line, earcon: earcon, interrupt: interrupt)
+    } else {
+      viewModel.speakStatus(updateRequired: isUpdateRequired, interrupt: interrupt)
+    }
+  }
+
+  /// From the camera card, or "connect" by voice without linked glasses. Once linked, auto uses
+  /// them, so a phone choice goes back to auto.
+  private func connectGlasses() {
+    if A11yPreferences.shared.cameraSource == .phone { A11yPreferences.shared.cameraSource = .auto }
+    wearablesVM.connectGlasses()
   }
 
   /// Magic Tap: iOS's play/pause gesture. Stops a read in progress, otherwise reads. With an update
@@ -196,7 +240,7 @@ struct CameraView: View {
     let reader = TextReader.shared
     if reader.isActive {
       reader.stop()
-    } else if isUpdateRequired {
+    } else if isUpdateRequired, !usingPhone {
       speakStatus()
     } else {
       reader.read()
@@ -256,7 +300,16 @@ struct CameraView: View {
         TextReader.shared.read()
       }
     case .connect:
-      Announcer.shared.say(SpokenMessage.alreadyConnected)
+      if wearablesVM.registrationState == .registered {
+        Announcer.shared.say(SpokenMessage.alreadyConnected)
+      } else {
+        connectGlasses()
+      }
+    case .usePhone: router.choose(.phone)
+    case .useGlasses: router.choose(.glasses)
+    case .whichCamera: Announcer.shared.say(router.whichCameraLine)
+    case .torchOn: router.setTorch(true)
+    case .torchOff: router.setTorch(false)
     case .disconnect:
       wearablesVM.disconnectGlasses()
     default: return false
@@ -271,7 +324,7 @@ struct CameraView: View {
 
   /// "Where am I": settings if open, then the status line.
   private func describeForVoice() -> String? {
-    let status = viewModel.statusLine(updateRequired: isUpdateRequired)
+    let status = router.phoneStatusLine ?? viewModel.statusLine(updateRequired: isUpdateRequired)
     return showSettingsMenu ? "Settings are open. \(status)" : status
   }
 
@@ -365,6 +418,13 @@ struct CameraView: View {
   /// What the user needs to know, in the order it matters. The spoken status line
   /// (CameraViewModel.statusLine) says the same things.
   private var status: Status {
+    if usingPhone {
+      if let problem = router.phoneProblem {
+        return Status(title: problem.title, subtitle: problem == .noCamera ? nil : "See below for what to do.", mood: .confused)
+      }
+      return Status(
+        title: "Ready to read", subtitle: "Hold the iPhone about 30 cm above a page, then tap Read text.", mood: .happy)
+    }
     if !viewModel.hasActiveDevice {
       return Status(title: "Put on your glasses", subtitle: "Waiting for them to connect.", mood: .idle)
     }
@@ -400,7 +460,7 @@ struct CameraView: View {
           .foregroundStyle(Theme.ink)
           .fixedSize(horizontal: false, vertical: true)
       }
-      if let battery = viewModel.batteryLevel, battery <= cameraBatteryWarningPercent {
+      if !usingPhone, let battery = viewModel.batteryLevel, battery <= cameraBatteryWarningPercent {
         Label("Glasses battery \(battery)%", systemImage: "battery.25percent")
           .font(.rounded(.subheadline, weight: .semibold))
           .foregroundStyle(Theme.inkSoft)
@@ -419,6 +479,14 @@ struct CameraView: View {
         A11yPreferences.shared.resetOnboarding()
       }
       .accessibilityHint("Goes through the sounds, speaker test and detail level again.")
+      if wearablesVM.registrationState != .registered {
+        CustomButton(title: "Connect my glasses", style: .secondary, isDisabled: wearablesVM.isConnecting) {
+          setSettingsMenu(open: false)
+          connectGlasses()
+        }
+        .accessibilityHint("Optional. Opens the Meta AI app to link your glasses, then come back.")
+        .accessibilityIdentifier("settings_connect_glasses_button")
+      }
       CustomButton(
         title: "Disconnect",
         style: .destructive,

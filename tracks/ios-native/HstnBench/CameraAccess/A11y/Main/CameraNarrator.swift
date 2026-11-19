@@ -15,6 +15,9 @@
  *   in words (narrate). What happens to the camera while it is in use (paused, removed, folded,
  *   off) is the reader's own result, so it is said in both modes. In hands-free there are no dialogs: errors are always spoken, and
  *   the camera permission question is put aloud and answered with yes or no.
+ * - With the phone as the camera (CameraSourceRouter), the glasses' connection, folded, removed
+ *   and battery lines are skipped (`glassesInUse`); the phone's own problems (taken by another app,
+ *   stopped) are said instead.
  */
 
 import MWDATCore
@@ -35,8 +38,12 @@ final class CameraNarrator {
   /// True once the appear sequence has run. Launch actions arriving before then are left for it.
   var isSettled: Bool { settled }
 
+  /// False while the phone camera reads: glasses changes are then not news.
+  var glassesInUse: @MainActor () -> Bool = { true }
+
   /// The appear sequence, in order:
-  /// 1. Wait for the device stream to report, so the status isn't a false "not connected".
+  /// 1. Wait for the device stream to report, so the status isn't a false "not connected". Then
+  ///    the router knows whether auto falls back to the phone (said once, by the router).
   /// 2. Take a launch action parked by Siri / Back Tap. With one, it is the feedback (Status speaks
   ///    the status line, Read reads); without one, speak the status line.
   /// 3. Then the one-time disclaimer, if setup was skipped.
@@ -44,19 +51,24 @@ final class CameraNarrator {
   /// ("Connected to …", "Setup finished").
   func screenAppeared(
     _ viewModel: CameraViewModel,
-    updateRequired: @escaping @MainActor () -> Bool,
+    router: CameraSourceRouter,
+    speakStatus: @MainActor (_ interrupt: Bool) -> Void,
     takeLaunchAction: @MainActor () -> LaunchAction?,
     runLaunchAction: @MainActor (LaunchAction) -> Void
   ) async {
-    await viewModel.waitForDeviceReport()
+    // Only linked glasses are worth waiting for.
+    if router.registered, router.active == .glasses || router.preference == .auto {
+      await viewModel.waitForDeviceReport()
+    }
     guard !Task.isCancelled else { return }
+    router.glassesWaitEnded()
     let action = takeLaunchAction()
     switch action {
     case nil:
       // Start-up narration is hands-free only.
-      if isHandsFree { viewModel.speakStatus(updateRequired: updateRequired(), interrupt: false) }
+      if isHandsFree { speakStatus(false) }
     case .status:
-      viewModel.speakStatus(updateRequired: updateRequired(), interrupt: false)
+      speakStatus(false)
     case .some(let action):
       runLaunchAction(action)
     }
@@ -83,6 +95,10 @@ final class CameraNarrator {
   // MARK: Session and stream
 
   func phaseChanged(from old: CameraPhase, to new: CameraPhase, viewModel: CameraViewModel) {
+    guard glassesInUse() else {
+      earcons.stopWorkingTick(owner: Self.tickOwner)
+      return
+    }
     if new.isWaiting { earcons.startWorkingTick(owner: Self.tickOwner) } else { earcons.stopWorkingTick(owner: Self.tickOwner) }
     guard settled, old != new else { return }
 
@@ -112,7 +128,7 @@ final class CameraNarrator {
   func donStateChanged(from old: DonState, to new: DonState, viewModel: CameraViewModel) {
     // Only matters while there is a session to pause; otherwise the status line covers it.
     // From .unknown is the first reading, not something that happened.
-    guard settled, old != .unknown, viewModel.hasSession else { return }
+    guard settled, glassesInUse(), old != .unknown, viewModel.hasSession else { return }
     if new == .doffed {
       say(SpokenMessage.glassesRemoved, earcon: .attention)
     } else if new == .donned, old == .doffed {
@@ -121,12 +137,12 @@ final class CameraNarrator {
   }
 
   func hingeStateChanged(from old: HingeState, to new: HingeState, viewModel: CameraViewModel) {
-    guard settled, old != .unknown, new == .closed, viewModel.hasSession else { return }
+    guard settled, glassesInUse(), old != .unknown, new == .closed, viewModel.hasSession else { return }
     say(SpokenMessage.glassesFolded, earcon: .disconnected)
   }
 
   func batteryChanged(from old: Int?, to level: Int?) {
-    guard let level else { return }
+    guard let level, glassesInUse() else { return }
     // Re-arm once the glasses have been charged back above the warning level.
     if level > cameraBatteryWarningPercent {
       announcedBatteryThreshold = nil
@@ -138,6 +154,19 @@ final class CameraNarrator {
     // The first reading, or before the first status line: that line mentions the battery itself.
     guard settled, old != nil else { return }
     narrate(SpokenMessage.batteryLow(percent: level), earcon: .attention, interrupt: false)
+  }
+
+  // MARK: Phone camera
+
+  /// The phone camera was taken (another app, split view) or stopped, or came back. Permission and
+  /// "no camera" are the reader's answer to a read, so they aren't repeated here.
+  func phoneProblemChanged(from old: PhoneCameraProblem?, to new: PhoneCameraProblem?) {
+    guard settled else { return }
+    if let new, new == .interrupted || new == .stoppedWithError {
+      say(new.spokenLine, earcon: .disconnected)
+    } else if new == nil, old == .interrupted {
+      say(SpokenMessage.phoneCameraResumed, earcon: .ready, interrupt: false)
+    }
   }
 
   // MARK: Errors and prompts

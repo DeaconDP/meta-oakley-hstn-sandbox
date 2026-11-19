@@ -25,7 +25,7 @@
     <string name="hf_where_home" description="Where am I, in the main menu">You\'re in the main menu.</string>
     <string name="hf_where_tool" description="Where am I, in a tool; %1$s is the tool name">You\'re in the <xliff:g id="tool">%1$s</xliff:g>.</string>
     <string name="hf_back_at_home" description="Back said in the main menu">You\'re in the main menu already. Say close the app to leave.</string>
-    <string name="hf_help_toolbox" description="Help in the main menu with hands-free off (push to talk)">Tap a tool to open it. Or tap the mic and say read my book, read my mail, labels, watch for, light, connect, status, or hands-free on.</string>
+    <string name="hf_help_toolbox" description="Help in the main menu with hands-free off (push to talk)">Tap a tool to open it. Or tap the mic and say read my book, read my mail, labels, watch for, light, use the phone, use the glasses, status, or hands-free on.</string>
     <string name="hf_welcome_short" description="Main menu welcome with short answers">SpeakUp is ready.</string>
 
     <!-- Connection -->
@@ -58,6 +58,7 @@
     <string name="hf_card_ready" description="Card state">Ready</string>
     <string name="hf_card_connecting" description="Card state">Connecting to glasses</string>
     <string name="hf_card_disconnected" description="Card state">Glasses disconnected</string>
+    <string name="hf_card_phone_off" description="Card state when the phone camera is the source and off">Phone camera off</string>
     <string name="hf_hints_home" description="Card hint phrases in the main menu, separated by |; each must be a command">read my book|read my mail|help</string>
     <string name="hf_hints_tool" description="Card hint phrases in a tool, separated by |; each must be a command">help|repeat|main menu</string>
 
@@ -72,7 +73,7 @@
     <string name="hf_mic_button_description" description="TalkBack: push-to-talk button">Talk. Listens for one command, like read my mail or status.</string>
     <string name="hf_mic_button_description_listening" description="TalkBack: push-to-talk button while listening">Listening for one command. Double tap to cancel.</string>
     <string name="hf_toolbox_heading" description="Heading of the toolbox home">Toolbox</string>
-    <string name="hf_toolbox_intro" description="Under the toolbox heading">Tools that use your glasses camera and speak the answer.</string>
+    <string name="hf_toolbox_intro" description="Under the toolbox heading">Tools that use your phone or glasses camera and speak the answer.</string>
     <string name="hf_connect_button" description="Connect button in the toolbox home">Connect glasses</string>
     <string name="hf_connect_button_description" description="TalkBack: connect button">Connect to your glasses and turn on the camera.</string>
     <string name="hf_sdk_heading" description="Heading over the SDK features list">On the glasses</string>
