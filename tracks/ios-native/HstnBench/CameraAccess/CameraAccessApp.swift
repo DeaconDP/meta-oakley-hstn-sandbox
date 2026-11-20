@@ -93,12 +93,14 @@ struct CameraAccessApp: App {
       #if SPEAKUP_NO_DAT
       // The App Store build: the phone camera only. speakup://handsfree still opens hands-free.
       MainAppView(link: noGlasses)
+        .readsImports()
         .onOpenURL { url in
           if HandsFreeMode.isHandsFreeURL(url) { VoiceControl.shared.startHandsFreeFromLaunch() }
         }
       #else
       // Main app view with the glasses link (WearablesViewModel wraps the shared Wearables SDK).
       MainAppView(link: wearablesViewModel)
+        .readsImports()
         // Registration and update failures: the title says what happened, the message is the
         // spoken sentence, and the action (if any) is the one next step.
         .alert(wearablesViewModel.errorTitle, isPresented: $wearablesViewModel.showError) {

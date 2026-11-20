@@ -44,8 +44,11 @@ enum TextRecognizer {
   static let alternatives = 3
   static let minimumTextHeight: Float = 1.0 / 64
 
-  /// Blocking; call off the main actor.
-  static func recognize(_ image: UIImage) throws -> RecognizedFrame {
+  /// Blocking; call off the main actor. `minimumTextHeight` is lower for imported pages and
+  /// screenshots (ImportedPages), where body text is a small share of the picture.
+  static func recognize(
+    _ image: UIImage, minimumTextHeight: Float = TextRecognizer.minimumTextHeight
+  ) throws -> RecognizedFrame {
     guard let cgImage = image.cgImage else { throw TextRecognizerError.noImage }
     let orientation = CGImagePropertyOrientation(image.imageOrientation)
     let rotated = [.left, .right, .leftMirrored, .rightMirrored].contains(orientation)
