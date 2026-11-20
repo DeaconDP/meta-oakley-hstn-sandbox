@@ -434,11 +434,11 @@ final class TextReader {
     let preferences = A11yPreferences.shared
     let blocks = ReadingOrder.blocks(page.lines)
     let rendered = SentenceSplitter.sentences(blocks: blocks)
-      .map { ReadSpeech.render($0, verbosity: preferences.verbosity, earconsEnabled: preferences.earconsEnabled) }
+      .map { ReadSpeech.render($0, verbosity: preferences.effectiveVerbosity, earconsEnabled: preferences.earconsEnabled) }
       .filter { !$0.chunks.isEmpty }
 
     let effective = rendered.isEmpty && !verdict.blocksReading ? FramingVerdict.noText : verdict
-    let guidance = SpokenMessage.readGuidance(effective, verbosity: preferences.verbosity, camera: cameraKind)
+    let guidance = SpokenMessage.readGuidance(effective, verbosity: preferences.effectiveVerbosity, camera: cameraKind)
     if effective.blocksReading {
       return finish(guidance: guidance ?? SpokenMessage.readFailed, earcon: .attention, myGeneration)
     }
@@ -471,7 +471,7 @@ final class TextReader {
       pageNumber += 1
       let words = page.page.map { SentenceSplitter.sentences(blocks: ReadingOrder.blocks($0.lines)) } ?? []
       let rendered = words
-        .map { ReadSpeech.render($0, verbosity: preferences.verbosity, earconsEnabled: preferences.earconsEnabled) }
+        .map { ReadSpeech.render($0, verbosity: preferences.effectiveVerbosity, earconsEnabled: preferences.earconsEnabled) }
         .filter { !$0.chunks.isEmpty }
       if let heading = page.heading { addSentence(Self.noticeSentence(heading)) }
       guard !rendered.isEmpty else {
@@ -577,7 +577,7 @@ final class TextReader {
     }
     phase = .finished
     announcer.announce(
-      SpokenMessage.readEnd(verbosity: A11yPreferences.shared.verbosity), earcon: .done, kind: .reply, interrupt: false)
+      SpokenMessage.readEnd(verbosity: A11yPreferences.shared.effectiveVerbosity), earcon: .done, kind: .reply, interrupt: false)
   }
 
   /// A progress line while work continues ("Taking a photo to read."). The tick keeps going.
@@ -665,7 +665,7 @@ final class TextReader {
   /// voice that caught up, or have their audio fetched ahead while the one before plays.
   private func addCloudSentence(_ text: String) {
     let preferences = A11yPreferences.shared
-    let rendered = CloudSentence.rendered(text, verbosity: preferences.verbosity, earconsEnabled: preferences.earconsEnabled)
+    let rendered = CloudSentence.rendered(text, verbosity: preferences.effectiveVerbosity, earconsEnabled: preferences.earconsEnabled)
     guard !rendered.chunks.isEmpty else { return }
     if sentences.isEmpty { clock.note("read verdict=cloud") }
     addSentence(rendered)
@@ -695,7 +695,7 @@ final class TextReader {
       // The model's own hint (SPEAKUP_NOTE), or ours when it sent nothing readable.
       clock.note("read cloud no_text note=\(note != nil)")
       let guidance =
-        note ?? SpokenMessage.readGuidance(.noText, verbosity: preferences.verbosity, camera: cameraKind) ?? SpokenMessage.readFailed
+        note ?? SpokenMessage.readGuidance(.noText, verbosity: preferences.effectiveVerbosity, camera: cameraKind) ?? SpokenMessage.readFailed
       return finish(guidance: guidance, earcon: .attention, generation)
     }
     clock.note("read cloud sentences=\(sentences.count)")

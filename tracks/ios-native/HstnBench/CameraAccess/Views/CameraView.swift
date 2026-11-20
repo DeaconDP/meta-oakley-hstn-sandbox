@@ -602,6 +602,7 @@ struct CameraView: View {
   private var settingsPanel: some View {
     VStack(alignment: .leading, spacing: 12) {
       VoiceSettingsRows()
+      MakeItYourOwnEntry()
       ReadingSettingsRows()
       CustomButton(title: "Replay setup", style: .secondary, isDisabled: false) {
         setSettingsMenu(open: false)

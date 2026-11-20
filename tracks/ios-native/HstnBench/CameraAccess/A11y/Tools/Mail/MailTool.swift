@@ -215,7 +215,7 @@ final class MailTool: SpeakUpTool {
     let camera = source.cameraKind
     if verdict.blocksReading {
       let guidance =
-        SpokenMessage.readGuidance(verdict, verbosity: A11yPreferences.shared.verbosity, camera: camera) ?? SpokenMessage.readFailed
+        SpokenMessage.readGuidance(verdict, verbosity: A11yPreferences.shared.effectiveVerbosity, camera: camera) ?? SpokenMessage.readFailed
       return fail(guidance, earcon: .attention, myGeneration)
     }
     let scan = LetterScan(page: recognized.page)
