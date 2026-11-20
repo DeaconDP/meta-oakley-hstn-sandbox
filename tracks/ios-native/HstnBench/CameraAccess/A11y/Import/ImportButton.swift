@@ -11,6 +11,9 @@
  * camera read is (TextReader.read(pages:source:)). Photos come through
  * PhotosPicker (no photo library permission needed: the picker runs out of process and hands
  * over only what was picked). Files come through the document picker, as a security-scoped copy.
+ *
+ * By voice, "read a photo", "read a file" and "import" open the same pickers or dialog through
+ * ImportPicker, after a spoken line about what comes next (CameraView.handleVoice).
  */
 
 import PhotosUI
@@ -26,6 +29,8 @@ struct ImportButton: View {
   @State private var pickingPhoto = false
   @State private var pickingFile = false
   @State private var photo: PhotosPickerItem?
+  /// Voice requests for the dialog or a picker (ImportPicker).
+  var picker: ImportPicker = .shared
 
   var body: some View {
     Button {
@@ -55,6 +60,30 @@ struct ImportButton: View {
       guard let item else { return }
       photo = nil
       Task { await Self.importPhoto(item) }
+    }
+    // By voice ("read a photo", "read a file", "import"): CameraView parks the request after its
+    // spoken line. `initial`: the button may only just have appeared, a tool having been open.
+    .onChange(of: picker.pending, initial: true) { _, _ in takeVoiceRequest() }
+  }
+
+  /// Opens what a voice command asked for. From the choice, the dialog goes first, then the picker.
+  private func takeVoiceRequest() {
+    guard let request = picker.consume() else { return }
+    let wasChoosing = choosing
+    choosing = false
+    let open = {
+      switch request {
+      case .choice: choosing = true
+      case .photo: pickingPhoto = true
+      case .file: pickingFile = true
+      }
+    }
+    guard wasChoosing || pickingPhoto || pickingFile else { return open() }
+    pickingPhoto = false
+    pickingFile = false
+    Task {
+      try? await Task.sleep(for: .milliseconds(600))
+      open()
     }
   }
 

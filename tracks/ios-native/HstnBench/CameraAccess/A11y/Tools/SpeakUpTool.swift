@@ -66,17 +66,36 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
     }
   }
 
-  /// Phrases that open it from anywhere ("open mail reader", "read my mail").
+  /// Phrases that open it from anywhere ("open mail reader", "read my mail", "switch to labels").
   var openPhrases: [String] {
-    switch self {
-    case .read: ["open reader", "read text"]
-    case .mail: ["open mail reader", "mail reader", "read my mail", "read this letter"]
-    case .labels: ["open labels", "labels", "scan a barcode", "read the label"]
-    case .watch: ["open watch for text", "watch for text"]
-    case .ask: ["open ask", "ask about the text"]
-    case .light: ["open light and colour", "light and colour", "is the light on", "what colour is this"]
-    case .reminders: ["open reminders", "reminders", "my reminders", "medicine log"]
-    }
+    let named: [String] =
+      switch self {
+      case .read: ["open reader", "read text"]
+      case .mail: ["open mail reader", "mail reader", "read my mail", "read this letter"]
+      case .labels: ["open labels", "labels", "scan a barcode", "read the label"]
+      case .watch: ["open watch for text", "watch for text"]
+      case .ask: ["open ask", "ask about the text"]
+      case .light: ["open light and colour", "light and colour", "is the light on", "what colour is this"]
+      case .reminders: ["open reminders", "reminders", "my reminders", "medicine log"]
+      }
+    return named + switchPhrases
+  }
+
+  /// "switch to …" and "go to …" with each of its names (J2). Whole phrases, not a filler, so
+  /// "switch to read text" opens Read text rather than reading, and "switch to the phone" is still
+  /// the camera.
+  var switchPhrases: [String] {
+    let names: [String] =
+      switch self {
+      case .read: ["read text", "reader", "the reader", "reading", "the text reader"]
+      case .mail: ["mail reader", "the mail reader", "mail", "my mail", "the mail"]
+      case .labels: ["labels", "the labels", "labels and barcodes", "barcodes", "the barcode scanner"]
+      case .watch: ["watch for text", "watch"]
+      case .ask: ["ask", "ask about the text"]
+      case .light: ["light and colour", "light and color", "light", "colour", "color"]
+      case .reminders: ["reminders", "my reminders", "the reminders", "medicine log", "the medicine log"]
+      }
+    return names.flatMap { ["switch to \($0)", "go to \($0)"] }
   }
 }
 

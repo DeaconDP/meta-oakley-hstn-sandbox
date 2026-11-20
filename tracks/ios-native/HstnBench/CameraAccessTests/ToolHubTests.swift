@@ -348,3 +348,183 @@ final class ToolsPublishTextTests: XCTestCase {
     }
   }
 }
+
+// MARK: - J2: "switch to <tool>" and import by voice
+
+@MainActor
+final class SwitchAndImportPhraseTests: XCTestCase {
+  private let camera = VoiceContext(screen: .camera)
+
+  private func parse(_ text: String, _ context: VoiceContext? = nil) -> VoiceParseResult {
+    VoiceCommandParser.parse(text, context: context ?? camera)
+  }
+
+  func testSwitchToOpensEachTool() {
+    let expected: [(String, VoiceCommand)] = [
+      ("switch to read text", .openReader), ("switch to the reader", .openReader), ("go to read text", .openReader),
+      ("switch to mail reader", .openMail), ("go to the mail reader", .openMail), ("switch to labels", .openLabels),
+      ("switch to watch for text", .openWatch), ("switch to ask", .openAsk), ("switch to light and colour", .openLight),
+      ("switch to light and color", .openLight), ("switch to reminders", .openReminders), ("go to labels", .openLabels),
+      ("can you switch to labels please", .openLabels), ("lets go to reminders", .openReminders),
+    ]
+    for (text, command) in expected {
+      XCTAssertEqual(parse(text), .command(command), text)
+    }
+  }
+
+  /// "switch to" is never a filler: it doesn't turn "read text" into reading, or take the camera.
+  func testSwitchToKeepsItsNeighbours() {
+    XCTAssertEqual(parse("switch to read text"), .command(.openReader), "opens Read text, doesn't read")
+    XCTAssertEqual(parse("read text"), .command(.read))
+    XCTAssertEqual(parse("switch to the phone"), .command(.usePhone))
+    XCTAssertEqual(parse("switch to the phone camera"), .command(.usePhone))
+    XCTAssertEqual(parse("switch to the glasses"), .command(.useGlasses))
+    XCTAssertEqual(parse("go to the main menu"), .command(.mainMenu))
+    XCTAssertEqual(parse("go back"), .command(.back))
+    XCTAssertEqual(parse("go to step 3"), .ignored(.unrecognized), "Read text's step phrase, not the app's")
+    XCTAssertEqual(parse("switch to"), .ignored(.unrecognized))
+    XCTAssertEqual(parse("switch to settings"), .ignored(.unrecognized))
+  }
+
+  func testImportPhrases() {
+    let expected: [(String, VoiceCommand)] = [
+      ("read a photo", .readPhoto), ("read a picture", .readPhoto), ("read a photo from my library", .readPhoto),
+      ("please read a screenshot", .readPhoto), ("read a file", .readFile), ("read a PDF", .readFile),
+      ("read a document", .readFile), ("import", .readPhotoOrFile), ("read a photo or PDF", .readPhotoOrFile),
+      ("read what I shared", .readShared),
+    ]
+    for (text, command) in expected {
+      XCTAssertEqual(parse(text), .command(command), text)
+    }
+  }
+
+  /// "read" stays reading, and the tools' own "read the ..." stay theirs.
+  func testImportDoesNotTakeOtherReads() {
+    XCTAssertEqual(parse("read"), .command(.read))
+    XCTAssertEqual(parse("read this"), .command(.read))
+    XCTAssertEqual(parse("read the text"), .command(.read))
+    XCTAssertEqual(parse("read the letter"), .command(.openMail))
+    XCTAssertEqual(parse("read a letter"), .command(.openMail))
+    XCTAssertEqual(parse("read the label"), .command(.openLabels))
+    XCTAssertEqual(parse("read my mail"), .command(.openMail))
+    for phrase in ["read a photo", "read a file", "read a pdf", "import"] {
+      XCTAssertNil(ReadTextPhrases.command(for: phrase), phrase)
+      XCTAssertNil(LabelsGrammar.parse(phrase), phrase)
+      XCTAssertNil(LetterGrammar.parse(phrase), phrase)
+      XCTAssertNil(ToolHub.globalLetterCommand(phrase), phrase)
+    }
+  }
+
+  func testImportOnlyFromTheMainScreen() {
+    XCTAssertEqual(parse("read a photo", VoiceContext(screen: .welcome)), .ignored(.unavailableHere))
+    XCTAssertEqual(parse("read a file", VoiceContext(screen: .home)), .ignored(.unavailableHere))
+    XCTAssertEqual(parse("reader, read a photo", VoiceContext(screen: .camera, isSpeaking: true)), .command(.readPhoto))
+    XCTAssertEqual(parse("read a photo", VoiceContext(screen: .camera, addressed: true)), .command(.readPhoto), "push to talk")
+  }
+
+  func testHelpOffersReadAPhotoOnce() {
+    let help = VoiceCommandParser.helpLine(context: camera)
+    XCTAssertTrue(help.contains("read a photo"), help)
+    XCTAssertFalse(help.contains("import"), help)
+    XCTAssertTrue(SpokenMessage.toolsList.contains("say read a photo, or read a file."))
+  }
+
+  func testEachImportCommandAsksForItsPicker() {
+    XCTAssertEqual(ImportPicker.request(for: .readPhoto), .photo)
+    XCTAssertEqual(ImportPicker.request(for: .readFile), .file)
+    XCTAssertEqual(ImportPicker.request(for: .readPhotoOrFile), .choice)
+    XCTAssertEqual(ImportPicker.request(for: .readShared), .choice)
+    XCTAssertNil(ImportPicker.request(for: .read))
+    for request in [ImportPicker.Request.photo, .file, .choice] {
+      let line = SpokenMessage.importOpening(request)
+      XCTAssertTrue(line.contains("VoiceOver or Voice Control"), line)
+      XCTAssertLessThanOrEqual(line.split(separator: " ").count, 25, line)
+    }
+  }
+
+  func testAPickerRequestIsTakenOnceAndExpires() {
+    var now = Date(timeIntervalSince1970: 1000)
+    let picker = ImportPicker(maxAge: 15) { now }
+    XCTAssertNil(picker.consume())
+    picker.request(.photo)
+    picker.request(.file)
+    XCTAssertEqual(picker.consume(), .file, "latest wins")
+    XCTAssertNil(picker.consume(), "once")
+    picker.request(.choice)
+    now += 16
+    XCTAssertNil(picker.consume(), "too old")
+    XCTAssertNil(picker.pending)
+  }
+}
+
+@MainActor
+final class SwitchAndImportRoutingTests: XCTestCase {
+  private var fakes: [ToolID: FakeTool] = [:]
+  private var hub: ToolHub!
+
+  override func setUp() async throws {
+    try await super.setUp()
+    fakes = [:]
+    for id in ToolID.allCases { fakes[id] = FakeTool(id) }
+    let fakes = fakes
+    hub = ToolHub(source: FakeToolCamera()) { fakes[$0]! }
+  }
+
+  override func tearDown() async throws {
+    hub.close(announce: false)
+    Announcer.shared.stop()
+    hub = nil
+    try await super.tearDown()
+  }
+
+  private func route(_ text: String) -> Bool {
+    guard case .command(let command) = VoiceCommandParser.parse(text, context: VoiceContext(screen: .camera)) else {
+      return hub.route(text, command: nil)
+    }
+    return hub.route(text, command: command)
+  }
+
+  /// "switch to ..." opens the tool with another tool open, even one that would take the words.
+  func testSwitchToOpensTheToolFromInsideAnother() {
+    hub.open(.mail)
+    fakes[.mail]?.takes = ["switch to labels", "switch to read text", "go to the mail reader"]
+    XCTAssertTrue(route("switch to labels"))
+    XCTAssertEqual(hub.openTool, .labels)
+    XCTAssertTrue(route("switch to read text"))
+    XCTAssertEqual(hub.openTool, .read)
+    XCTAssertTrue(route("go to the mail reader"))
+    XCTAssertEqual(hub.openTool, .mail)
+    XCTAssertEqual(fakes[.mail]?.heard, [], "the mail reader never saw them")
+  }
+
+  /// The import phrases go to the screen (which closes the tool), never to the open tool.
+  func testImportGoesToTheScreenWithAToolOpen() {
+    for tool in ToolID.allCases {
+      hub.open(tool)
+      fakes[tool]?.takes = ["read a photo", "read a file", "import", "read what i shared"]
+      for phrase in ["read a photo", "read a file", "import", "read what I shared"] {
+        XCTAssertFalse(route(phrase), "\(phrase) in \(tool)")
+      }
+      XCTAssertEqual(fakes[tool]?.heard, [], "\(tool) heard an import phrase")
+      XCTAssertEqual(hub.openTool, tool, "the screen closes it, not the hub")
+    }
+  }
+
+  func testImportFromTheHomeGoesToTheScreen() {
+    XCTAssertNil(hub.openTool)
+    XCTAssertFalse(route("read a photo"))
+    XCTAssertNil(hub.openTool)
+  }
+}
+
+/// Review fix: "switch to colour" must open colour mode, not the light tone.
+@MainActor
+final class SwitchToColourTests: XCTestCase {
+  func testSwitchToColourOpensColourMode() {
+    for phrase in ["switch to colour", "switch to color", "go to colour", "go to color"] {
+      XCTAssertEqual(LightTool.mode(forOpeningPhrase: phrase), .colour, phrase)
+    }
+    XCTAssertEqual(LightTool.mode(forOpeningPhrase: "switch to light"), .probe)
+    XCTAssertEqual(LightTool.mode(forOpeningPhrase: "switch to light and colour"), .probe)
+  }
+}

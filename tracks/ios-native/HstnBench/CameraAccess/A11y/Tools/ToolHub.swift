@@ -60,6 +60,8 @@ final class ToolHub: VoiceToolRouting {
     .stop, .close, .mainMenu, .help, .whereAmI, .listTools, .closeApp, .faster, .slower, .openSettings,
     .shortAnswers, .normalAnswers, .detailedAnswers, .glassesDisplayOn, .glassesDisplayOff, .handsFreeOn, .handsFreeOff,
     .usePhone, .useGlasses, .whichCamera, .torchOn, .torchOff, .status, .connect, .disconnect,
+    // "Read a photo", "read a file": the screen closes the tool and opens the picker (ImportPicker).
+    .readPhoto, .readFile, .readPhotoOrFile, .readShared,
   ]
 
   init(

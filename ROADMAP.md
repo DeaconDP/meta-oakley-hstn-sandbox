@@ -110,7 +110,7 @@ Plan: notes/value-strategy.md > 6.
 A blind user can run SpeakUp on iPhone by voice alone, from launch to the end of the session. Where iOS forces a tap (system permission alerts, pickers), the app says so and names the voice way round it. Full plan: notes/voice-journey-ios.md.
 
 - **J1 End the session by voice:** "goodbye", "end session", "close the app" say goodbye, then stop the mic, the glasses session and audio, and leave the app idle; "close" always goes up one level, as on Android. A short "listening" line on return. iOS has no way for an app to quit itself, so the user leaves with the lock button or Siri. **Built 2026-11-20** on the Simulator; not yet on a real iPhone.
-- **J2 Grammar gaps:** "switch to \<tool>", and "read a photo" / "read a file" to open Import.
+- **J2 Grammar gaps:** "switch to \<tool>", and "read a photo" / "read a file" to open Import. **Built 2026-11-20** on the Simulator; not yet on a real iPhone.
 - **J3 First run for everyone:** spoken welcome and a big "Use my voice" button without VoiceOver; a spoken pre-prompt before every system alert, naming Voice Control's "Tap Allow".
 - **J4 No touch-only dead ends:** Import by voice, error alerts always spoken, spoken handoff to and from Meta AI.
 - **J5 Every setting by voice, with undo:** voice choice, sounds, tips, "undo", "what's my setup". The iOS slice of C0 and C1.

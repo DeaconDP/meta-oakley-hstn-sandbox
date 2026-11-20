@@ -120,6 +120,38 @@ final class ToolsHomeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["tools_home_title"].waitForExistence(timeout: 10))
   }
 
+  /// J2: "switch to <tool>" moves between tools; "import" from inside a tool goes back to the
+  /// tools home and offers the two pickers; "read a photo" opens the Photos picker.
+  func testSwitchToAndImportByVoice() {
+    launch(["--voice-inject"])
+    let field = app.textFields["voice_test_transcript"]
+    XCTAssertTrue(field.waitForExistence(timeout: 10))
+    func say(_ text: String) {
+      field.tap()
+      field.typeText(text + "\n")
+    }
+    say("reader, switch to labels")
+    let labels = NSPredicate(format: "label == %@", "Labels and barcodes")
+    wait(for: [expectation(for: labels, evaluatedWith: app.staticTexts["tool_title"])], timeout: 10)
+    say("reader, switch to read text")
+    let readText = NSPredicate(format: "label == %@", "Read text")
+    wait(for: [expectation(for: readText, evaluatedWith: app.staticTexts["tool_title"])], timeout: 10)
+    say("reader, import")
+    XCTAssertTrue(app.staticTexts["tools_home_title"].waitForExistence(timeout: 10), "the tool closes for the import")
+    XCTAssertTrue(app.buttons["Choose a photo"].waitForExistence(timeout: 20), "the choice opens after the spoken line")
+    XCTAssertTrue(app.buttons["Choose a file"].exists)
+    let cancel = app.buttons["Cancel"]
+    if cancel.exists { cancel.tap() } else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap() }
+    let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.buttons["Choose a photo"])
+    wait(for: [gone], timeout: 5)
+    say("reader, read a photo")
+    // The Photos picker runs out of process; its sheet still shows in the app's tree.
+    let picker = app.descendants(matching: .any).matching(
+      NSPredicate(format: "label IN %@ OR identifier IN %@", ["Photos", "Collections", "Albums", "Search"], ["PhotosPicker"]))
+      .firstMatch
+    XCTAssertTrue(picker.waitForExistence(timeout: 20), "the Photos picker should open: \(app.debugDescription)")
+  }
+
   /// "Remind me ..." from the tools home opens Reminders, confirms, and lists it; "undo" takes it off.
   /// UI tests use notifications that never ask (ReminderStore.live), so no permission prompt.
   func testReminderByVoiceFromTheHome() {

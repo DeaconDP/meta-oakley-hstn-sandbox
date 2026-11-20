@@ -91,7 +91,10 @@ final class LightTool: SpeakUpTool {
 
   /// "what colour is this" (or "colour mode") opens colour mode; anything else, the tool's name included, the probe.
   static func mode(forOpeningPhrase phrase: String) -> Mode {
-    LightGrammar.parse(phrase) == .colour ? .colour : .probe
+    // "switch to colour" (ToolID.switchPhrases): LightGrammar wants "colour mode" for the bare word.
+    let words = phrase.lowercased().split(whereSeparator: { !$0.isLetter }).joined(separator: " ")
+    if ["switch to colour", "switch to color", "go to colour", "go to color"].contains(words) { return .colour }
+    return LightGrammar.parse(phrase) == .colour ? .colour : .probe
   }
 
   // MARK: SpeakUpTool

@@ -383,6 +383,8 @@ struct CameraView: View {
       // Usually ToolHub opened it already with the words said; this is a glasses display button.
       setSettingsMenu(open: false)
       if let tool = command.tool { hub.open(tool) }
+    case .readPhoto, .readFile, .readPhotoOrFile, .readShared:
+      openImportByVoice(command)
     case .tryAgain:
       if let action = viewModel.errorAction {
         viewModel.errorAction = nil
@@ -416,6 +418,35 @@ struct CameraView: View {
     default: return false
     }
     return true
+  }
+
+  /// "Read a photo", "read a file", "import", "read what I shared": back to the tools home, where
+  /// the import button is, say what comes next, then open its picker or dialog (ImportPicker).
+  /// The picker opens once the line has finished, so VoiceOver moving into it doesn't cut it off,
+  /// and also when the line is cut off, so a stop doesn't leave a dead end.
+  private func openImportByVoice(_ command: VoiceCommand) {
+    if command == .readShared, ImportedReading.hasPending {
+      setSettingsMenu(open: false)
+      runLaunchAction(.readImported)
+      return
+    }
+    guard let request = ImportPicker.request(for: command) else { return }
+    // With an update pending the screen has no import button; say why nothing can open.
+    if isUpdateRequired, !usingPhone {
+      speakStatus()
+      return
+    }
+    setSettingsMenu(open: false)
+    if TextReader.shared.isActive { TextReader.shared.stop() }
+    hub.close(announce: false)
+    var line = SpokenMessage.importOpening(request)
+    if command == .readShared { line = SpokenMessage.importNothingShared + " " + line }
+    // Also when the line was cut off ("stop"), so the user isn't left with nothing; but not if a
+    // tool opened or the session ended meanwhile, or the picker would turn up later, unasked.
+    Announcer.shared.say(line, kind: .status) { [hub] _ in
+      guard hub.openTool == nil, !VoiceControl.shared.isSessionEnded else { return }
+      ImportPicker.shared.request(request)
+    }
   }
 
   private func closeSettings() {

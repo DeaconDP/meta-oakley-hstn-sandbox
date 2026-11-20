@@ -71,6 +71,15 @@ enum VoiceCommand: String, CaseIterable, Sendable {
   case openAsk
   case openLight
   case openReminders
+  // Import (ImportButton, ImportPicker): a photo or PDF already on the phone, read in Read text.
+  /// "Read a photo": the Photos picker.
+  case readPhoto
+  /// "Read a file", "read a PDF": the Files picker.
+  case readFile
+  /// "Import": the choice between the two.
+  case readPhotoOrFile
+  /// "Read what I shared": what the share sheet left, else the choice.
+  case readShared
 
   /// The word or phrase help offers for it, and the name the UI shows as the last command.
   var phrase: String {
@@ -114,6 +123,10 @@ enum VoiceCommand: String, CaseIterable, Sendable {
     case .openAsk: "open ask"
     case .openLight: "light and colour"
     case .openReminders: "open reminders"
+    case .readPhoto: "read a photo"
+    case .readFile: "read a file"
+    case .readPhotoOrFile: "import"
+    case .readShared: "read what I shared"
     }
   }
 
@@ -146,6 +159,9 @@ enum VoiceCommand: String, CaseIterable, Sendable {
 
   /// The commands that open a tool by name.
   static let openTools: [VoiceCommand] = ToolID.allCases.map(open)
+
+  /// The commands that open the photo or file pickers (ImportPicker), main screen only.
+  static let importCommands: [VoiceCommand] = [.readPhoto, .readFile, .readPhotoOrFile, .readShared]
 }
 
 /// Which screen commands apply to.
@@ -231,6 +247,24 @@ enum VoiceCommandParser {
     .openReminders: ToolID.reminders.openPhrases + [
       "open the reminders", "open my reminders", "open medicine log", "open the medicine log", "my medicine log",
     ],
+    // "read a ..." with a photo or file: never bare "read" (.read), Read text's own phrases, or the
+    // mail reader's "read a letter" / Labels' "read the label".
+    .readPhoto: [
+      "read a photo", "read a picture", "read an image", "read a screenshot", "read a photo from my library",
+      "read a picture from my library", "read a photo from my photos", "read a photo from my phone", "read a picture from my phone",
+      "read from my photos", "read from photos", "choose a photo", "pick a photo", "open my photos", "open photos",
+      "import a photo", "import a picture", "import a screenshot",
+    ],
+    .readFile: [
+      "read a file", "read a pdf", "read a document", "read a pdf file", "read a file from my phone", "read from my files",
+      "read from files", "choose a file", "pick a file", "open a file", "open a pdf", "open my files", "open files",
+      "import a file", "import a pdf", "import a document",
+    ],
+    .readPhotoOrFile: [
+      "import", "read a photo or pdf", "read a photo or a pdf", "read a photo or file", "read a photo or a file",
+      "read a picture or a pdf", "import something", "import a photo or pdf", "import a photo or a pdf",
+    ],
+    .readShared: ["read what i shared", "read what i shared with you", "read what i sent", "read the shared file", "read my shared file"],
     .openSettings: ["settings", "open settings", "open the settings", "show settings"],
     .close: ["close", "close this", "close settings", "close the settings", "done"],
     .whereAmI: ["where am i", "what screen is this", "what screen am i on", "where are we"],
@@ -392,7 +426,7 @@ enum VoiceCommandParser {
       let reading: [VoiceCommand] = context.hasReadSentences ? [.continueOn] : []
       let camera: [VoiceCommand] = [.whichCamera, .usePhone, .useGlasses, .torchOn, .torchOff]
       return [.read, .status, .tryAgain, .openReader, .openSettings, .back, .close, .connect, .disconnect] + camera + reading + answers
-        + VoiceCommand.openTools
+        + VoiceCommand.openTools + VoiceCommand.importCommands
     }
   }
 
@@ -428,6 +462,7 @@ enum VoiceCommandParser {
   static func helpLine(context: VoiceContext) -> String {
     let quiet: Set<VoiceCommand> = [
       .back, .close, .yes, .no, .continueOn, .tryAgain, .disconnect, .openReader, .useGlasses, .torchOff,
+      .readFile, .readPhotoOrFile, .readShared,
     ]
     let glassesOnly: Set<VoiceCommand> = [.connect, .useGlasses, .disconnect, .glassesDisplayOn, .glassesDisplayOff]
     var here = screenCommands(context: context)

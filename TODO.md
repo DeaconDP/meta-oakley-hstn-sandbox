@@ -70,7 +70,7 @@
 ## Voice from start to finish (notes/voice-journey-ios.md)
 - [x] J1 iOS: end the session by voice ("goodbye", "end session", "close the app"): mic off first, goodbye, tool, reader, camera and ticks off, glasses session ended after the goodbye; Start again button, mic button or coming back starts again with a spoken line (2026-11-20, notes/voice-journey-ios.md > J1; unit tests 533 run, 2 failed and both fixed or rerun green; not tried on a real iPhone)
 - [ ] J1 follow-up: Android's "close in the menu ends the session" rule on iOS, or decide against it; real-iPhone and glasses check of the goodbye
-- [ ] J2 iOS: "switch to <tool>" phrases; "read a photo" / "read a file" open Import
+- [x] J2 iOS: "switch to <tool>" phrases; "read a photo" / "read a file" open Import (2026-11-20, notes/voice-journey-ios.md > J2; "switch to" / "go to" for every tool, "read a photo", "read a file", "import", "read what I shared" with a spoken line before the picker; unit tests 743 run, 0 failed; UI 13 run, 0 failed; store build OK; not tried on a real iPhone)
 - [ ] J3 iOS: check notes/a11y-onboarding.md:72 against the code; spoken welcome and "Use my voice" button without VoiceOver; spoken pre-prompt before mic, speech and camera alerts; camera asked at setup when "phone" is chosen
 - [ ] J4 iOS: Import by voice; spoken "tap the mic to answer" in toolbox mode; error alerts always spoken; spoken Meta AI handoff and return; find out about "read my latest photo" with PhotoKit
 - [ ] J5 iOS: natural voice, VoiceOver voice, sounds and tips by voice; "undo" / "put it back"; "what's my setup" (with C0/C1)

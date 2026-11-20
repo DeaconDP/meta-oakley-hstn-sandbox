@@ -88,7 +88,56 @@ Match Android's rule (notes/tools-layer.md:144-150): "close" always goes up one 
 - On return to the foreground, clear the flag and say a short "SpeakUp is listening. Say help any time." with the listening earcon.
 - Tests: `VoiceTests.testListToolsAndCloseTheApp` (:930) changes. Add parser cases in `VoiceCommandParserTests` and a lifecycle test (goodbye finishes before the mic stops, nothing heard after).
 
-### J2 Grammar gaps (S)
+### J2 Grammar gaps (S) — built 2026-11-20
+
+**What was built:**
+- **"switch to \<tool>" and "go to \<tool>":** whole phrases from `ToolID.switchPhrases`, added to `openPhrases` (`SpeakUpTool.swift`). Each tool has a few names: "switch to read text" / "the reader", "mail reader" / "my mail", "labels" / "barcodes", "watch for text", "ask", "light and colour" / "color" / "light", "reminders" / "medicine log". "switch to" is not a filler word. So "switch to read text" opens Read text (`.openReader`) and doesn't read, "switch to the phone" and "switch to the glasses" still change the camera, and "go to step 3" is still Read text's. ToolHub's step 3 opens the named tool even when another tool is open, before that tool hears the words.
+- **Import by voice:** four new commands, main screen only (`VoiceCommand.importCommands`):
+  - `.readPhoto`: "read a photo", "read a picture", "read a screenshot", "read a photo from my library", "choose a photo", "open my photos"...
+  - `.readFile`: "read a file", "read a PDF", "read a document", "choose a file", "open my files"...
+  - `.readPhotoOrFile`: "import", "read a photo or PDF".
+  - `.readShared`: "read what I shared". It reads what the share sheet left; if nothing is waiting, it says "Nothing shared is waiting." and offers the choice.
+- **Routing:** they are in `ToolHub.alwaysGlobal`, so an open tool never hears them. `CameraView.openImportByVoice`:
+  1. closes settings, the reader and the open tool, quietly;
+  2. says one line (`SpokenMessage.importOpening`), e.g. "Opening your photos. Pick one and I'll read it. The picker works with VoiceOver or Voice Control.";
+  3. once the line has finished or been cut off, parks a request in `ImportPicker` (new, `A11y/Import/ImportPicker.swift`).
+  `ImportButton` watches `ImportPicker.pending` with `initial: true`, because the button only appears once the tool has closed. It opens the Photos picker, the Files picker or the "Choose a photo / Choose a file" dialog. Saying "read a photo" while the dialog is up closes it first. A request expires after 15 s. While a glasses update is needed (no import button on screen), it says the status instead. The pickers themselves stay the system's.
+- **Help:** the camera help offers "read a photo". "list tools" ends with "To hear a photo or PDF from your phone, say read a photo, or read a file."
+- Hands-free and the toolbox use the same grammar. With push to talk, the press counts as the wake word.
+
+**Not done:** "read my latest photo" / "read my last screenshot" with PhotoKit. That needs photo library access and its own pre-prompt (J4).
+
+**Tests** (Mac, Xcode 27.2, iOS 27.0 Simulator "SpeakUp J1 iPhone 17", `-parallel-testing-enabled NO`):
+- Unit tests, skipping the display mock test: 743 run, 0 failed. The count includes other branch work in the tree.
+- UI tests `ToolsHomeUITests` and `VoiceControlUITests`: 13 run, 0 failed.
+- The SpeakUp (store) scheme builds.
+
+New tests, in `ToolHubTests.swift`:
+- `SwitchAndImportPhraseTests` (8):
+  - "switch to" / "go to" for every tool;
+  - the neighbours: read text, the phone, the glasses, main menu, step 3;
+  - the import phrases, and that they don't take "read", "read the letter" or "read the label";
+  - main screen only;
+  - help;
+  - the spoken lines;
+  - `ImportPicker` expiry.
+- `SwitchAndImportRoutingTests` (3): "switch to" from inside another tool, and import phrases never reaching an open tool.
+- UI `testSwitchToAndImportByVoice`: "switch to labels", then "switch to read text", then "import" (the tool closes and the choice appears), then "read a photo" (the Photos picker opens).
+- `testEveryOpenPhraseOpensItsTool` covers all the new open phrases.
+
+**Fixes after an independent review:**
+- "switch to colour" opened the light tone instead of colour mode, because `LightGrammar` wants "colour mode" for the bare word. `LightTool.mode(forOpeningPhrase:)` now accepts it. Test: `SwitchToColourTests`.
+- A cut-off "Opening your photos" line still parked a picker request. If a tool opened in between, the picker appeared unasked once that tool closed. The request is now parked only if no tool is open and the session hasn't ended.
+
+Rerun after the fixes: unit tests 744 run, 0 failed; the same UI tests 13 run, 0 failed; the store scheme builds.
+
+**Known, left as is:**
+- With Watch open and asking what to look for, "switch to watch" becomes the word to watch for. "open watch" already did this.
+- Bare "import" can no longer be a Watch target.
+
+**Not tried on a real iPhone:** whether VoiceOver moving into the picker cuts off the spoken line, and Voice Control in the Photos and Files pickers.
+
+**Plan as written:**
 - "switch to \<tool>" as explicit phrases in `ToolID.openPhrases` (`SpeakUpTool.swift:66-74`), not a filler word, so "switch to read text" doesn't start reading and "switch to the phone" still changes camera. `ToolHubTests.testEveryOpenPhraseOpensItsTool` covers it.
 - "read a photo", "read a file", "read what I shared" to open Import (J4).
 
