@@ -70,6 +70,7 @@ enum VoiceCommand: String, CaseIterable, Sendable {
   case openWatch
   case openAsk
   case openLight
+  case openReminders
 
   /// The word or phrase help offers for it, and the name the UI shows as the last command.
   var phrase: String {
@@ -112,6 +113,7 @@ enum VoiceCommand: String, CaseIterable, Sendable {
     case .openWatch: "watch for text"
     case .openAsk: "open ask"
     case .openLight: "light and colour"
+    case .openReminders: "open reminders"
     }
   }
 
@@ -124,6 +126,7 @@ enum VoiceCommand: String, CaseIterable, Sendable {
     case .openWatch: .watch
     case .openAsk: .ask
     case .openLight: .light
+    case .openReminders: .reminders
     default: nil
     }
   }
@@ -137,6 +140,7 @@ enum VoiceCommand: String, CaseIterable, Sendable {
     case .watch: .openWatch
     case .ask: .openAsk
     case .light: .openLight
+    case .reminders: .openReminders
     }
   }
 
@@ -223,6 +227,9 @@ enum VoiceCommandParser {
     .openLight: ToolID.light.openPhrases + [
       "open light", "open light and color", "light and color", "what color is this", "open colour", "open color",
       "is the light on or off", "is there a light on",
+    ],
+    .openReminders: ToolID.reminders.openPhrases + [
+      "open the reminders", "open my reminders", "open medicine log", "open the medicine log", "my medicine log",
     ],
     .openSettings: ["settings", "open settings", "open the settings", "show settings"],
     .close: ["close", "close this", "close settings", "close the settings", "done"],
@@ -384,9 +391,9 @@ enum VoiceCommandParser {
     }
   }
 
-  /// "read text, mail reader, labels, watch for text, ask, or light and colour".
+  /// "read text, mail reader, labels, watch for text, ask, light and colour, or reminders".
   static let toolNames: String = {
-    let names = ["read text", "mail reader", "labels", "watch for text", "ask", "light and colour"]
+    let names = ["read text", "mail reader", "labels", "watch for text", "ask", "light and colour", "reminders"]
     return names.dropLast().joined(separator: ", ") + ", or " + names.last!
   }()
 

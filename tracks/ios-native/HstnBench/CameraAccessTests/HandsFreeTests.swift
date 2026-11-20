@@ -107,7 +107,7 @@ final class HandsFreeModeRuleTests: XCTestCase {
   func testToolsMatchTheirCommands() {
     XCTAssertEqual(
       HandsFreeTool.allCases.map(\.command),
-      [.read, .openMail, .openLabels, .openWatch, .openAsk, .openLight, .status, .openSettings])
+      [.read, .openMail, .openLabels, .openWatch, .openAsk, .openLight, .openReminders, .status, .openSettings])
   }
 }
 

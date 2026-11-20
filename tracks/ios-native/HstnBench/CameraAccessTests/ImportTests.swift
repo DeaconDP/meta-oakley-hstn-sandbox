@@ -481,11 +481,13 @@ final class OpenToolIntentTests: XCTestCase {
     XCTAssertEqual(OpenLightIntent.tool, .light)
     XCTAssertEqual(OpenWatchIntent.tool, .watch)
     XCTAssertEqual(OpenAskIntent.tool, .ask)
+    XCTAssertEqual(OpenRemindersIntent.tool, .reminders)
     XCTAssertEqual(LaunchAction.open(OpenMailIntent.tool), .openMail)
     XCTAssertEqual(LaunchAction.open(OpenLabelsIntent.tool), .openLabels)
     XCTAssertEqual(LaunchAction.open(OpenLightIntent.tool), .openLight)
     XCTAssertEqual(LaunchAction.open(OpenWatchIntent.tool), .openWatch)
     XCTAssertEqual(LaunchAction.open(OpenAskIntent.tool), .openAsk)
+    XCTAssertEqual(LaunchAction.open(OpenRemindersIntent.tool), .openReminders)
   }
 
   func testOpenToolIntentCarriesItsParameter() {
@@ -499,6 +501,7 @@ final class OpenToolIntentTests: XCTestCase {
     XCTAssertTrue(OpenLightIntent.openAppWhenRun)
     XCTAssertTrue(OpenWatchIntent.openAppWhenRun)
     XCTAssertTrue(OpenAskIntent.openAppWhenRun)
+    XCTAssertTrue(OpenRemindersIntent.openAppWhenRun)
     XCTAssertTrue(ReadImportedIntent.openAppWhenRun)
   }
 

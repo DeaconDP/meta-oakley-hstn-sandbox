@@ -27,6 +27,7 @@ enum LaunchAction: String, Sendable, CaseIterable {
   case openWatch
   case openAsk
   case openLight
+  case openReminders
   /// Read pages that came in from outside (share sheet, Photos, Files): ImportedReading.
   case readImported
 
@@ -38,6 +39,7 @@ enum LaunchAction: String, Sendable, CaseIterable {
     case .openWatch: .watch
     case .openAsk: .ask
     case .openLight: .light
+    case .openReminders: .reminders
     case .read, .status, .repeatLast, .readImported: nil
     }
   }
@@ -51,6 +53,7 @@ enum LaunchAction: String, Sendable, CaseIterable {
     case .watch: .openWatch
     case .ask: .openAsk
     case .light: .openLight
+    case .reminders: .openReminders
     }
   }
 }

@@ -210,7 +210,7 @@ final class ToolPhraseTests: XCTestCase {
   func testOpenAndANameOpensEachTool() {
     let expected: [(String, VoiceCommand)] = [
       ("open read text", .openReader), ("open mail reader", .openMail), ("open labels", .openLabels),
-      ("open watch for text", .openWatch), ("open ask", .openAsk), ("open light and colour", .openLight),
+      ("open watch for text", .openWatch), ("open ask", .openAsk), ("open light and colour", .openLight), ("open reminders", .openReminders),
       ("please open the mail reader", .openMail), ("what color is this", .openLight), ("scan a barcode", .openLabels),
     ]
     for (text, command) in expected {
@@ -237,22 +237,22 @@ final class ToolPhraseTests: XCTestCase {
   func testHelpNamesTheTools() {
     let help = VoiceCommandParser.helpLine(context: camera)
     XCTAssertTrue(help.hasPrefix("You can say these. Here: read"), help)
-    XCTAssertTrue(help.contains("Tools: say open, then read text, mail reader, labels, watch for text, ask, or light and colour."), help)
+    XCTAssertTrue(help.contains("Tools: say open, then read text, mail reader, labels, watch for text, ask, light and colour, or reminders."), help)
     XCTAssertFalse(help.contains("open mail reader,"), "the tools are one group, not six phrases in Here")
     XCTAssertFalse(VoiceCommandParser.helpLine(context: VoiceContext(screen: .home)).contains("Tools:"))
   }
 
-  func testListToolsNamesAllSix() {
+  func testListToolsNamesAllSeven() {
     for tool in ToolID.allCases {
       XCTAssertTrue(SpokenMessage.toolsList.contains(tool.title), tool.title)
     }
-    XCTAssertTrue(SpokenMessage.toolsList.hasPrefix("SpeakUp has six tools."))
+    XCTAssertTrue(SpokenMessage.toolsList.hasPrefix("SpeakUp has seven tools."))
   }
 
   func testHandsFreeListsTheToolsWithTheirCommands() {
     XCTAssertEqual(
       HandsFreeTool.allCases.map(\.command),
-      [.read, .openMail, .openLabels, .openWatch, .openAsk, .openLight, .status, .openSettings])
+      [.read, .openMail, .openLabels, .openWatch, .openAsk, .openLight, .openReminders, .status, .openSettings])
     for tool in ToolID.allCases {
       XCTAssertEqual(HandsFreeTool(tool).tool, tool)
     }

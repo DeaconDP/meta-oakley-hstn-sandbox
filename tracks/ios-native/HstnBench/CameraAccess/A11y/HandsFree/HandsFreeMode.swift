@@ -26,7 +26,7 @@ enum HandsFreeMode {
   }
 }
 
-/// What the toolbox lists and "list tools" names: the six tools (ToolID), then status and
+/// What the toolbox lists and "list tools" names: the seven tools (ToolID), then status and
 /// settings, so a new user can find them.
 enum HandsFreeTool: String, CaseIterable, Identifiable, Sendable {
   case reader
@@ -35,6 +35,7 @@ enum HandsFreeTool: String, CaseIterable, Identifiable, Sendable {
   case watch
   case ask
   case light
+  case reminders
   case status
   case settings
 
@@ -49,6 +50,7 @@ enum HandsFreeTool: String, CaseIterable, Identifiable, Sendable {
     case .watch: .watch
     case .ask: .ask
     case .light: .light
+    case .reminders: .reminders
     case .status, .settings: nil
     }
   }
@@ -61,6 +63,7 @@ enum HandsFreeTool: String, CaseIterable, Identifiable, Sendable {
     case .watch: self = .watch
     case .ask: self = .ask
     case .light: self = .light
+    case .reminders: self = .reminders
     }
   }
 

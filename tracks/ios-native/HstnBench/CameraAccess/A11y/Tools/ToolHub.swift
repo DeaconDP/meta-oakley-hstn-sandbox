@@ -1,5 +1,5 @@
 /*
- * ToolHub - the six everyday tools behind the tools home: one instance of each, which one is open,
+ * ToolHub - the seven everyday tools behind the tools home: one instance of each, which one is open,
  * and where a transcript goes while it is open (notes/tools-home-ios.md)
  *
  * Opening a tool stops the one before it (its camera work and speech), then starts the new one
@@ -62,6 +62,7 @@ final class ToolHub: VoiceToolRouting {
     case .watch: WatchTool()
     case .ask: AskTool()
     case .light: LightTool()
+    case .reminders: RemindersTool()
     }
   }
 
@@ -87,6 +88,7 @@ final class ToolHub: VoiceToolRouting {
       light.openingMode = phrase.map(LightTool.mode(forOpeningPhrase:)) ?? .probe
     }
     BenchClock.shared.note("tool open=\(id.rawValue)")
+    ActivityLog.shared.note("Opened \(id.title)", tool: id)
     openTool = id
     tool(id).start(source: source)
   }
@@ -115,6 +117,7 @@ final class ToolHub: VoiceToolRouting {
     tool(openTool).stop()
     self.openTool = nil
     BenchClock.shared.note("tool close=\(openTool.rawValue)")
+    ActivityLog.shared.note("Closed \(openTool.title)", tool: openTool)
     if announce { announcer.announce(SpokenMessage.toolClosed(openTool), earcon: .ready, kind: .status) }
   }
 
@@ -126,6 +129,8 @@ final class ToolHub: VoiceToolRouting {
   // MARK: Voice
 
   func route(_ text: String, command: VoiceCommand?) -> Bool {
+    // A reminder just went off: "done" and "snooze" answer it, wherever the user is.
+    if ReminderAlerts.shared.takesReply(text) { return true }
     if let command {
       // Another tool by name, or an always-on command: the app's. Saying the open tool's own name
       // phrase ("read the label", "what colour is this") is left to that tool first.
@@ -139,6 +144,13 @@ final class ToolHub: VoiceToolRouting {
     if let current, current.handle(transcript: text) { return true }
     if let request = WatchGrammar.opens(text) {
       openWatch(for: request.target)
+      return true
+    }
+    // "Remind me at 6 to ...", "what's due this week", "I took my evening pill", "what was I
+    // doing?" from anywhere (A11y/Reminders).
+    if ReminderGrammar.worksFromAnywhere(text), let reminders = tool(.reminders) as? RemindersTool,
+      reminders.handleFromAnywhere(text, hub: self)
+    {
       return true
     }
     if command == nil, openTool == .read, AskGrammar.isQuestion(text), let ask = tool(.ask) as? AskTool {
