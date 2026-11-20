@@ -19,9 +19,14 @@ enum LetterSpeech {
     "I can see two different amounts to pay, so I can't say which is right. Hold the letter a little closer, then say how much."
   static let notSureFigure = "an amount I can't read for sure"
   static let scamAdvice = "Check with someone you trust before you pay or reply."
+  /// Never "it's genuine" or "it's safe": the rules can only find signs, not rule them out.
+  static let noScamSigns =
+    "No scam signs found. That doesn't prove a letter is safe, so if you're unsure, check with someone you trust."
 
-  static func kindPhrase(_ letter: Letter) -> String {
-    switch letter.kind {
+  static func kindPhrase(_ letter: Letter) -> String { kindPhrase(kind: letter.kind) }
+
+  static func kindPhrase(kind: LetterKind) -> String {
+    switch kind {
     case .bill: "a bill"
     case .bank: "a letter from a bank"
     case .official: "an official letter"
@@ -160,7 +165,7 @@ enum LetterSpeech {
   static func scam(_ letter: Letter) -> String {
     if letter.isEnvelope { return "I can only see the envelope. Open it and say read, then ask again." }
     guard !letter.scamSigns.isEmpty else {
-      return "I found no scam signs, but I can't tell if a letter is genuine. If you're unsure, check with someone you trust."
+      return noScamSigns
     }
     let signs = letter.scamSigns.map(\.spoken)
     let list = signs.count == 1 ? signs[0] : signs.dropLast().joined(separator: ", ") + ", and " + signs[signs.count - 1]

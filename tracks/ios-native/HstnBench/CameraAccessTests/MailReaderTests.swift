@@ -599,7 +599,7 @@ final class MailReaderTests: XCTestCase {
     XCTAssertTrue(summary.contains("It has signs of a scam"), summary)
     XCTAssertTrue(summary.contains("Check with someone you trust"), summary)
     let answer = LetterSpeech.scam(l)
-    XCTAssertTrue(answer.hasPrefix("It has signs of a scam: it asks for payment by gift card"), answer)
+    XCTAssertTrue(answer.hasPrefix("It has signs of a scam: it asks for payment in an unusual way, like gift cards"), answer)
     XCTAssertTrue(answer.hasSuffix(LetterSpeech.scamAdvice), answer)
   }
 
@@ -608,7 +608,8 @@ final class MailReaderTests: XCTestCase {
       let l = read(scan)
       XCTAssertEqual(l.scamSigns, [])
       let answer = LetterSpeech.scam(l)
-      XCTAssertTrue(answer.hasPrefix("I found no scam signs, but I can't tell if a letter is genuine."), answer)
+      XCTAssertTrue(answer.hasPrefix("No scam signs found."), answer)
+      XCTAssertFalse(answer.lowercased().contains("genuine"), answer)
       for line in [answer, LetterSpeech.summary(l), LetterSpeech.isJunk(l), LetterSpeech.kind(l)] {
         XCTAssertFalse(line.lowercased().contains("it's genuine") || line.lowercased().contains("it is genuine"), line)
       }
@@ -745,10 +746,13 @@ final class MailToolTests: XCTestCase {
   private func tool(photo: LetterScan, frame: LetterScan? = nil) -> MailTool {
     let photoPage = visionPage(photo)
     let framePage = frame.map { visionPage($0) }
-    return MailTool { image in
-      let page = image.size.width == 4 ? photoPage : (framePage ?? photoPage)
-      return RecognizedFrame(page: page, quality: .unknown, ocrMilliseconds: 1)
-    }
+    let store = LettersStore(
+      directory: FileManager.default.temporaryDirectory.appendingPathComponent("letters-\(UUID().uuidString)"), defaults: nil)
+    return MailTool(
+      recognize: { image in
+        let page = image.size.width == 4 ? photoPage : (framePage ?? photoPage)
+        return RecognizedFrame(page: page, quality: .unknown, ocrMilliseconds: 1)
+      }, letters: store, reminders: { NoReminders() }, online: { nil })
   }
 
   private func waitUntilLooked(_ tool: MailTool) async {

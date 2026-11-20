@@ -1,6 +1,6 @@
 # Mail reader (iOS, phone first)
 
-2026-11-20. A port of the Android mail reader (notes/mail-reader.md) to the iOS app. You hold up a letter or envelope and ask "what is this letter?". The app says who it's from, who it's for, what kind of letter it is, what it's about, any amount due and deadline, and any scam signs. "Read it all" then reads every word. It runs on the phone. It uses Apple Vision OCR and fixed rules, and makes no cloud calls on any path.
+2026-11-20. A port of the Android mail reader (notes/mail-reader.md) to the iOS app. You hold up a letter or envelope and ask "what is this letter?". The app says who it's from, who it's for, what kind of letter it is, what it's about, any amount due and deadline, and any scam signs. "Read it all" then reads every word. It runs on the phone. It uses Apple Vision OCR and fixed rules, and makes no cloud calls on any path. Update: reminders, the letters log and "explain this letter" were added later the same day (notes/letters-ios.md). The only cloud call is the AI explanation, and only when the user asks for it.
 
 Code is in `tracks/ios-native/HstnBench/CameraAccess/A11y/Tools/Mail/`. Tests are in `CameraAccessTests/MailReaderTests.swift`.
 

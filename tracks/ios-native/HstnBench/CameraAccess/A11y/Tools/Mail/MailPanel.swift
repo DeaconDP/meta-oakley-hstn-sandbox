@@ -10,6 +10,11 @@
  * figure either. Brand font at Dynamic Type sizes, theme colours (dark mode and Increase
  * Contrast follow), buttons at least 60 pt, stacked one per row at accessibility sizes.
  * Accessibility identifiers start with "mail_".
+ *
+ * "Deal with this letter": after a letter with a deadline, the reminder offer as buttons; Explain
+ * this letter / Explain with AI and the explanation (marked as AI when it is); My letters, which
+ * shows the letters log (LettersPanel) in place of the letter; and a letter opened from the log,
+ * with a way back to the one just read.
  */
 
 import SwiftUI
@@ -22,7 +27,7 @@ struct MailPanel: View {
 
   private var isLargeText: Bool { dynamicTypeSize.isAccessibilitySize }
   private var isLooking: Bool { tool.phase == .looking }
-  private var hasLetter: Bool { tool.letter != nil }
+  private var hasLetter: Bool { tool.letter != nil || tool.savedFocus != nil }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -55,7 +60,32 @@ struct MailPanel: View {
 
       controls
 
-      if let letter = tool.letter {
+      if tool.pendingQuestion == .reminder, !tool.reminderOffers.isEmpty {
+        reminderOffer
+      }
+
+      dealButtons
+
+      if let explanation = tool.explanation {
+        section(tool.explanationIsAI ? "AI explanation" : "Explanation", id: "mail_explanation") {
+          VStack(alignment: .leading, spacing: 6) {
+            Text(explanation)
+              .font(.rounded(.title3, weight: .bold))
+              .foregroundStyle(Theme.ink)
+              .fixedSize(horizontal: false, vertical: true)
+            Text(tool.explanationIsAI ? "Written by AI from the letter's text. Check anything important." : "From rules on your phone.")
+              .font(.rounded(.body, weight: .regular))
+              .foregroundStyle(Theme.inkSoft)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+        }
+      }
+
+      if tool.showingLetters {
+        LettersPanel(tool: tool)
+      } else if let saved = tool.savedFocus {
+        savedLetter(saved)
+      } else if let letter = tool.letter {
         facts(letter)
         if let sentence = tool.currentSentence {
           section("Reading now", id: "mail_sentence") {
@@ -78,7 +108,8 @@ struct MailPanel: View {
   }
 
   private var statusText: String {
-    switch tool.phase {
+    if tool.isExplainingOnline { return "Asking online for an AI explanation…" }
+    return switch tool.phase {
     case .idle: "Mail reader. Hold up a letter."
     case .looking: "Looking at the letter…"
     case .ready: tool.letter?.isEnvelope == true ? "Envelope read" : "Letter read"
@@ -166,6 +197,109 @@ struct MailPanel: View {
     .disabled(!control.enabled)
     .accessibilityLabel(control.title)
     .accessibilityIdentifier(control.id)
+  }
+
+  // MARK: Deal with this letter
+
+  private var reminderOffer: some View {
+    section("Reminder", id: "mail_reminder_offer") {
+      VStack(alignment: .leading, spacing: 10) {
+        Text(tool.activeRecord?.deadlineKind == .appointment ? "Do you want a reminder before the appointment?" : "Do you want a reminder before the deadline?")
+          .font(.rounded(.title3, weight: .heavy))
+          .foregroundStyle(Theme.ink)
+          .fixedSize(horizontal: false, vertical: true)
+        ForEach(Array(tool.reminderOffers.enumerated()), id: \.offset) { _, choice in
+          let title = LetterReminderPlanner.phrase(choice).capitalisedFirst
+          Button {
+            tool.remind(choice)
+          } label: {
+            Text(title).frame(maxWidth: .infinity, minHeight: 60)
+          }
+          .buttonStyle(ChunkyButtonStyle(tone: .neutral, lipHeight: 5))
+          .accessibilityLabel(title)
+          .accessibilityIdentifier("mail_remind_\(title.lowercased().replacingOccurrences(of: " ", with: "_"))")
+        }
+        Button {
+          tool.perform(letter: .no)
+        } label: {
+          Text("No reminder").frame(maxWidth: .infinity, minHeight: 60)
+        }
+        .buttonStyle(ChunkyButtonStyle(tone: .neutral, lipHeight: 5))
+        .accessibilityIdentifier("mail_remind_no_button")
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var dealButtons: some View {
+    let hasRecord = tool.activeRecord != nil && !isLooking
+    let explain = Control(title: "Explain this letter", icon: "text.bubble", id: "mail_explain_button", enabled: hasRecord) {
+      tool.explain(.onDevice)
+    }
+    let ai = Control(title: "Explain with AI", icon: "sparkles", id: "mail_explain_ai_button", enabled: hasRecord && !tool.isExplainingOnline) {
+      tool.explain(.online)
+    }
+    let log = Control(title: tool.showingLetters ? "Hide my letters" : "My letters", icon: "tray.full", id: "mail_letters_button", enabled: true) {
+      if tool.showingLetters {
+        EarconPlayer.shared.play(.ready)
+        tool.showingLetters = false
+      } else {
+        tool.listLetters()
+      }
+    }
+    if isLargeText {
+      VStack(spacing: 10) { ForEach([explain, ai, log]) { button($0) } }
+    } else {
+      VStack(spacing: 10) {
+        HStack(spacing: 10) { ForEach([explain, ai]) { button($0) } }
+        button(log)
+      }
+    }
+  }
+
+  private func savedLetter(_ saved: LetterRecord) -> some View {
+    VStack(alignment: .leading, spacing: 16) {
+      section("Saved letter", id: "mail_saved") {
+        VStack(alignment: .leading, spacing: 10) {
+          Text(saved.title)
+            .font(.rounded(.title2, weight: .heavy))
+            .foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+          Text(saved.summary)
+            .font(.rounded(.title3, weight: .bold))
+            .foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+          if saved.reminderAt != nil {
+            Text("Reminder set")
+              .font(.rounded(.headline, weight: .heavy))
+              .foregroundStyle(Theme.inkSoft)
+          }
+          Button {
+            EarconPlayer.shared.play(.ready)
+            tool.closeSaved()
+          } label: {
+            Text(tool.letter == nil ? "Close this letter" : "Back to the letter I just read").frame(maxWidth: .infinity, minHeight: 60)
+          }
+          .buttonStyle(ChunkyButtonStyle(tone: .neutral, lipHeight: 5))
+          .accessibilityIdentifier("mail_saved_close_button")
+        }
+      }
+      if let sentence = tool.currentSentence {
+        section("Reading now", id: "mail_sentence") {
+          Text(sentence)
+            .font(.rounded(.title2, weight: .bold))
+            .foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      section("The letter", id: "mail_saved_text") {
+        Text(saved.text)
+          .font(.rounded(.title3, weight: .regular))
+          .foregroundStyle(Theme.ink)
+          .fixedSize(horizontal: false, vertical: true)
+          .textSelection(.enabled)
+      }
+    }
   }
 
   // MARK: What was found
