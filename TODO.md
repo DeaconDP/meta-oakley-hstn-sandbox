@@ -68,7 +68,10 @@
   - [ ] Settings core: route `SettingsVoice` before `VoiceCommandParser` while conversation mode or the clarity check is active, so "carry on", "again" and "stop" reach them
 - [ ] C3: aliases + macros by voice with conflict check, home-menu show/hide/reorder, wake word choice, tip pacing Fewer/Normal/Off
   - [x] iOS tip pacing Fewer/Normal/Off (2026-11-20)
+  - [x] C3 iOS (2026-11-20, notes/customisation-ios-words.md): aliases, macros built by voice with read-back and run in order, conflict check, tools menu show/hide/reorder by voice and on screen, address word choice. Tip pacing not done. Not tried on a real iPhone
 - [ ] C4 (Experimental): glasses controls map for `Capture`/`Select`/`Nav`, "what do my buttons do?", `LaunchApp` into a tool; find out whether Meta's press-and-hold shortcut can launch a DAT app
+  - [x] C4 iOS (2026-11-20, notes/customisation-ios-words.md): glasses controls map wired to MWDATInputs 1.0.1 (Beta build only), "what do my buttons do?" with the Meta warning, favourite tool, Shortcuts intents to run a macro or open the favourite. Not done: `LaunchApp`, the press-and-hold question
+  - [ ] C4 iOS on real glasses: which Inputs events HSTN sends, swipe directions, the double-press timing, inputs after re-wear
 - [ ] C5: profiles (Home / Out and about / Reading), switch by voice, optional announced triggers, learned suggestions
   - [x] iOS (2026-11-20): starters, save/switch/list/delete by voice and on screen, learned suggestions after three tweaks. No automatic triggers yet
 - [ ] C6: detail dial + description preferences passed to the model

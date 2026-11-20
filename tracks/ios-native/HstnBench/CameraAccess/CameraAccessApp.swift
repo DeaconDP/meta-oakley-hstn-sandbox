@@ -78,6 +78,8 @@ struct CameraAccessApp: App {
     if LaunchOptions.isUITesting, LaunchOptions.forcesOnboarding {
       A11yPreferences.shared.resetOnboarding()
     }
+    // Your words and Your buttons: their settings areas, grammars and the hook before parsing.
+    MakeItYourOwnWords.install()
     // Render the earcons now, so the first tone doesn't wait on engine setup.
     EarconPlayer.shared.prepare()
     // And look up the voice, so the first word doesn't wait on that.

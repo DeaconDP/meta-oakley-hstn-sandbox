@@ -373,7 +373,11 @@ final class CameraViewModel {
 
   private func handleDeviceState(_ state: DeviceState) {
     if batteryLevel != state.batteryLevel { batteryLevel = state.batteryLevel }
-    if donState != state.donState { donState = state.donState }
+    if donState != state.donState {
+      // DAT known issue: inputs stop after the glasses come off and go back on; adding them again fixes it.
+      if state.donState == .donned, donState == .doffed { DATGlassesInputs.shared.reattach() }
+      donState = state.donState
+    }
     if hingeState != state.hingeState { hingeState = state.hingeState }
   }
 
@@ -431,11 +435,13 @@ final class CameraViewModel {
       if let deviceSession {
         VoiceControl.shared.attachGlasses(session: deviceSession, wearables: wearables)
         attachGlassesDisplay(session: deviceSession)
+        DATGlassesInputs.shared.attach(to: deviceSession)
       }
     }
     if state == .stopped {
       VoiceControl.shared.detachGlasses()
       HandsFreeSurface.shared.glasses.detach()
+      DATGlassesInputs.shared.detach()
       endBackgroundStopErrorSuppression()
       cleanupSession()
     }
