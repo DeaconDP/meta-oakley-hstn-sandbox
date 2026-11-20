@@ -149,6 +149,13 @@ object SetupSpeech {
 
   private fun shortcutCount(n: Int, what: String) = if (n == 1) "1 $what" else "$n ${what}s"
 
+  /** The first sentence of [text] (short replies). "1.5 times." isn't cut at its decimal point. */
+  fun firstSentence(text: String): String {
+    val t = text.trim()
+    val m = Regex("^(.+?[.!?])(?=\\s+[A-Z]|$)").find(t) ?: return t
+    return m.groupValues[1]
+  }
+
   /** "Speech 1.4 times" style capitalisation for the start of a reply. */
   fun sentence(s: String): String = s.replaceFirstChar { it.titlecase(Locale.UK) }.let { if (it.endsWith(".") || it.endsWith("?")) it else "$it." }
 }

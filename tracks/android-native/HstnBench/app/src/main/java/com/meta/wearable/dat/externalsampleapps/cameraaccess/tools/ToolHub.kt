@@ -859,9 +859,7 @@ class ToolHub(
 
   /** [text] cut to its first sentence when the user asked for short replies. */
   fun brief(text: String, tool: ToolId? = host?.toolId): String {
-    if (verbosity(tool) != Verbosity.SHORT) return text
-    val m = Regex("^(.+?[.!?])(\\s|$)").find(text.trim()) ?: return text
-    return m.groupValues[1]
+    return if (verbosity(tool) == Verbosity.SHORT) SetupSpeech.firstSentence(text) else text
   }
 
   private fun remember(text: String) {
@@ -1092,6 +1090,8 @@ class ToolHub(
 
   override fun onSpoken(tag: String) {
     echo.finished(SystemClock.elapsedRealtime())
+    // ToolHub's own lines that no tool waits for (conversation mode, earcons said as words).
+    if (tag.startsWith("~")) return
     if (tag == "aside") {
       isSpeakingAside = false
       host?.onAsideDone()

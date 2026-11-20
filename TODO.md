@@ -49,3 +49,21 @@
   - [x] iOS: spoken tips. After a quiet spell, the app says what to say next for the current screen. Gaps are 8 s, 30 s, 1 min and 2 min, then it stops, and the tips fade as the user learns them. There's an off switch in settings (2026-11-16, notes/a11y-onboarding.md > Spoken tips; unit tests 179/0 on the iOS 27 simulator; not yet tried on the iPhone)
 - [ ] Real HSTN: check Meta AI registration and permission screens under VoiceOver, plus the open questions in notes/a11y-onboarding.md
 - [ ] Mention the accessibility focus in README once the first demo runs
+
+## Make it your own (notes/customisation-roadmap.md)
+- [x] C0 Android: one settings schema shared by both platforms (rate on one 0.5–3× scale, per-tool overrides); the old Android prefs migrated; the book rate merged into "main rate + book override" (2026-11-20, notes/customisation-android.md; JVM 341/0)
+- [ ] C0 iOS: the same schema; migrate the `A11yPreferences` keys
+- [ ] C0: one audio bus per platform. Android: built behind an Experimental switch (`AudioBus`, TTS via synthesizeToFile streaming into one AudioTrack mixer), off by default until earcon latency (`bus_earcon_ms`) and first-word delay are measured on the A26 + HSTN; iOS `AVSpeechSynthesizer.write` into the shared engine
+- [x] C0 Android: settings grammar: slower/faster, shorter/more detail, "keep that", "undo"/"put it back", "what's my setup", "reset speech"/"reset <area>", "lock settings"/"unlock settings"
+- [ ] Fix the gap in notes/a11y-onboarding.md:69: iOS detail level and rate aren't in Settings; earcons can't be reached
+- [x] C1 Android: speech presets (Brisk/Normal/Gentle), pitch, pauses, voice choice by voice with samples (device locale, US fallback), per-tool verbosity (welcomes and reminders only so far), earcon on/off/volume/earcons-only/speak-instead, Android settings screen
+- [x] C2 Android: balance, which ear for which sound, manual "I use mono" with Watch for text side cues falling back to pitch plus words, Clear speech (DynamicsProcessing on the TTS session), conversation mode
+- [x] C3 Android: aliases and routines by voice with conflict check, home-menu show/hide/reorder, address word, tip pacing Fewer/Normal/Off
+- [ ] C4 (Experimental): Android glasses controls wired to DAT Inputs with "what do my buttons do?" (not yet run on the mock or hardware; needs Developer Center approval); `LaunchApp` into a tool; find out whether Meta's press-and-hold shortcut can launch a DAT app
+- [x] C5 Android: profiles (Home / Out and about / Reading), switch and save by voice, learned suggestions after 3 repeats (asked, never applied)
+- [ ] C5: optional announced automatic triggers
+- [ ] C6: detail dial + description preferences passed to the model (Android stores them; no consumer yet)
+- [x] C7 Android: export/import as JSON and a short code, share sheet and paste
+- [ ] C7: helper view (the Android screen speaks every change; no separate helper mode), backup with the bookmarks
+- [ ] Android: run the instrumented suite and a CustomiseTest on the A26; TalkBack pass over the settings screen
+- [ ] Real HSTN: per-temple stereo, OS mono/balance over A2DP, capture-button events, `KEY_PARAM_PAN` support

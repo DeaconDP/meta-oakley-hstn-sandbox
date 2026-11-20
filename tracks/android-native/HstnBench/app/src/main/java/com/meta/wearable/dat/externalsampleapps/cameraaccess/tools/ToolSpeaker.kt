@@ -109,6 +109,7 @@ class ToolSpeaker(context: Context, private val listener: Listener) {
     applyLanguageAndVoice()
     tts.setSpeechRate(rate)
     tts.setPitch(config.pitch)
+    if (config.clearSpeech && config.bus == null) clearEffect = ClearSpeechEffect.create(sessionId)?.also { it.enabled = true }
     tts.setOnUtteranceProgressListener(
         object : UtteranceProgressListener() {
           override fun onStart(utteranceId: String) {
@@ -159,7 +160,7 @@ class ToolSpeaker(context: Context, private val listener: Listener) {
     if (parts.size < 3) return
     val gen = parts[0].toIntOrNull() ?: return
     val tag = parts[2]
-    if (tag.startsWith("~")) return // a pause
+    if (tag == "~pause") return // silence between sentences, not speech
     main.post { if (gen == generation.get()) listener.onSpoken(tag) }
   }
 
