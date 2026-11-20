@@ -117,13 +117,14 @@ enum VoiceCoachLines {
   /// The whole line for one tip. Later tips start "I'm still listening."; the last one says it will
   /// stop. `wakeWord`: commands are given as "reader, read", since bare ones are ignored right now.
   static func line(
-    for situation: CoachSituation, tip: Int, isLast: Bool, wakeWord: Bool, verbosity: Verbosity
+    for situation: CoachSituation, tip: Int, isLast: Bool, wakeWord: Bool, verbosity: Verbosity,
+    glassesSupported: Bool = GlassesSupport.isBuiltIn
   ) -> String {
     let words = Words(wakeWord: wakeWord)
     let short = verbosity == .short
     var parts: [String] = []
     if tip > 0, !short { parts.append("I'm still listening.") }
-    parts.append(hint(for: situation, words, short: short))
+    parts.append(hint(for: situation, words, short: short, glassesSupported: glassesSupported))
     if isLast { parts.append("I'll stop reminding you now. \(words.sayFirst("help")) whenever you need me.") }
     return parts.joined(separator: " ")
   }
@@ -137,7 +138,11 @@ enum VoiceCoachLines {
     func sayFirst(_ command: String) -> String { wakeWord ? "Say reader, \(command)" : "Say \(command)" }
   }
 
-  static func hint(for situation: CoachSituation, _ w: Words, short: Bool) -> String {
+  /// `glassesSupported` false is the App Store build: it never offers connect or the glasses.
+  static func hint(
+    for situation: CoachSituation, _ w: Words, short: Bool, glassesSupported: Bool = GlassesSupport.isBuiltIn
+  ) -> String {
+    if !glassesSupported, let phoneOnly = phoneOnlyHint(for: situation, w, short: short) { return phoneOnly }
     switch situation {
     case .welcome:
       return short
@@ -185,6 +190,24 @@ enum VoiceCoachLines {
       return short
         ? "The camera is off. \(w.sayFirst("status")) to hear how to fix it."
         : "I can't use the phone camera yet. \(w.sayFirst("status")) to hear how to fix it."
+    }
+  }
+}
+
+extension VoiceCoachLines {
+  /// The App Store build's first-screen tips. The glasses' situations can't happen there.
+  static func phoneOnlyHint(for situation: CoachSituation, _ w: Words, short: Bool) -> String? {
+    switch situation {
+    case .welcome, .welcomeRetry, .welcomeConnected:
+      return short
+        ? "\(w.sayFirst("continue")) to start."
+        : "To start reading with your iPhone's camera, \(w.say("continue"))."
+    case .notLinked, .noGlasses, .glassesNotReady, .paused:
+      return short
+        ? "Hold the phone over some text and \(w.say("read"))."
+        : "Hold the phone flat, about 30 centimetres above a page, and \(w.say("read")). \(w.sayFirst("list tools")) to hear what else I can do."
+    default:
+      return nil
     }
   }
 }

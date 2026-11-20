@@ -84,11 +84,19 @@ protocol SpeakUpTool: AnyObject {
   func start(source: ReadFrameSource)
   /// Closed, or another tool opened: stop the camera work and any speech it started.
   func stop()
-  /// A transcript while this tool is open, after the global commands had their turn.
-  /// True if the tool used it.
+  /// A transcript while this tool is open. The tool sees it before most global commands (ToolHub,
+  /// VoiceControl): only stop, close, main menu, help and the like are taken first. True if the
+  /// tool used it.
   func handle(transcript: String) -> Bool
   /// What "help" says while this tool is open.
   var helpLine: String { get }
   /// The tool's panel on the phone screen. Large text, VoiceOver labelled, WCAG 2.2 AA.
   func makePanel() -> AnyView
+  /// The app's global "stop" while this tool stays open: quiet the tool's own sound and work
+  /// (a tone, a watch loop, an answer). Speech is already cut by then. Default: nothing more.
+  func pauseForStop()
+}
+
+extension SpeakUpTool {
+  func pauseForStop() {}
 }

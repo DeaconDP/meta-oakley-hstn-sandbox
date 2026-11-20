@@ -77,6 +77,10 @@ final class MailTool: SpeakUpTool {
   /// Bumped by every new look, reading step and stop, so late callbacks do nothing.
   @ObservationIgnored private var generation = 0
   @ObservationIgnored private var lastAnswer: String?
+  /// Where the letter's text goes for "Ask about the text". Only the masked text (safeText).
+  @ObservationIgnored var recentText: RecentText = .shared
+  /// Counts letters, so a new letter is a new passage and an added page replaces its letter's.
+  @ObservationIgnored private var letterNumber = 0
 
   /// `recognize` is Vision OCR (TextRecognizer, shared with Read text); tests can pass their own.
   init(recognize: @escaping @Sendable (UIImage) throws -> RecognizedFrame = { try TextRecognizer.recognize($0) }) {
@@ -219,6 +223,7 @@ final class MailTool: SpeakUpTool {
     let newScans: [LetterScan]
     switch mode {
     case .new, .envelope:
+      letterNumber += 1
       newScans = [scan]
     case .addPage:
       if let last = scans.last, MailPages.isSamePage(last, scan) {
@@ -241,6 +246,7 @@ final class MailTool: SpeakUpTool {
     earcons.stopWorkingTick(owner: Self.tickOwner)
     scans = newScans
     letter = read
+    recentText.append(read.safeText, source: .mail, key: "letter-\(letterNumber)")
     summary = LetterSpeech.summary(read)
     sentences = []
     sentenceIndex = 0
@@ -369,6 +375,7 @@ final class MailTool: SpeakUpTool {
     let myGeneration = generation
     let index = sentenceIndex
     guard sentences.indices.contains(index) else { return }
+    recentText.setCurrent(sentences[index], source: .mail)
     announcer.say(sentences[index], kind: .reply, interrupt: interrupt) { [weak self] finished in
       self?.sentenceEnded(index, finished: finished, myGeneration)
     }
@@ -391,6 +398,7 @@ final class MailTool: SpeakUpTool {
 
   private func finishedReading() {
     generation += 1
+    recentText.setCurrent(nil, source: .mail)
     phase = .ready
     sentenceIndex = 0
     say("That's the end of the letter. Say read it all to hear it again, or new letter.", earcon: .done, interrupt: false)

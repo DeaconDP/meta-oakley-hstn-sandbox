@@ -152,6 +152,11 @@ final class LightTool: SpeakUpTool {
     }
   }
 
+  /// The app's global "stop" while the tool stays open: the tone goes quiet (ToolHub).
+  func pauseForStop() {
+    if mode == .probe, probing { pauseTone() }
+  }
+
   /// For the integrator: the global "stop" while this tool is open should silence the tone too.
   func pauseTone() {
     guard mode == .probe else {

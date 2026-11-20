@@ -9,10 +9,12 @@
 //
 // CameraView.swift
 //
-// The main screen, and the only one after setup: what the glasses are doing, one big Read text
-// button, the reading card while there is something read, and Settings. There are no camera
-// steps to take by hand. Reading starts the session and the stream itself (TextReader asks
-// CameraViewModel+Read), and going to the background ends them.
+// The main screen, and the only one after setup: the tools home (notes/tools-home-ios.md). The
+// status, then the six tools (ToolHub), the camera card, and Settings. Opening a tool shows its
+// panel with a Close button in place of the list. Read text is the first tool: its tile reads at
+// once, as the one big Read button did. There are no camera steps to take by hand. Reading starts
+// the session and the stream itself, and going to the background ends them. Glasses are a small
+// optional row, and absent in the App Store build.
 //
 // Accessibility (notes/a11y-onboarding.md): every state change is heard (CameraNarrator), Magic
 // Tap reads (or stops reading), every control has a 60 pt target and Dynamic Type text, and it is
@@ -45,7 +47,9 @@ struct CameraView: View {
   @State private var showSettingsMenu: Bool = false
   @State private var isLaunchingUpdate: Bool = false
   @State private var narrator = CameraNarrator()
+  @AccessibilityFocusState private var toolTitleFocused: Bool
   private var router: CameraSourceRouter { CameraSourceRouter.shared }
+  private var hub: ToolHub { ToolHub.shared }
 
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -70,40 +74,66 @@ struct CameraView: View {
 
       VStack(spacing: 0) {
         PinnedVoiceIndicator()
-        ScrollView {
-          VStack(alignment: .leading, spacing: 16) {
-            FlowingVoiceIndicator()
-            topBar
-            // Settings has its own copy of the switch.
-            if showSettingsMenu {
-              settingsPanel
-            } else {
-              HandsFreeControls()
-            }
-            CameraSourceCard(router: router, connectGlasses: connectGlasses)
-            if isUpdateRequired, !usingPhone {
-              updateControls
-            } else {
-              readButton
-              if TextReader.shared.phase != .idle {
-                ReadPanel(isLargeText: isLargeText, onStatus: speakStatus)
+        ScrollViewReader { scroll in
+          ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+              FlowingVoiceIndicator()
+              topBar
+                .id(Self.topID)
+              // Settings opens at the top. The tools come next; the mode switch and mic button
+              // follow them (Settings has its own copy of the switch).
+              if showSettingsMenu {
+                settingsPanel
               }
-              ToolboxList(tools: [.status, .settings], perform: performTool)
+              if isUpdateRequired, !usingPhone {
+                CameraSourceCard(router: router, connectGlasses: connectGlasses)
+                updateControls
+                if !showSettingsMenu { HandsFreeControls() }
+              } else if let open = hub.openTool {
+                ToolPanelHeader(tool: open, isLargeText: isLargeText, close: { hub.close() })
+                  .accessibilityFocused($toolTitleFocused)
+                hub.tool(open).makePanel()
+                if !showSettingsMenu { HandsFreeControls() }
+                CameraSourceCard(router: router, connectGlasses: connectGlasses)
+              } else {
+                ToolsHome(openTool: openFromHome, status: speakStatus)
+                if !showSettingsMenu { HandsFreeControls() }
+                CameraSourceCard(router: router, connectGlasses: connectGlasses)
+                if link.supportsGlasses {
+                  GlassesRow(link: link, connected: viewModel.hasActiveDevice, connect: connectGlasses)
+                }
+                ToolboxList(tools: [.status, .settings], perform: performTool)
+              }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .frame(maxWidth: 700, alignment: .leading)
+            .frame(maxWidth: .infinity)
+          }
+          .scrollBounceBehavior(.basedOnSize)
+          // A tool opened or closed: back to the top, where its name (or the list) is.
+          .onChange(of: hub.openTool) { _, open in
+            withAnimation(motion(.easeOut(duration: 0.2))) { scroll.scrollTo(Self.topID, anchor: .top) }
+            guard open != nil else { return }
+            Task {
+              try? await Task.sleep(for: .milliseconds(300))
+              toolTitleFocused = true
             }
           }
-          .padding(.horizontal, 20)
-          .padding(.vertical, 16)
-          .frame(maxWidth: 700, alignment: .leading)
-          .frame(maxWidth: .infinity)
         }
-        .scrollBounceBehavior(.basedOnSize)
       }
     }
     .accessibilityElement(children: .contain)
-    // Two-finger double-tap: read, or stop reading.
+    // Two-finger double-tap: read, or stop reading (or quiet the open tool).
     .accessibilityAction(.magicTap) { performPrimaryAction() }
-    // Two-finger scrub closes the settings menu.
-    .accessibilityAction(.escape) { setSettingsMenu(open: false) }
+    // Two-finger scrub closes the settings menu, then the open tool.
+    .accessibilityAction(.escape) {
+      if showSettingsMenu {
+        setSettingsMenu(open: false)
+      } else {
+        hub.close()
+      }
+    }
     // No dialogs in hands-free: CameraNarrator says the error and "try again" runs its action.
     .alert(viewModel.errorTitle.isEmpty ? "Couldn't do that" : viewModel.errorTitle, isPresented: unlessHandsFree(showErrorBinding)) {
       // One next step, then OK. VoiceOver reads title, message and both buttons.
@@ -176,9 +206,13 @@ struct CameraView: View {
         router.phoneStatusLine ?? viewModel.statusLine(updateRequired: link.requiresFirmwareUpdate)
       }
       TextReader.shared.source = router
+      hub.source = router
+      VoiceControl.shared.tools = hub
       VoiceControl.shared.setScreen(.camera, describe: describeForVoice, handler: handleVoice)
       // Spoken tips after a quiet spell ("Hold some text in front of you and say read").
-      VoiceCoach.shared.provide(for: .camera) { [viewModel, link, router] in
+      VoiceCoach.shared.provide(for: .camera) { [viewModel, link, router, hub] in
+        // A tool has its own words; the tips are about reading.
+        if let open = hub.openTool, open != .read { return nil }
         if router.active == .phone {
           return CoachSituation.forPhone(problem: router.phoneProblem, hasReadSentences: TextReader.shared.hasSentences)
         }
@@ -187,6 +221,8 @@ struct CameraView: View {
       }
     }
     .onDisappear {
+      hub.close(announce: false)
+      if VoiceControl.shared.tools === hub { VoiceControl.shared.tools = nil }
       VoiceControl.shared.clearScreen { $0 == .camera }
       VoiceCoach.shared.stopProviding(for: .camera)
       LaunchActionRouter.shared.statusProvider = nil
@@ -216,6 +252,24 @@ struct CameraView: View {
 
   private var usingPhone: Bool { router.active == .phone }
 
+  private static let topID = "camera_top"
+
+  /// A tile on the tools home. Read text reads at once, as the one Read button always did.
+  private func openFromHome(_ tool: ToolID) {
+    setSettingsMenu(open: false)
+    if tool == .read {
+      readNow()
+    } else {
+      hub.open(tool)
+    }
+  }
+
+  /// Read text, opened if it isn't, then read what's in view.
+  private func readNow() {
+    if hub.openTool != .read { hub.openReadTextQuietly() }
+    TextReader.shared.read()
+  }
+
   /// The phone's status line while it is the camera, otherwise the glasses'.
   private func speakStatus() {
     speakStatus(interrupt: true)
@@ -242,23 +296,30 @@ struct CameraView: View {
   /// pending nothing can be read, so it says the status instead.
   private func performPrimaryAction() {
     let reader = TextReader.shared
-    if reader.isActive {
+    if let open = hub.openTool, open != .read {
+      Announcer.shared.stop()
+      hub.stopForGlobal()
+    } else if reader.isActive {
       reader.stop()
     } else if isUpdateRequired, !usingPhone {
       speakStatus()
     } else {
-      reader.read()
+      readNow()
     }
   }
 
   private func runLaunchAction(_ action: LaunchAction?) {
     switch action {
-    case .read: TextReader.shared.read()
+    case .read: readNow()
     case .status: speakStatus()
     case .repeatLast: Announcer.shared.repeatLast()
-    case .readImported: ImportedReading.readPending()
-    // Opening a tool is wired up by the tools home (ToolHub); until then Read text stands in.
-    case .openMail, .openLabels, .openWatch, .openAsk, .openLight: TextReader.shared.read()
+    case .readImported:
+      // Shown in Read text's panel, as any page is.
+      if hub.openTool != .read { hub.openReadTextQuietly() }
+      ImportedReading.readPending()
+    case .openMail, .openLabels, .openWatch, .openAsk, .openLight:
+      setSettingsMenu(open: false)
+      if let tool = action?.tool { hub.open(tool) }
     case nil: break
     }
   }
@@ -269,36 +330,57 @@ struct CameraView: View {
   private func handleVoice(_ command: VoiceCommand) -> Bool {
     let reader = TextReader.shared
     switch command {
-    case .read: runLaunchAction(.read)
+    case .read:
+      setSettingsMenu(open: false)
+      runLaunchAction(.read)
     case .status: runLaunchAction(.status)
     case .stop:
-      // Stopping the reader also stops the voice; otherwise just cut what is being said.
+      // Stopping the reader also stops the voice; otherwise just cut what is being said. An open
+      // tool also goes quiet (a tone, a watch loop, a barcode search) but stays open.
       if reader.isActive { reader.stop() } else { Announcer.shared.stop() }
+      hub.stopForGlobal()
     case .repeatLast:
       if reader.hasSentences { reader.repeatSentence() } else { runLaunchAction(.repeatLast) }
     case .continueOn: reader.next()
     case .back:
-      // Sentences first, as before; then out of settings; then the main menu line.
-      if reader.hasSentences {
+      // Sentences first, as before (an open tool had "back" first); then out of settings; then out
+      // of the tool; then the main menu line.
+      if reader.hasSentences, hub.openTool == nil || hub.openTool == .read {
         reader.previous()
       } else if showSettingsMenu {
         closeSettings()
+      } else if hub.openTool != nil {
+        hub.close()
       } else {
         return false
       }
     case .close:
-      guard showSettingsMenu else { return false }
-      closeSettings()
+      if showSettingsMenu {
+        closeSettings()
+      } else if hub.openTool != nil {
+        hub.close()
+      } else {
+        return false
+      }
     case .mainMenu:
       setSettingsMenu(open: false)
       if reader.isActive { reader.stop() }
+      hub.close(announce: false)
       return false  // VoiceControl says where that is
+    case .help:
+      // With a tool open: its own commands, then how to leave it. Otherwise the app's help.
+      guard let tool = hub.current else { return false }
+      Announcer.shared.say(SpokenMessage.toolHelp(tool.toolID, tool.helpLine))
     case .openSettings:
       setSettingsMenu(open: true)
       Announcer.shared.say(SpokenMessage.settingsOpened)
     case .openReader:
       setSettingsMenu(open: false)
-      return false
+      hub.open(.read)
+    case .openMail, .openLabels, .openWatch, .openAsk, .openLight:
+      // Usually ToolHub opened it already with the words said; this is a glasses display button.
+      setSettingsMenu(open: false)
+      if let tool = command.tool { hub.open(tool) }
     case .tryAgain:
       if let action = viewModel.errorAction {
         viewModel.errorAction = nil
@@ -333,19 +415,39 @@ struct CameraView: View {
   /// "Where am I": settings if open, then the status line.
   private func describeForVoice() -> String? {
     let status = router.phoneStatusLine ?? viewModel.statusLine(updateRequired: isUpdateRequired)
-    return showSettingsMenu ? "Settings are open. \(status)" : status
+    if showSettingsMenu { return "Settings are open. \(status)" }
+    if let open = hub.openTool { return "\(open.title) is open. Say close to go back to the tools. \(status)" }
+    return status
   }
 
   private func performTool(_ tool: HandsFreeTool) {
     switch tool {
-    case .reader: TextReader.shared.read()
     case .status: speakStatus()
     case .settings: setSettingsMenu(open: !showSettingsMenu)
+    default: if let open = tool.tool { openFromHome(open) }
     }
   }
 
   private func confirmCameraPermission() {
-    Task { await viewModel.confirmCameraPermissionRedirect { TextReader.shared.read() } }
+    // The view model resumes the read only once "Camera access allowed" has been heard to the end.
+    // If something else cut that line (a camera status line), the read would never carry on, so
+    // once speech is quiet (at most 4 s) it carries on here instead, unless access was refused.
+    let resumed = ResumeFlag()
+    Task {
+      await viewModel.confirmCameraPermissionRedirect {
+        guard !resumed.done else { return }
+        resumed.done = true
+        readNow()
+      }
+      var waited = 0
+      while waited < 40, !resumed.done, Announcer.shared.isSpeaking {
+        try? await Task.sleep(for: .milliseconds(100))
+        waited += 1
+      }
+      guard !resumed.done, !viewModel.showError, viewModel.isSessionActive, !TextReader.shared.isActive else { return }
+      resumed.done = true
+      readNow()
+    }
   }
 
   private func declineCameraPermission() {
@@ -373,16 +475,20 @@ struct CameraView: View {
   /// One line: what the reader is doing, else the status title.
   private var cardState: String {
     let reader = TextReader.shared
-    if reader.phase != .idle { return reader.statusText }
+    let readerShown = hub.openTool == .read || hub.openTool == nil
+    if readerShown, reader.phase != .idle { return reader.statusText }
     if showSettingsMenu { return "Settings" }
+    if let open = hub.openTool { return open.title }
     return status.title
   }
 
   private var cardHints: [VoiceCommand] {
-    if TextReader.shared.isActive { return [.stop, .continueOn, .mainMenu] }
-    if TextReader.shared.hasSentences { return [.read, .continueOn, .back] }
+    let readerShown = hub.openTool == .read || hub.openTool == nil
+    if readerShown, TextReader.shared.isActive { return [.stop, .continueOn, .mainMenu] }
+    if readerShown, TextReader.shared.hasSentences { return [.read, .continueOn, .back] }
     if showSettingsMenu { return [.faster, .slower, .close] }
-    return [.read, .status, .help]
+    if hub.openTool != nil { return [.stop, .close, .help] }
+    return [.read, .listTools, .help]
   }
 
   private func perform(_ action: CameraErrorAction) {
@@ -525,23 +631,6 @@ struct CameraView: View {
     .transition(.opacity)
   }
 
-  // MARK: - Read
-
-  /// The one action. Always enabled: when reading can't start, the reader says why ("Glasses
-  /// aren't connected…"), which beats a dimmed button that can't explain itself.
-  private var readButton: some View {
-    Button {
-      TextReader.shared.read()
-    } label: {
-      PathTileLabel(icon: "text.viewfinder", title: "Read text", coin: .neutral, isBig: true, say: .read)
-    }
-    .buttonStyle(ChunkyButtonStyle(tone: .yellow, lipHeight: 8, radius: 30))
-    .accessibilityIdentifier("read_button")
-    .accessibilityLabel("Read text")
-    .accessibilityHint("Reads the text in front of you aloud, word for word.")
-    .cameraQuickActions(status: speakStatus)
-  }
-
   // MARK: - Update controls
 
   @ViewBuilder
@@ -559,6 +648,12 @@ struct CameraView: View {
     .accessibilityIdentifier("update_firmware_button")
     .accessibilityHint("Opens the Meta AI app to update your glasses.")
   }
+}
+
+/// Whether the Read that asked for camera access has carried on (confirmCameraPermission).
+@MainActor
+private final class ResumeFlag {
+  var done = false
 }
 
 // MARK: - Update banner

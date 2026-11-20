@@ -117,9 +117,12 @@ final class WatchTool: SpeakUpTool {
     } else if target != nil {
       resume()
     } else {
-      ask()
+      ask(opening: true)
     }
   }
+
+  /// The app's global "stop" while the tool stays open.
+  func pauseForStop() { pause() }
 
   func stop() {
     stopLoop()
@@ -218,12 +221,17 @@ final class WatchTool: SpeakUpTool {
     }
   }
 
-  private func ask() {
+  private func ask(opening: Bool = false) {
     stopLoop()
     target = nil
     lastSighting = nil
     phase = .asking
-    say(WatchWording.askTarget)
+    if opening {
+      say("Watch for text. " + WatchWording.askTarget, earcon: .ready)
+      lastSpoken = WatchWording.askTarget
+    } else {
+      say(WatchWording.askTarget)
+    }
   }
 
   private func sayWhatTarget() {

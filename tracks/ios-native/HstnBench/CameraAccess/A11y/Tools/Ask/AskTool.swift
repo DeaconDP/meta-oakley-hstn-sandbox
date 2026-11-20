@@ -64,7 +64,7 @@ final class AskTool: SpeakUpTool {
     answersOnline = answerer.hasOnline
     refreshSummary()
     let lead = snapshot == nil ? "Nothing has been read yet, but I can still define words. " : ""
-    announcer.say(lead + AskWording.start, kind: .reply)
+    announcer.announce(lead + AskWording.start, earcon: .ready, kind: .reply)
   }
 
   func stop() {
@@ -72,6 +72,9 @@ final class AskTool: SpeakUpTool {
     answerTask = nil
     isAnswering = false
   }
+
+  /// The app's global "stop": the answer being worked out is dropped.
+  func pauseForStop() { stop() }
 
   func handle(transcript: String) -> Bool {
     guard answerer.classify(transcript) != nil else { return false }
