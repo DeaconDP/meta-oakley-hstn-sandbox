@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct CameraNarration: ViewModifier {
-  let viewModel: CameraViewModel
+  let viewModel: any GlassesCamera
   let narrator: CameraNarrator
   let updateRequired: @MainActor () -> Bool
   /// The camera permission prompt's Continue and Cancel, so the question can be answered by voice.
@@ -21,11 +21,11 @@ struct CameraNarration: ViewModifier {
       .onChange(of: viewModel.a11yPhase) { old, new in
         narrator.phaseChanged(from: old, to: new, viewModel: viewModel)
       }
-      .onChange(of: viewModel.donState) { old, new in
-        narrator.donStateChanged(from: old, to: new, viewModel: viewModel)
+      .onChange(of: viewModel.wear) { old, new in
+        narrator.wearChanged(from: old, to: new, viewModel: viewModel)
       }
-      .onChange(of: viewModel.hingeState) { old, new in
-        narrator.hingeStateChanged(from: old, to: new, viewModel: viewModel)
+      .onChange(of: viewModel.hinge) { old, new in
+        narrator.hingeChanged(from: old, to: new, viewModel: viewModel)
       }
       .onChange(of: viewModel.batteryLevel) { old, new in
         narrator.batteryChanged(from: old, to: new)

@@ -20,7 +20,7 @@
  *   stopped) are said instead.
  */
 
-import MWDATCore
+import Foundation
 import UIKit
 
 @MainActor
@@ -50,7 +50,7 @@ final class CameraNarrator {
   /// Everything is queued (interrupt: false), so it doesn't cut what onboarding is still saying
   /// ("Connected to …", "Setup finished").
   func screenAppeared(
-    _ viewModel: CameraViewModel,
+    _ viewModel: any GlassesCamera,
     router: CameraSourceRouter,
     speakStatus: @MainActor (_ interrupt: Bool) -> Void,
     takeLaunchAction: @MainActor () -> LaunchAction?,
@@ -58,7 +58,7 @@ final class CameraNarrator {
   ) async {
     // Only linked glasses are worth waiting for.
     if router.registered, router.active == .glasses || router.preference == .auto {
-      await viewModel.waitForDeviceReport()
+      await viewModel.waitForDeviceReport(timeout: .seconds(2))
     }
     guard !Task.isCancelled else { return }
     router.glassesWaitEnded()
@@ -94,7 +94,7 @@ final class CameraNarrator {
 
   // MARK: Session and stream
 
-  func phaseChanged(from old: CameraPhase, to new: CameraPhase, viewModel: CameraViewModel) {
+  func phaseChanged(from old: CameraPhase, to new: CameraPhase, viewModel: any GlassesCamera) {
     guard glassesInUse() else {
       earcons.stopWorkingTick(owner: Self.tickOwner)
       return
@@ -110,14 +110,14 @@ final class CameraNarrator {
         narrate(SpokenMessage.glassesConnected, earcon: .connected)
       } else {
         // The camera went off by itself; folding is the common cause, so name it when DAT says so.
-        say(viewModel.hingeState == .closed ? SpokenMessage.glassesFolded : SpokenMessage.cameraEnded, earcon: .disconnected)
+        say(viewModel.hinge == .closed ? SpokenMessage.glassesFolded : SpokenMessage.cameraEnded, earcon: .disconnected)
       }
     case .waitingForDevice:
       say(SpokenMessage.waitingForGlasses, earcon: .working)
     case .streaming:
       if old == .paused { say(SpokenMessage.resumed, earcon: .ready, interrupt: false) }
     case .paused:
-      say(viewModel.donState == .doffed ? SpokenMessage.glassesRemoved : SpokenMessage.paused, earcon: .attention)
+      say(viewModel.wear == .doffed ? SpokenMessage.glassesRemoved : SpokenMessage.paused, earcon: .attention)
     case .sessionStarting, .sessionReady, .previewStarting, .stopping:
       break  // the tick covers waits; the reader says what it's doing
     }
@@ -125,7 +125,7 @@ final class CameraNarrator {
 
   // MARK: Device state
 
-  func donStateChanged(from old: DonState, to new: DonState, viewModel: CameraViewModel) {
+  func wearChanged(from old: GlassesWear, to new: GlassesWear, viewModel: any GlassesCamera) {
     // Only matters while there is a session to pause; otherwise the status line covers it.
     // From .unknown is the first reading, not something that happened.
     guard settled, glassesInUse(), old != .unknown, viewModel.hasSession else { return }
@@ -136,7 +136,7 @@ final class CameraNarrator {
     }
   }
 
-  func hingeStateChanged(from old: HingeState, to new: HingeState, viewModel: CameraViewModel) {
+  func hingeChanged(from old: GlassesHinge, to new: GlassesHinge, viewModel: any GlassesCamera) {
     guard settled, glassesInUse(), old != .unknown, new == .closed, viewModel.hasSession else { return }
     say(SpokenMessage.glassesFolded, earcon: .disconnected)
   }
@@ -171,7 +171,7 @@ final class CameraNarrator {
 
   // MARK: Errors and prompts
 
-  func errorShown(_ viewModel: CameraViewModel) {
+  func errorShown(_ viewModel: any GlassesCamera) {
     earcons.stopWorkingTick(owner: Self.tickOwner)
     if isHandsFree {
       // No alert in hands-free: the words are the only way to hear it. "Try again" runs its action.

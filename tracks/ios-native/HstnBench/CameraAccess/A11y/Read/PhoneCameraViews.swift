@@ -56,22 +56,25 @@ struct CameraSourceCard: View {
         .font(.rounded(.headline, weight: .heavy))
         .foregroundStyle(Theme.ink)
         .accessibilityHidden(true)
-      Group {
-        if dynamicTypeSize.isAccessibilitySize {
-          Picker("Camera", selection: binding) {
-            ForEach(CameraSourcePreference.allCases) { Text($0.title).tag($0) }
+      // The App Store build has no glasses: nothing to choose, only the caption.
+      if GlassesSupport.isBuiltIn {
+        Group {
+          if dynamicTypeSize.isAccessibilitySize {
+            Picker("Camera", selection: binding) {
+              ForEach(CameraSourcePreference.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.menu)
+          } else {
+            Picker("Camera", selection: binding) {
+              ForEach(CameraSourcePreference.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
           }
-          .pickerStyle(.menu)
-        } else {
-          Picker("Camera", selection: binding) {
-            ForEach(CameraSourcePreference.allCases) { Text($0.title).tag($0) }
-          }
-          .pickerStyle(.segmented)
         }
+        .accessibilityLabel("Camera")
+        .accessibilityHint("Choose the iPhone's camera, your glasses, or automatic. You can also say use the phone or use the glasses.")
+        .accessibilityIdentifier("camera_source_picker")
       }
-      .accessibilityLabel("Camera")
-      .accessibilityHint("Choose the iPhone's camera, your glasses, or automatic. You can also say use the phone or use the glasses.")
-      .accessibilityIdentifier("camera_source_picker")
       Text(caption)
         .font(.rounded(.subheadline, weight: .semibold))
         .foregroundStyle(Theme.inkSoft)

@@ -22,26 +22,25 @@
 // connecting are spoken by WearablesViewModel. Styled from A11y/Theme.
 //
 
-import MWDATCore
 import SwiftUI
 
 struct HomeScreenView: View {
-  var viewModel: WearablesViewModel
+  var link: any GlassesLink
 
   var body: some View {
     content
       .onAppear {
         VoiceControl.shared.setScreen(.home, describe: { SpokenMessage.voiceHomeStatus }, handler: handleVoice)
         // Spoken tips after a quiet spell: "say connect". Not while Meta AI is being opened.
-        VoiceCoach.shared.provide(for: .home) { [viewModel] in viewModel.isConnecting ? nil : .notLinked }
+        VoiceCoach.shared.provide(for: .home) { [link] in link.isConnecting ? nil : .notLinked }
         // Hands-free narrates each screen change; the toolbox doesn't.
         if A11yPreferences.shared.handsFree {
           Announcer.shared.announce(SpokenMessage.mainMenuHome, earcon: .attention, interrupt: false)
         }
       }
-      .task(id: viewModel.isConnecting) {
+      .task(id: link.isConnecting) {
         HandsFreeSurface.shared.publish(
-          screen: .home, state: viewModel.isConnecting ? "Connecting" : "Glasses not connected", hints: [.connect, .help])
+          screen: .home, state: link.isConnecting ? "Connecting" : "Glasses not connected", hints: [.connect, .help])
       }
       .onDisappear {
         VoiceControl.shared.clearScreen { $0 == .home }
@@ -53,7 +52,7 @@ struct HomeScreenView: View {
   /// own, as are main menu, back, close and disconnect here (there is nowhere further to go).
   private func handleVoice(_ command: VoiceCommand) -> Bool {
     switch command {
-    case .connect, .tryAgain: viewModel.connectGlasses()
+    case .connect, .tryAgain: link.connectGlasses()
     case .usePhone: CameraSourceRouter.shared.choose(.phone)
     case .status: Announcer.shared.announce(SpokenMessage.voiceHomeStatus, earcon: .attention)
     default: return false
@@ -87,22 +86,22 @@ struct HomeScreenView: View {
           .fixedSize(horizontal: false, vertical: true)
           .frame(maxWidth: .infinity, alignment: .leading)
 
-        MascotSays(mood: viewModel.connectionNotice == nil ? .happy : .confused, text: SpokenMessage.beforeMetaAIHandoff)
+        MascotSays(mood: link.connectionNotice == nil ? .happy : .confused, text: SpokenMessage.beforeMetaAIHandoff)
 
-        if let notice = viewModel.connectionNotice {
+        if let notice = link.connectionNotice {
           ConnectionNoticeView(text: notice)
         }
 
         HandsFreeControls()
       } footer: {
         // Title kept: the UI tests find this button by "Connect my glasses".
-        Button(viewModel.isConnecting ? "Connecting…" : "Connect my glasses") {
-          viewModel.connectGlasses()
+        Button(link.isConnecting ? "Connecting…" : "Connect my glasses") {
+          link.connectGlasses()
         }
         .buttonStyle(.a11yPrimary)
         .sayHint(.connect)
-        .disabled(viewModel.isConnecting)
-        .accessibilityHint(viewModel.isConnecting ? "" : "Opens the Meta AI app to confirm.")
+        .disabled(link.isConnecting)
+        .accessibilityHint(link.isConnecting ? "" : "Opens the Meta AI app to confirm.")
         .accessibilityIdentifier("connect_glasses_button")
         Button("Use my iPhone's camera") {
           CameraSourceRouter.shared.choose(.phone)
@@ -115,7 +114,7 @@ struct HomeScreenView: View {
     }
     .background(Theme.page.ignoresSafeArea())
     // "Connecting…" otherwise only changes visually.
-    .a11yAnnounce(onChangeOf: viewModel.isConnecting) { connecting in
+    .a11yAnnounce(onChangeOf: link.isConnecting) { connecting in
       connecting ? "Connecting." : nil
     }
   }

@@ -17,12 +17,11 @@
  *
  * Never: from outside the app, or over the user.
  *
- * Pure parts (VoiceCoachSchedule, VoiceCoachLines, CameraViewModel.coachSituation) are unit
+ * Pure parts (VoiceCoachSchedule, VoiceCoachLines, GlassesCamera.coachSituation) are unit
  * tested; the driver takes its world through Environment, so tests run it with a fake clock.
  */
 
 import Foundation
-import MWDATCore
 import UIKit
 
 /// What the screen is waiting for, as far as tips go. nil from a screen means "don't prompt now":
@@ -203,23 +202,7 @@ extension CoachSituation {
   }
 }
 
-extension CameraViewModel {
-  /// What a tip should be about on the main screen, or nil when nothing should be suggested.
-  func coachSituation(updateRequired: Bool, hasReadSentences: Bool) -> CoachSituation? {
-    // An alert owns the moment; the update has its own button and line.
-    if showError || showCameraPermissionRedirectConfirm || updateRequired {
-      return nil
-    }
-    if !hasActiveDevice { return .noGlasses }
-    if hingeState == .closed || (donState == .doffed && !hasSession) { return .glassesNotReady }
-    switch a11yPhase {
-    case .idle, .sessionReady, .streaming: return hasReadSentences ? .afterReading : .ready
-    case .paused: return .paused
-    case .noDevice: return .noGlasses
-    case .sessionStarting, .previewStarting, .waitingForDevice, .stopping: return nil
-    }
-  }
-}
+// The glasses' situation (GlassesCamera.coachSituation) is in A11y/Glasses/GlassesLink.swift.
 
 // MARK: - The driver
 

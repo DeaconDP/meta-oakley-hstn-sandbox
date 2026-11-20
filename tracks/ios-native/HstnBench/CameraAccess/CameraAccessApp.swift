@@ -17,27 +17,37 @@
 // HstnBench: errors get a specific title, a spoken sentence with an earcon (WearablesViewModel
 // .present), and one action where there is one, instead of a generic "Something went wrong".
 //
+// Two builds share this entry point (notes/phone-camera-ios.md > "App Store build without the DAT
+// SDK"). CameraAccess (Beta) configures DAT and passes WearablesViewModel as the GlassesLink. The
+// SpeakUp target (SPEAKUP_NO_DAT) links no DAT, passes NoGlassesLink and reads with the iPhone only.
+//
 
 import Foundation
-import MWDATCore
 import SwiftUI
 
+#if !SPEAKUP_NO_DAT
+import MWDATCore
 #if DEBUG
 import MWDATMockDevice
+#endif
 #endif
 
 @main
 struct CameraAccessApp: App {
+  #if !SPEAKUP_NO_DAT
   #if DEBUG
   // Debug menu for simulating device connections during development. The
   // ladybug button toggles `showDebugMenu`; the sheet hosts the mock device kit.
   @State private var showDebugMenu = false
   @State private var mockDeviceKitViewModel = MockDeviceKitViewModel(mockDeviceKit: MockDeviceKit.shared)
   #endif
-  private let wearables: WearablesInterface
   @State private var wearablesViewModel: WearablesViewModel
+  #else
+  @State private var noGlasses = NoGlassesLink()
+  #endif
 
   init() {
+    #if !SPEAKUP_NO_DAT
     do {
       try Wearables.configure()
     } catch {
@@ -62,6 +72,7 @@ struct CameraAccessApp: App {
       }
     }
     #endif
+    #endif
 
     // A test that asks for onboarding gets the first-run screen, whatever an earlier run saved.
     if LaunchOptions.isUITesting, LaunchOptions.forcesOnboarding {
@@ -72,16 +83,22 @@ struct CameraAccessApp: App {
     // And look up the voice, so the first word doesn't wait on that.
     AppVoice.shared.prepare()
 
-    let wearables = Wearables.shared
-    self.wearables = wearables
-    self._wearablesViewModel = State(wrappedValue: WearablesViewModel(wearables: wearables))
+    #if !SPEAKUP_NO_DAT
+    self._wearablesViewModel = State(wrappedValue: WearablesViewModel(wearables: Wearables.shared))
+    #endif
   }
 
   var body: some Scene {
     WindowGroup {
-      // Main app view with access to the shared Wearables SDK instance
-      // The Wearables.shared singleton provides the core DAT API
-      MainAppView(wearables: Wearables.shared, viewModel: wearablesViewModel)
+      #if SPEAKUP_NO_DAT
+      // The App Store build: the phone camera only. speakup://handsfree still opens hands-free.
+      MainAppView(link: noGlasses)
+        .onOpenURL { url in
+          if HandsFreeMode.isHandsFreeURL(url) { VoiceControl.shared.startHandsFreeFromLaunch() }
+        }
+      #else
+      // Main app view with the glasses link (WearablesViewModel wraps the shared Wearables SDK).
+      MainAppView(link: wearablesViewModel)
         // Registration and update failures: the title says what happened, the message is the
         // spoken sentence, and the action (if any) is the one next step.
         .alert(wearablesViewModel.errorTitle, isPresented: $wearablesViewModel.showError) {
@@ -113,6 +130,7 @@ struct CameraAccessApp: App {
         DebugMenuView(showDebugMenu: $showDebugMenu)
       }
         #endif
+      #endif
     }
   }
 }

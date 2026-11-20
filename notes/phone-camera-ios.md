@@ -65,15 +65,44 @@ Unit tests on the iPhone 17 Simulator (iOS 27.0, Xcode 27.2): 229 run with 1 fai
 
 ## App Store build without the DAT SDK
 
-Meta's docs (build-integration-ios > Prerequisites, DAT v1.0): "since the SDK currently uses the ExternalAccessory framework, it will lead to App Store rejection due to Apple's MFi program and privacy manifest requirements." A store build must not link the SDK. **Not built in this change**: it isn't contained enough.
+Meta's docs (build-integration-ios > Prerequisites, DAT v1.0): "since the SDK currently uses the ExternalAccessory framework, it will lead to App Store rejection due to Apple's MFi program and privacy manifest requirements." A store build must not link the SDK. Built on 2026-11-20.
 
-What it would take:
+There are now two app targets in `CameraAccess.xcodeproj`:
 
-- **18 app files import `MWDAT*`**, and 5 more use `CameraViewModel` or `WearablesViewModel` without importing it (`CameraNarration`, `CameraViewModel+Read`, `LaunchIntents`, two MockDeviceKit views). Tests: 3 files import it.
-- **Leave out of the store target (10 files)**: `ViewModels/CameraViewModel.swift`, `ViewModels/WearablesViewModel.swift`, `Views/RegistrationView.swift`, the 5 MockDeviceKit files, `A11y/HandsFree/DATGlassesDisplay.swift`, `A11y/Voice/GlassesSpeechListener.swift`. Plus `CameraViewModel+Read/+Status`, `CameraProblem` and the `CameraViewModel` extension in `VoiceCoach`.
-- **Rework behind a protocol (about 8 files)**: `CameraView` (574 lines, typed on both view models throughout), `OnboardingView`, `HomeScreenView`, `MainAppView`, `CameraAccessApp` (`Wearables.configure`, the mock test server), `CameraNarrator`/`CameraNarration`, `VoiceControl` (`attachGlasses(session:wearables:)`). The clean way is a `GlassesLink` protocol (registration state as an app enum, connect, disconnect, notice, update required) and a `GlassesCamera` protocol (status line, phase, don/hinge/battery), with DAT implementations and a "no glasses" stub, and `#if !SPEAKUP_NO_DAT` only at the seams.
-- **Project**: a second app target (`SpeakUp`) sharing the synchronized `A11y` group with membership exceptions, no `MWDAT*` package products, `SWIFT_ACTIVE_COMPILATION_CONDITIONS = SPEAKUP_NO_DAT`, its own scheme, and its own Info.plist without the `MWDAT` dictionary, the `bluetooth-central`/`bluetooth-peripheral` background modes, the Bluetooth descriptions, and the local network and Bonjour keys (if those are only for DAT). `UISupportedExternalAccessoryProtocols` isn't in the current plist. A test plan run against both targets.
-- **Estimate**: 2 to 3 days, most of it in `CameraView` and the onboarding and voice seams. It touches every main-screen path, so it should be its own change. This change makes it smaller: the router, the phone source and the phone UI don't import DAT.
+- **CameraAccess** (the Beta, glasses build): unchanged in behaviour. Links DAT, bundle id `com.deaco.hstnbench`.
+- **SpeakUp** (the App Store build): bundle id `com.deaco.speakup`, scheme `SpeakUp`. Links no `MWDAT*` product, compiles with `SPEAKUP_NO_DAT`, and uses `Config/SpeakUp-Info.plist`. The built app has no `Frameworks` folder and no `MWDAT` symbols.
+
+### What was built
+
+- **Protocols** in `A11y/Glasses/GlassesLink.swift`, with no DAT types. `GlassesLink`: registration as an app enum (`GlassesRegistration`), connecting, notice, update required, connect, disconnect, updates, and `makeCamera()`. `GlassesCamera`: status line, phase, worn (`GlassesWear`), folded (`GlassesHinge`), battery, errors and the permission prompt. `CameraPhase`, `cameraBatteryWarningPercent`, `CameraErrorAction` and `coachSituation` moved here from DAT files.
+- **DAT side** in `A11y/Glasses/DATGlassesLink.swift`: `WearablesViewModel` and `CameraViewModel` conform. Nothing else in them changed.
+- **No-glasses side** in `A11y/Glasses/NoGlassesLink.swift`: `NoGlassesLink` and `NoGlassesCamera`. Asking to connect says "Meta glasses work in the SpeakUp Beta app. This version reads with your iPhone's camera."
+- **Views** use the protocols: `MainAppView(link:)`, `OnboardingView(link:)`, `HomeScreenView(link:)`, `CameraView(link:)`, `CameraNarrator`, `CameraNarration`. `VoiceCoach` no longer imports DAT.
+- **`#if !SPEAKUP_NO_DAT`** only in `CameraAccessApp` (DAT setup, mock kit, registration view; the store build passes `NoGlassesLink` and handles `speakup://handsfree` itself) and `VoiceControl.attachGlasses(session:wearables:)`.
+- **Left out of the SpeakUp target**: the DAT view models, `RegistrationView`, the MockDeviceKit files, `DebugMenuView`, `VideoFrameDecoder` (they are explicit files, not added to it), and by membership exception in `A11y`: `DATGlassesLink`, `DATGlassesDisplay`, `GlassesSpeechListener`, `CameraViewModel+Status`, `CameraViewModel+Read`, `CameraProblem`, and the test fixtures in `Read/Fixtures`.
+
+### What the store build does differently
+
+- **Setup**: one button, "Start reading", straight to the main screen with the phone camera. The welcome line doesn't mention glasses. "continue", "yes" or "phone" by voice also start. "connect" says glasses need the Beta app.
+- **Main screen**: no camera switch (only the caption), and no "Connect my glasses" or "Disconnect" in Settings. `CameraSourceRouter.preference` is always phone. "use the glasses", "connect" and "disconnect" say glasses need the Beta app.
+- **Info.plist**: no `MWDAT` dictionary, no Bluetooth background modes or descriptions, no local network or Bonjour keys, no `hstnbench` URL scheme, no photo library line (nothing saves photos). Background modes: `audio` only. The microphone line no longer mentions the glasses. No entitlements file.
+
+### How to build it
+
+```sh
+xcodebuild build -project CameraAccess.xcodeproj -scheme SpeakUp \
+  -destination 'platform=iOS Simulator,name=<your simulator>'
+```
+
+Unit tests stay on the CameraAccess scheme. iPhone 17 Simulator, iOS 27.0, Xcode 27.2: 259 run with 1 failure before, and the same 259 with the same 1 failure after (the known `DATGlassesDisplayMockTests.testTheCardRendersOnTheMockDisplay`). The SpeakUp app was launched in the Simulator: the setup screen shows only Start reading, and the main screen shows Ready to read, the phone camera card and Read text.
+
+### What's left
+
+- **Signing and App Store Connect**: set the team, create the `com.deaco.speakup` app record, add a privacy manifest (`PrivacyInfo.xcprivacy`) and check the export compliance answer. Not tried.
+- **Voice help still names the glasses** in the store build ("use the glasses", "connect" in help and hints). The commands answer honestly, but help could hide them when `GlassesSupport.isBuiltIn` is false.
+- **No tests run against the SpeakUp target**. A small test target hosted in SpeakUp (onboarding without glasses, router stays on the phone) would catch a DAT import slipping into a shared file. Today a slip shows up as a SpeakUp build error, so build both schemes before merging.
+- **New files in `A11y`** go into both targets by default. A tool that imports `MWDAT*` must be added to the SpeakUp exception set in the project.
+- **App name and icon**: both builds show "SpeakUp". The Beta could get its own display name or icon so the two can sit side by side on one phone.
 
 ## Not tried on a real iPhone
 

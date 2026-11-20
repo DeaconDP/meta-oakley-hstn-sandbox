@@ -127,7 +127,8 @@ final class WearablesViewModel {
   @ObservationIgnored private var registrationTask: Task<Void, Never>?
   @ObservationIgnored private var deviceStreamTask: Task<Void, Never>?
   @ObservationIgnored private var setupDeviceStreamTask: Task<Void, Never>?
-  private let wearables: WearablesInterface
+  /// Internal so DATGlassesLink can make the camera screen's CameraViewModel from it.
+  let wearables: WearablesInterface
   private var deviceCompatibility: [DeviceIdentifier: Compatibility] = [:]
   private var compatibilityListenerTokens: [DeviceIdentifier: AnyListenerToken] = [:]
 

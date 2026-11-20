@@ -29,16 +29,19 @@
 // by spoken lines and yes/no questions (CameraNarrator), and the screen publishes its card to
 // HandsFreeSurface for a glasses display.
 //
+// No DAT types here: the glasses come in as GlassesLink and GlassesCamera (A11y/Glasses). In the
+// App Store build (SPEAKUP_NO_DAT) they are NoGlassesLink, so there is no connect or disconnect,
+// no camera switch, and "connect" or "use the glasses" says glasses need the Beta app.
+//
 
-import MWDATCore
 import SwiftUI
 import UIKit
 
 private let updateRequiredTitle = "Update required"
 
 struct CameraView: View {
-  @State private var viewModel: CameraViewModel
-  @Bindable var wearablesVM: WearablesViewModel
+  @State private var viewModel: any GlassesCamera
+  var link: any GlassesLink
   @State private var showSettingsMenu: Bool = false
   @State private var isLaunchingUpdate: Bool = false
   @State private var narrator = CameraNarrator()
@@ -47,13 +50,13 @@ struct CameraView: View {
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-  init(wearables: WearablesInterface, wearablesVM: WearablesViewModel) {
-    self._viewModel = State(wrappedValue: CameraViewModel(wearables: wearables))
-    self._wearablesVM = Bindable(wearablesVM)
+  init(link: any GlassesLink) {
+    self._viewModel = State(wrappedValue: link.makeCamera())
+    self.link = link
   }
 
   private var isUpdateRequired: Bool {
-    wearablesVM.requiresFirmwareUpdate
+    link.requiresFirmwareUpdate
   }
 
   /// Accessibility text sizes: the status card and the reading card stack their parts.
@@ -102,7 +105,7 @@ struct CameraView: View {
     // Two-finger scrub closes the settings menu.
     .accessibilityAction(.escape) { setSettingsMenu(open: false) }
     // No dialogs in hands-free: CameraNarrator says the error and "try again" runs its action.
-    .alert(viewModel.errorTitle.isEmpty ? "Couldn't do that" : viewModel.errorTitle, isPresented: unlessHandsFree($viewModel.showError)) {
+    .alert(viewModel.errorTitle.isEmpty ? "Couldn't do that" : viewModel.errorTitle, isPresented: unlessHandsFree(showErrorBinding)) {
       // One next step, then OK. VoiceOver reads title, message and both buttons.
       if let action = viewModel.errorAction {
         Button(action.title) {
@@ -114,7 +117,7 @@ struct CameraView: View {
     } message: {
       Text(viewModel.errorMessage)
     }
-    .alert("Allow camera access", isPresented: unlessHandsFree($viewModel.showCameraPermissionRedirectConfirm)) {
+    .alert("Allow camera access", isPresented: unlessHandsFree(permissionPromptBinding)) {
       // The Read that asked for access carries on once it's allowed.
       Button("Continue") {
         VoiceControl.shared.clearQuestion()
@@ -129,10 +132,10 @@ struct CameraView: View {
     }
     .modifier(
       CameraNarration(
-        viewModel: viewModel, narrator: narrator, updateRequired: { wearablesVM.requiresFirmwareUpdate },
+        viewModel: viewModel, narrator: narrator, updateRequired: { [link] in link.requiresFirmwareUpdate },
         permissionYes: confirmCameraPermission, permissionNo: declineCameraPermission))
     // The router follows the glasses' link and presence to pick the camera.
-    .onChange(of: wearablesVM.registrationState) { _, state in router.registered = state == .registered }
+    .onChange(of: link.isRegistered) { _, registered in router.registered = registered }
     .onChange(of: viewModel.hasActiveDevice) { _, connected in router.glassesConnected = connected }
     // Problems while the phone camera is in use: said in both modes, like the glasses' pauses.
     .onChange(of: router.phoneProblem) { old, new in
@@ -165,22 +168,22 @@ struct CameraView: View {
     }
     // Lets StatusIntent answer through Siri without opening the app.
     .onAppear {
-      router.glasses = viewModel
-      router.registered = wearablesVM.registrationState == .registered
+      router.glasses = viewModel.frameSource
+      router.registered = link.isRegistered
       router.glassesConnected = viewModel.hasActiveDevice
       narrator.glassesInUse = { [router] in router.active == .glasses }
-      LaunchActionRouter.shared.statusProvider = { [viewModel, wearablesVM, router] in
-        router.phoneStatusLine ?? viewModel.statusLine(updateRequired: wearablesVM.requiresFirmwareUpdate)
+      LaunchActionRouter.shared.statusProvider = { [viewModel, link, router] in
+        router.phoneStatusLine ?? viewModel.statusLine(updateRequired: link.requiresFirmwareUpdate)
       }
       TextReader.shared.source = router
       VoiceControl.shared.setScreen(.camera, describe: describeForVoice, handler: handleVoice)
       // Spoken tips after a quiet spell ("Hold some text in front of you and say read").
-      VoiceCoach.shared.provide(for: .camera) { [viewModel, wearablesVM, router] in
+      VoiceCoach.shared.provide(for: .camera) { [viewModel, link, router] in
         if router.active == .phone {
           return CoachSituation.forPhone(problem: router.phoneProblem, hasReadSentences: TextReader.shared.hasSentences)
         }
         return viewModel.coachSituation(
-          updateRequired: wearablesVM.requiresFirmwareUpdate, hasReadSentences: TextReader.shared.hasSentences)
+          updateRequired: link.requiresFirmwareUpdate, hasReadSentences: TextReader.shared.hasSentences)
       }
     }
     .onDisappear {
@@ -193,7 +196,7 @@ struct CameraView: View {
         reader.source = nil
       }
       router.screenDisappeared()
-      if router.glasses === viewModel { router.glasses = nil }
+      if router.glasses === viewModel.frameSource { router.glasses = nil }
     }
     .navigationBarHidden(true)
   }
@@ -230,8 +233,9 @@ struct CameraView: View {
   /// From the camera card, or "connect" by voice without linked glasses. Once linked, auto uses
   /// them, so a phone choice goes back to auto.
   private func connectGlasses() {
-    if A11yPreferences.shared.cameraSource == .phone { A11yPreferences.shared.cameraSource = .auto }
-    wearablesVM.connectGlasses()
+    // The App Store build: the link only says that glasses need the Beta app. The setting stays.
+    if link.supportsGlasses, A11yPreferences.shared.cameraSource == .phone { A11yPreferences.shared.cameraSource = .auto }
+    link.connectGlasses()
   }
 
   /// Magic Tap: iOS's play/pause gesture. Stops a read in progress, otherwise reads. With an update
@@ -300,18 +304,19 @@ struct CameraView: View {
         TextReader.shared.read()
       }
     case .connect:
-      if wearablesVM.registrationState == .registered {
+      if link.isRegistered {
         Announcer.shared.say(SpokenMessage.alreadyConnected)
       } else {
         connectGlasses()
       }
     case .usePhone: router.choose(.phone)
-    case .useGlasses: router.choose(.glasses)
+    case .useGlasses:
+      if link.supportsGlasses { router.choose(.glasses) } else { link.connectGlasses() }
     case .whichCamera: Announcer.shared.say(router.whichCameraLine)
     case .torchOn: router.setTorch(true)
     case .torchOff: router.setTorch(false)
     case .disconnect:
-      wearablesVM.disconnectGlasses()
+      link.disconnectGlasses()
     default: return false
     }
     return true
@@ -350,6 +355,16 @@ struct CameraView: View {
     Binding(get: { binding.wrappedValue && !A11yPreferences.shared.handsFree }, set: { binding.wrappedValue = $0 })
   }
 
+  private var showErrorBinding: Binding<Bool> {
+    Binding(get: { [viewModel] in viewModel.showError }, set: { [viewModel] in viewModel.showError = $0 })
+  }
+
+  private var permissionPromptBinding: Binding<Bool> {
+    Binding(
+      get: { [viewModel] in viewModel.showCameraPermissionRedirectConfirm },
+      set: { [viewModel] in viewModel.showCameraPermissionRedirectConfirm = $0 })
+  }
+
   // MARK: - The glasses display card
 
   /// One line: what the reader is doing, else the status title.
@@ -379,7 +394,7 @@ struct CameraView: View {
         TextReader.shared.read()
       }
     case .updateGlassesApp:
-      Task { await wearablesVM.openDATGlassesAppUpdate() }
+      Task { await link.openDATGlassesAppUpdate() }
     case .openSettings:
       if let url = URL(string: UIApplication.openSettingsURLString) {
         UIApplication.shared.open(url)
@@ -405,7 +420,10 @@ struct CameraView: View {
       .accessibilityIdentifier("settings_button")
       .accessibilityLabel("Settings")
       .accessibilityValue(showSettingsMenu ? "Open" : "Closed")
-      .accessibilityHint("Shows voice control, voice, reading voice, Replay setup and Disconnect.")
+      .accessibilityHint(
+        link.supportsGlasses
+          ? "Shows voice control, voice, reading voice, Replay setup and Disconnect."
+          : "Shows voice control, voice, reading voice and Replay setup.")
     }
   }
 
@@ -431,11 +449,11 @@ struct CameraView: View {
     if isUpdateRequired {
       return Status(title: updateRequiredTitle, subtitle: "Apply the update to start reading.", mood: .confused)
     }
-    if viewModel.hingeState == .closed {
+    if viewModel.hinge == .closed {
       return Status(title: "Glasses folded", subtitle: "Unfold them to read.", mood: .idle)
     }
     if viewModel.isPaused {
-      let removed = viewModel.donState == .doffed
+      let removed = viewModel.wear == .doffed
       return Status(title: removed ? "Glasses removed" : "Paused", subtitle: "Tap your glasses to resume.", mood: .idle)
     }
     if viewModel.isBusy {
@@ -479,23 +497,26 @@ struct CameraView: View {
         A11yPreferences.shared.resetOnboarding()
       }
       .accessibilityHint("Goes through the sounds, speaker test and detail level again.")
-      if wearablesVM.registrationState != .registered {
-        CustomButton(title: "Connect my glasses", style: .secondary, isDisabled: wearablesVM.isConnecting) {
-          setSettingsMenu(open: false)
-          connectGlasses()
+      // The App Store build has no glasses, so nothing to connect or disconnect.
+      if link.supportsGlasses {
+        if !link.isRegistered {
+          CustomButton(title: "Connect my glasses", style: .secondary, isDisabled: link.isConnecting) {
+            setSettingsMenu(open: false)
+            connectGlasses()
+          }
+          .accessibilityHint("Optional. Opens the Meta AI app to link your glasses, then come back.")
+          .accessibilityIdentifier("settings_connect_glasses_button")
         }
-        .accessibilityHint("Optional. Opens the Meta AI app to link your glasses, then come back.")
-        .accessibilityIdentifier("settings_connect_glasses_button")
+        CustomButton(
+          title: "Disconnect",
+          style: .destructive,
+          isDisabled: !link.isRegistered
+        ) {
+          link.disconnectGlasses()
+          setSettingsMenu(open: false)
+        }
+        .accessibilityHint("Disconnects this app from your glasses. You'd connect again through Meta AI.")
       }
-      CustomButton(
-        title: "Disconnect",
-        style: .destructive,
-        isDisabled: wearablesVM.registrationState != .registered
-      ) {
-        wearablesVM.disconnectGlasses()
-        setSettingsMenu(open: false)
-      }
-      .accessibilityHint("Disconnects this app from your glasses. You'd connect again through Meta AI.")
     }
     .themeCard()
     .transition(.opacity)
@@ -528,7 +549,7 @@ struct CameraView: View {
     CustomButton(title: "Update firmware", style: .primary, isDisabled: isLaunchingUpdate) {
       isLaunchingUpdate = true
       Task {
-        await wearablesVM.openFirmwareUpdate()
+        await link.openFirmwareUpdate()
         isLaunchingUpdate = false
       }
     }

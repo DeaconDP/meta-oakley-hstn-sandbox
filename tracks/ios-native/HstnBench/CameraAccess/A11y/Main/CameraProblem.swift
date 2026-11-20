@@ -10,25 +10,7 @@
 import MWDATCamera
 import MWDATCore
 
-/// The single next step offered with an error. The camera screen turns it into an alert button and
-/// performs it.
-enum CameraErrorAction: Equatable, Sendable {
-  /// Reads again, which starts the camera again on the way.
-  case tryAgain
-  /// Re-runs the camera start, which checks permission and explains the Meta AI switch first.
-  case allowCamera
-  case updateGlassesApp
-  case openSettings
-
-  var title: String {
-    switch self {
-    case .tryAgain: "Try again"
-    case .allowCamera: "Allow camera"
-    case .updateGlassesApp: "Update in Meta AI"
-    case .openSettings: "Open Settings"
-    }
-  }
-}
+// CameraErrorAction is in A11y/Glasses/GlassesLink.swift, so the App Store build has it too.
 
 struct CameraProblem: Equatable, Sendable {
   /// Short alert title; the message carries the full sentence.

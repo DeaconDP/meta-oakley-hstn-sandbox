@@ -26,8 +26,10 @@ final class CameraSourceRouter: ReadFrameSource {
   static let shared = CameraSourceRouter()
 
   /// What the user picked (A11yPreferences.cameraSource), except that UI tests keep the old
-  /// glasses-only screens unless launched with --phone-camera.
+  /// glasses-only screens unless launched with --phone-camera. The App Store build (no DAT) is
+  /// always the phone.
   var preference: CameraSourcePreference {
+    if !GlassesSupport.isBuiltIn { return .phone }
     if LaunchOptions.isUITesting, !LaunchOptions.usesPhoneCamera, preferenceOverride == nil { return .glasses }
     return preferenceOverride ?? preferences.cameraSource
   }

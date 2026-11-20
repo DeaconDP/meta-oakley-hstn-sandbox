@@ -26,7 +26,9 @@
  */
 
 import AVFoundation
+#if !SPEAKUP_NO_DAT
 import MWDATCore
+#endif
 import Observation
 import Speech
 import UIKit
@@ -483,8 +485,10 @@ final class VoiceControl {
 
   // MARK: Glasses
 
+  #if !SPEAKUP_NO_DAT
   /// A device session reached STARTED. Checks the wearable mic quietly; never redirects to Meta AI
-  /// on its own (requestGlassesMicrophone does, from a button).
+  /// on its own (requestGlassesMicrophone does, from a button). Not in the App Store build, which
+  /// has no DAT: there the phone's mic is the only one.
   func attachGlasses(session: DeviceSession, wearables: WearablesInterface) {
     guard !environment.isInert, environment.glassesSpeechEnabled() else { return }
     attachGlasses(
@@ -498,6 +502,7 @@ final class VoiceControl {
         return status == .granted ? .granted : .denied
       })
   }
+  #endif
 
   /// Separate from the DAT types, so tests can use a fake listener.
   func attachGlasses(

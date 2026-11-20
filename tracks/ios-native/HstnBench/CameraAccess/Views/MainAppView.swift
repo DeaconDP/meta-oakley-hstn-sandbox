@@ -18,28 +18,29 @@
 // is "glasses" and they aren't linked (CameraSourcePolicy.showsCameraScreen). Resetting it (A11yPreferences.shared.resetOnboarding()) shows it again,
 // which is how "Replay setup" works. UI tests skip it unless launched with --onboarding.
 //
+// The glasses come in as a GlassesLink: WearablesViewModel in the Beta build, NoGlassesLink in the
+// App Store build, which never shows the connect screen.
+//
 
-import MWDATCore
 import SwiftUI
 
 struct MainAppView: View {
-  let wearables: WearablesInterface
-  var viewModel: WearablesViewModel
+  var link: any GlassesLink
 
   private let preferences = A11yPreferences.shared
 
   var body: some View {
     Group {
       if !preferences.onboardingCompleted, !LaunchOptions.skipsOnboarding {
-        OnboardingView(wearablesViewModel: viewModel)
-      } else if CameraSourcePolicy.showsCameraScreen(
-        CameraSourceRouter.shared.preference, registered: viewModel.registrationState == .registered)
+        OnboardingView(link: link)
+      } else if !link.supportsGlasses
+        || CameraSourcePolicy.showsCameraScreen(CameraSourceRouter.shared.preference, registered: link.isRegistered)
       {
         // Linked glasses, or the phone camera (V0 "Glasses optional": no glasses needed).
-        CameraView(wearables: wearables, wearablesVM: viewModel)
+        CameraView(link: link)
       } else {
         // The user asked for the glasses and they aren't linked yet: the connect screen.
-        HomeScreenView(viewModel: viewModel)
+        HomeScreenView(link: link)
       }
     }
     .safeAreaInset(edge: .top, spacing: 0) { VoiceDownloadNoticeBanner() }
