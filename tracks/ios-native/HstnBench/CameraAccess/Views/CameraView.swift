@@ -256,6 +256,9 @@ struct CameraView: View {
     case .read: TextReader.shared.read()
     case .status: speakStatus()
     case .repeatLast: Announcer.shared.repeatLast()
+    case .readImported: ImportedReading.readPending()
+    // Opening a tool is wired up by the tools home (ToolHub); until then Read text stands in.
+    case .openMail, .openLabels, .openWatch, .openAsk, .openLight: TextReader.shared.read()
     case nil: break
     }
   }
