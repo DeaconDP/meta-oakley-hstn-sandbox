@@ -92,8 +92,14 @@
 - [x] V0/V4 iOS (2026-11-20, notes/tools-home-ios.md, notes/reach-ios.md): tools home with Read text, Mail, Labels, Watch, Ask and Light; Siri and Shortcuts per tool; photos and PDFs from the share sheet, Files and the in-app button, read through TextReader with next/previous/repeat/stop. Unit 525/0, UI 41 passed, 1 skipped, 0 failed. Not tried on a real iPhone
 - [ ] V0 iOS: port the book reader
 - [ ] V4 iOS: real-iPhone pass: Siri phrases, Action Button, share sheet, Open in from Files, PhotosPicker, document picker, App Group provisioning
-- [ ] V1: "deal with this letter": deadline reminder, "what's due this week", letters log + export, plain-English explain (text only, optional Haiku), explain in my language
-- [ ] V2: food check (expiry vs today, my allergens, cooking steps); recipe/manual "next step"
+- [x] V1 iOS: "deal with this letter": the reminder offer, the letters log with export, explain on the phone or with AI, more scam rules (2026-11-20, notes/letters-ios.md). "My letters" and "read the letter from ..." work from any screen
+- [ ] V1 Android: "deal with this letter": deadline reminder, "what's due this week", letters log + export, plain-English explain (text only, optional Haiku), explain in my language
+- [ ] V1 iOS on a real iPhone: read real letters, let a letter reminder go off, export the log through the share sheet, and check the log can't be read while the phone is locked
+- [x] V2 iOS: food check in Labels (my allergens, dates against today, cooking steps) and "next step" in Read text (2026-11-20, notes/food-check-ios.md, notes/phone-reading-ios.md)
+- [ ] V2 Android: food check (expiry vs today, my allergens, cooking steps); recipe/manual "next step"
+- [ ] V2 iOS on a real iPhone: food check on real packs, small ingredient print, how often "touches the edge" stops it, cooking steps on real packs and recipe photos
+- [x] Voice clashes after the iOS merge (2026-11-20): "yes", "no", "done" and "undo" go to the newest question; step words go to the open tool only; "big text" and "remind me" work inside other tools (notes/tools-home-ios.md > Voice clashes)
+- [ ] Voice clashes on a real iPhone: "yes", "done", "undo" and "next step" with a live mic, across tools
 - [ ] V3: carer mode: consented, per-item, revocable sharing of letter summaries and the medication log
 - [ ] V4: Quick Settings tile, widget, share target for images/PDFs; iOS Action Button / App Intents / Back Tap; job-first store copy and keywords
 - [ ] Make on-device speech the default; check OpenAI TTS shutdown date (reported 2027-01-06) and replacement price
@@ -101,12 +107,18 @@
 - [ ] Business: list grants (Meta AI Glasses Impact Grants, Microsoft AI for Accessibility, Innovate UK), contact BVA / Vision Ireland / ACB about a glasses Beta, sound out one UK bank or energy firm about sponsoring "understand your letter"
 
 ## Beyond reading (notes/use-cases.md)
-- [ ] U1: Reminders tool: "remind me in 20 minutes / at 6 to …", "what reminders do I have", done/snooze/repeat; spoken on the glasses when `donState` says worn, otherwise a phone notification
-- [ ] U1: Notes and "what was I doing?" (tool-action log + spoken notes, no frames)
-- [ ] U1: Medication log ("I took it" / "did I take my evening pill?"), never says a dose
+- [x] U1 iOS: Reminders tool: time reminders, "what reminders do I have", "what's due this week", done and snooze; spoken in the app, a notification otherwise (2026-11-20, notes/reminders-ios.md)
+- [x] U1 iOS: "what was I doing?" from the tool log (no spoken notes yet)
+- [x] U1 iOS: medication log ("I took it", "did I take my evening pill?"), never says a dose
+- [ ] U1 iOS on a real iPhone: a reminder going off in front, in the background and locked; the permission prompt and "notifications off"; Snooze and Done on the notification; the store while locked; VoiceOver on the panel
+- [ ] U1: Reminders tool on Android, and spoken on the glasses when `donState` says worn
+- [ ] U1: spoken notes (tool-action log + spoken notes, no frames)
+- [ ] U1: Medication log on Android ("I took it" / "did I take my evening pill?"), never says a dose
 - [ ] U1: Routine checklists by voice ("leaving the house"), can call the Light tool
-- [ ] U1: Labels: expiry check against today, allergen check against the user's list, abstain when cut off
-- [ ] U1: Mail: scam-sign rules (urgent payment, gift cards, "final notice", bank details asked for)
+- [x] U1 iOS: Labels: expiry check against today, allergen check against the user's list, abstain when cut off (2026-11-20, notes/food-check-ios.md)
+- [ ] U1 Android: Labels: expiry check against today, allergen check against the user's list, abstain when cut off
+- [x] U1 iOS: Mail: scam-sign rules (urgent payment, gift cards, "final notice", bank details asked for) (2026-11-20, notes/letters-ios.md)
+- [ ] U1 Android: Mail: scam-sign rules (check against the iOS list)
 - [ ] U1: Check whether a TalkBack/VoiceOver-read phone notification reaches the glasses over A2DP when SpeakUp isn't running
 - [ ] U2: "Where am I" tool (GPS + reverse geocode + nearest junction); carve out the book reader's "where am I"
 - [ ] U2: Markers and "take me back" (clock-face bearing and distance on request)

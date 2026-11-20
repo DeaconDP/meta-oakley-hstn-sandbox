@@ -182,11 +182,11 @@ enum ReadTextVoice {
         mirror.hide()
         return true
       case .yes:
-        guard reader.torchOfferPending else { return false }
+        guard reader.torchOfferTakesAnswer else { return false }
         reader.acceptTorchOffer()
         return true
       case .no:
-        guard reader.torchOfferPending else { return false }
+        guard reader.torchOfferTakesAnswer else { return false }
         reader.declineTorchOffer()
         return true
       }

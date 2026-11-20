@@ -78,6 +78,11 @@ enum ReminderGrammar {
     return nil
   }
 
+  /// "undo", "cancel that": takes back the reminder just added (ToolHub, from another tool).
+  static func isUndo(_ text: String) -> Bool {
+    undoPhrases.contains(stripFillers(ReminderTimeParser.tokens(text)).map(\.norm).joined(separator: " "))
+  }
+
   /// For ToolHub: does this go to Reminders from any screen?
   static func worksFromAnywhere(_ text: String) -> Bool {
     parse(text)?.worksFromAnywhere ?? false

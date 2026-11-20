@@ -629,7 +629,9 @@ final class RemindersWiringTests: XCTestCase {
     XCTAssertEqual(lines.first, "Reminders. Nothing coming up. \(RemindersWording.start)")
   }
 
-  func testRemindMeFromAnotherToolOpensReminders() async throws {
+  /// From the home, "remind me ..." opens Reminders without its opening line. Inside another tool
+  /// it answers in place (VoiceClashTests has the clashes).
+  func testRemindMeFromTheHomeOpensRemindersAndInAToolAnswersInPlace() async throws {
     let notes = FakeNotifications()
     let store = ReminderStore(fileURL: nil, notifier: notes, clock: Fixed.clock)
     var lines: [String] = []
@@ -638,12 +640,17 @@ final class RemindersWiringTests: XCTestCase {
       if id == .reminders { return reminders }
       return BlankTool(id)
     }
-    hub.open(.mail)
     XCTAssertTrue(hub.route("remind me in 20 minutes to read the letter", command: nil))
     XCTAssertEqual(hub.openTool, .reminders)
     for _ in 0..<50 where store.reminders.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
     XCTAssertEqual(store.reminders.count, 1)
     XCTAssertEqual(lines, ["Reminder at 2:20 pm today: read the letter. Say undo to cancel."], "no opening line first")
+
+    hub.open(.mail)
+    XCTAssertTrue(hub.route("remind me at 6 to take the bins out", command: nil))
+    XCTAssertEqual(hub.openTool, .mail, "answered in place")
+    for _ in 0..<50 where store.reminders.count < 2 { try await Task.sleep(for: .milliseconds(20)) }
+    XCTAssertEqual(store.reminders.count, 2)
 
     hub.open(.labels)
     XCTAssertTrue(hub.route("what was I doing", command: nil))

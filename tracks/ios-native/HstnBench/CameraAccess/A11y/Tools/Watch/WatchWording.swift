@@ -12,11 +12,8 @@ enum WatchWording {
   static let name = "Watch for text"
 
   static func help(camera: CameraKind) -> String {
-    let what = camera == .phone ? "your phone's camera" : "your glasses"
-    return "I keep reading what \(what) can see and tell you when your word or number appears, and which side it's on. "
-      + "You can say: watch for, then a word or number. Where is it. What are you watching for. Watch for something else. "
-      + "Stop watching. Carry on watching. Ticks off, ticks on, or tick every 20 seconds. "
-      + "I can miss things, so silence doesn't mean it isn't there. Keep using your cane or dog as usual."
+    "Watch for text. Say watch for, then a word or number. Say where is it, or stop watching. "
+      + "I can miss things, so silence doesn't mean it isn't there."
   }
 
   static let askTarget = "What should I watch for? Say a word or a number, like 42, or exit."

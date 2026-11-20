@@ -8,14 +8,28 @@
  * ("Mail reader. Hold the phone flat over a letter..."). Read text is the original TextReader,
  * wrapped as ReadTextTool so it opens and closes like the rest.
  *
- * Voice (VoiceToolRouting, called by VoiceControl before the screen's commands):
- * - The app's always-on commands win: stop, close, main menu, help, where am I, list tools,
- *   settings by voice, faster and slower, and a command that opens another tool.
- * - Then the open tool sees the words, so its own phrases ("read", "repeat", "how much", "back")
- *   aren't taken by the app's grammar first.
- * - Then "watch for 42" / "tell me when you see 42" from anywhere opens Watch with that target,
- *   and, with Read text open, a question about the page ("what does ephemeral mean") goes to Ask.
- * - Anything else goes on to the screen as before ("read" opens Read text and reads).
+ * Voice (VoiceToolRouting, called by VoiceControl before the screen's commands). Short answers
+ * go to the newest question still waiting (VoiceQuestions). The order:
+ * 1. A reminder that just went off: "snooze" (for 30 minutes), and "done" while the reminder is
+ *    the newest question (no tool opened or closed, nothing else asked since). Otherwise "done"
+ *    is close again.
+ * 2. "Undo" just after a reminder was added from another tool, while that's the newest question.
+ * 3. The app's always-on commands win: stop, close, main menu, help, where am I, list tools,
+ *    settings by voice, faster and slower, and a command that opens another tool.
+ * 4. Then the open tool sees the words, so its own phrases ("read", "repeat", "how much", "back",
+ *    "next step", "yes" to its own question) aren't taken by the app's grammar first. Steps belong
+ *    to the open tool only: Read text's page steps, or Labels' cooking steps.
+ * 5. "watch for 42" / "tell me when you see 42" from anywhere opens Watch with that target.
+ * 6. Letters from anywhere: "my letters", "what letters do I have" and "read the letter from
+ *    <sender>" open the mail reader and go to its letters log.
+ * 7. Reminders from anywhere: "remind me at 6 to ...", "what's due this week", "I took my evening
+ *    pill", "what was I doing?". From the home they open Reminders; inside a tool they answer in
+ *    place and the tool stays open.
+ * 8. "big text" outside Read text: from the home it opens Read text's big text; inside another
+ *    tool it says where big text is.
+ * 9. With Read text open, a question about the page ("what does ephemeral mean") goes to Ask.
+ * 10. The open tool's own name again, unused by it, restarts its first line.
+ * Anything else goes on to the screen as before ("read" opens Read text and reads).
  * Global stop cuts speech (the screen does that) and also calls the open tool's pauseForStop(),
  * so a light tone, a watch loop or a barcode search goes quiet too.
  */
@@ -36,6 +50,10 @@ final class ToolHub: VoiceToolRouting {
   @ObservationIgnored private var tools: [ToolID: any SpeakUpTool] = [:]
   @ObservationIgnored private let makeTool: @MainActor (ToolID) -> any SpeakUpTool
   @ObservationIgnored private let announcer: Announcer
+  /// Who asked last (VoiceQuestions). Opening or closing a tool means the user moved on.
+  @ObservationIgnored var questions: VoiceQuestions = .shared
+  /// The reminder that went off last ("done", "snooze"); tests pass their own.
+  @ObservationIgnored var alerts: ReminderAlerts = .shared
 
   /// The app's commands that always mean the same thing, even with a tool open.
   static let alwaysGlobal: Set<VoiceCommand> = [
@@ -89,6 +107,7 @@ final class ToolHub: VoiceToolRouting {
     }
     BenchClock.shared.note("tool open=\(id.rawValue)")
     ActivityLog.shared.note("Opened \(id.title)", tool: id)
+    questions.movedOn()
     openTool = id
     tool(id).start(source: source)
   }
@@ -118,6 +137,7 @@ final class ToolHub: VoiceToolRouting {
     self.openTool = nil
     BenchClock.shared.note("tool close=\(openTool.rawValue)")
     ActivityLog.shared.note("Closed \(openTool.title)", tool: openTool)
+    questions.movedOn()
     if announce { announcer.announce(SpokenMessage.toolClosed(openTool), earcon: .ready, kind: .status) }
   }
 
@@ -129,11 +149,17 @@ final class ToolHub: VoiceToolRouting {
   // MARK: Voice
 
   func route(_ text: String, command: VoiceCommand?) -> Bool {
-    // A reminder just went off: "done" and "snooze" answer it, wherever the user is.
-    if ReminderAlerts.shared.takesReply(text) { return true }
+    // 1. A reminder just went off: "snooze", and "done" while it's the newest question.
+    if alerts.takesReply(text) { return true }
+    // 2. "Undo" right after a reminder was added from another tool, while that's the newest question.
+    if openTool != .reminders, ReminderGrammar.isUndo(text), let reminders = tool(.reminders) as? RemindersTool,
+      reminders.handleFromAnywhere(text, hub: self)
+    {
+      return true
+    }
     if let command {
-      // Another tool by name, or an always-on command: the app's. Saying the open tool's own name
-      // phrase ("read the label", "what colour is this") is left to that tool first.
+      // 3. Another tool by name, or an always-on command: the app's. Saying the open tool's own
+      // name phrase ("read the label", "what colour is this") is left to that tool first.
       if let target = command.tool, target != openTool, command != .read || openTool == nil {
         if command == .read { return false }  // The screen's "read": opens Read text and reads.
         open(target, phrase: text)
@@ -141,29 +167,76 @@ final class ToolHub: VoiceToolRouting {
       }
       if Self.alwaysGlobal.contains(command), command.tool == nil { return false }
     }
+    // 4. The open tool's own phrases.
     if let current, current.handle(transcript: text) { return true }
+    // 5. "Watch for 42" from anywhere.
     if let request = WatchGrammar.opens(text) {
       openWatch(for: request.target)
       return true
     }
-    // "Remind me at 6 to ...", "what's due this week", "I took my evening pill", "what was I
-    // doing?" from anywhere (A11y/Reminders).
+    // 6. "My letters", "read the letter from Northgate" from anywhere (A11y/Letters).
+    if routeLetters(text) { return true }
+    // 7. "Remind me at 6 to ...", "what's due this week", "I took my evening pill", "what was I
+    // doing?" from anywhere (A11y/Reminders). In place inside a tool, Reminders opens from the home.
     if ReminderGrammar.worksFromAnywhere(text), let reminders = tool(.reminders) as? RemindersTool,
       reminders.handleFromAnywhere(text, hub: self)
     {
       return true
     }
+    // 8. "Big text" outside Read text.
+    if routeBigText(text) { return true }
+    // 9. A question about the page, with Read text open.
     if command == nil, openTool == .read, AskGrammar.isQuestion(text), let ask = tool(.ask) as? AskTool {
       ask.preferredSource = .read
       ask.ask(text)
       return true
     }
+    // 10. The open tool's name again, and the tool didn't use it: say its first line again.
     if let command, let target = command.tool, target == openTool, command != .read {
-      // The open tool's name again, and the tool didn't use it: say its first line again.
       open(target, phrase: text)
       return true
     }
     return false
+  }
+
+  /// "my letters", "what letters do I have", "read the letter from <sender>" with another tool
+  /// open or on the home: opens the mail reader without its first line, then its letters log.
+  /// With the mail reader open these never get here: it hears them first.
+  private func routeLetters(_ text: String) -> Bool {
+    guard let letter = Self.globalLetterCommand(text), let mail = tool(.mail) as? MailTool else { return false }
+    if openTool != .mail {
+      mail.quietStart = true
+      open(.mail)
+    }
+    switch letter {
+    case .readSaved(let name): mail.openSaved(named: name)
+    default: mail.listLetters()
+    }
+    return true
+  }
+
+  /// The letters phrases that work from anywhere. "read the council letter" stays the mail
+  /// reader's: from anywhere only "... letter from <sender>" opens a saved letter.
+  static func globalLetterCommand(_ text: String) -> LetterVoiceCommand? {
+    switch LetterGrammar.parse(text) {
+    case .myLetters: return .myLetters
+    case .readSaved(let name) where VoiceCommandParser.normalize(text).contains("from"): return .readSaved(name)
+    default: return nil
+    }
+  }
+
+  /// "big text" with no tool open opens Read text and its big text (which says so if nothing has
+  /// been read yet). Inside another tool it says where big text is, rather than nothing at all.
+  private func routeBigText(_ text: String) -> Bool {
+    guard let command = ReadTextPhrases.command(for: text), command == .bigTextOn || command == .bigTextOff else { return false }
+    guard let openTool else {
+      guard command == .bigTextOn else { return false }
+      openReadTextQuietly()
+      return current?.handle(transcript: text) ?? false
+    }
+    guard openTool != .read else { return false }
+    announcer.announce(SpokenMessage.bigTextOnlyInReadText, earcon: .attention, kind: .reply)
+    return true
   }
 }
 
@@ -184,7 +257,7 @@ final class ReadTextTool: SpeakUpTool {
   }
 
   var helpLine: String {
-    "Read text. Say read to read what's in view, then next, back, repeat or stop. Say big text for large print, and next step for recipes and manuals."
+    "Read text. Say read, then next, back or repeat. Say big text for large print, or next step for recipes."
   }
 
   func start(source: ReadFrameSource) {
@@ -204,6 +277,7 @@ final class ReadTextTool: SpeakUpTool {
   func stop() {
     if reader === TextReader.shared { FramingAssist.shared.stop() }
     if reader.isActive { reader.stop() }
+    reader.dropTorchOffer()
   }
 
   func handle(transcript: String) -> Bool { ReadTextVoice.handle(transcript, reader: reader) }

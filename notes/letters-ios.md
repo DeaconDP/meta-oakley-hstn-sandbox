@@ -73,7 +73,7 @@ Under the main buttons: the reminder offer as buttons (with No reminder), then E
 
 ## Phrases that need global routing
 
-They work only while the mail reader is open. These would be worth routing from anywhere (owner of VoiceCommand / ToolHub):
+Done 2026-11-20 (integration): "my letters", "what letters do I have" and "read the letter from <sender>" now work from any screen (ToolHub.route, step 6). "Explain this letter" from the home is still to do. The original list:
 
 - "my letters", "what letters do I have": open Mail, then `MailTool.listLetters()`.
 - "read the letter from <sender>": open Mail, then `MailTool.openSaved(named:)`.

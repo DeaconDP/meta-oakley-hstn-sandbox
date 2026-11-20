@@ -148,7 +148,11 @@ final class VoiceControl {
   @ObservationIgnored private var hasBegun = false
   @ObservationIgnored private var observers: [NSObjectProtocol] = []
   @ObservationIgnored private var describeScreen: (@MainActor () -> String?)?
-  @ObservationIgnored private var question: (yes: @MainActor () -> Void, no: @MainActor () -> Void)?
+  @ObservationIgnored private var question: (yes: @MainActor () -> Void, no: @MainActor () -> Void)? {
+    didSet { if case .some = question { questions.ask(.app) } else { questions.settle(.app) } }
+  }
+  /// Who asked last (VoiceQuestions): a tool's newer yes-or-no question gets "yes" before the app's.
+  @ObservationIgnored var questions: VoiceQuestions = .shared
   @ObservationIgnored private var pushToTalkTimeout: Task<Void, Never>?
   /// The tools (ToolHub): gets a transcript before the screen's commands, see inject(transcript:).
   @ObservationIgnored weak var tools: (any VoiceToolRouting)?
@@ -465,9 +469,11 @@ final class VoiceControl {
     performCommon(command, on: screen)
   }
 
-  /// A waiting question would take this command.
+  /// A waiting question would take this command first: the app asked, and no tool has asked a
+  /// yes-or-no question since (the mail reader's reminder offer, Read text's torch offer). If a
+  /// tool asked later, the tool hears "yes" first; if it doesn't take it, the app's question does.
   private func answersQuestion(_ command: VoiceCommand) -> Bool {
-    question != nil && [.yes, .no, .continueOn].contains(command)
+    question != nil && [.yes, .no, .continueOn].contains(command) && questions.isNewest(.app, among: VoiceAsker.yesOrNo)
   }
 
   /// A waiting question takes yes and no first.

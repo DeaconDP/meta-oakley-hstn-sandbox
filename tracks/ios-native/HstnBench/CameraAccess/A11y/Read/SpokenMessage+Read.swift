@@ -224,6 +224,9 @@ extension SpokenMessage {
 
   static let bigTextNothing = "Nothing read yet. Read something first, then say big text."
 
+  /// "big text" with another tool open: big text follows pages read in Read text.
+  static let bigTextOnlyInReadText = "Big text is for pages in Read text. Say open reader, then big text."
+
   // MARK: Read: steps
 
   static let stepsNothingRead = "Nothing read yet. Read a recipe or a manual first, then say next step."

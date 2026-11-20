@@ -74,7 +74,8 @@ enum HandsFreeTool: String, CaseIterable, Identifiable, Sendable {
 
   var summary: String {
     if let tool { return tool.summary }
-    return self == .status ? "Says whether the camera is ready to read." : "Voice, speed, answer length and the glasses display."
+    if self == .status { return "Says whether the camera is ready to read." }
+    return GlassesSupport.isBuiltIn ? "Voice, speed, answer length and the glasses display." : "Voice, speed and answer length."
   }
 
   var icon: String {

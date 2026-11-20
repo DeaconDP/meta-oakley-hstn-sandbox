@@ -8,10 +8,8 @@
 
 enum LabelsSpeech {
   static let help =
-    "Hold up a packet, tin or box in front of the camera. You can say: scan this, look it up, read the label, read it all, when does it expire, "
-    + "ingredients, how do I cook it, then next step, allergens, does it contain nuts, what is it, or stop scanning. "
-    + "For food check, tell me your allergens, for example my allergens are peanuts and milk, then say is this OK for me. "
-    + "Only the barcode number goes online, and only when you say look it up."
+    "Labels and barcodes. Say scan this, read the label, when does it expire, how do I cook it, or is this OK for me. "
+    + "Look it up sends only the barcode."
 
   // Food check: my allergens
   static let noAllergensSet =

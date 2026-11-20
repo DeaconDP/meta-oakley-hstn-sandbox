@@ -89,7 +89,11 @@ final class ReminderAlerts: NSObject, UNUserNotificationCenterDelegate {
     var at: Date
   }
 
-  private(set) var lastFired: Fired?
+  private(set) var lastFired: Fired? {
+    didSet { if lastFired != nil { questions.ask(.reminderAlert) } else { questions.settle(.reminderAlert) } }
+  }
+  /// Who asked last: "done" answers the reminder only while it is the newest question.
+  var questions: VoiceQuestions = .shared
   /// How long "done" and "snooze" mean the reminder that went off.
   static let replyWindow: TimeInterval = 30 * 60
 
@@ -168,10 +172,15 @@ final class ReminderAlerts: NSObject, UNUserNotificationCenterDelegate {
   }
 
   /// From ToolHub before anything else: "done" or "snooze" just after a reminder went off.
+  ///
+  /// "Snooze" means nothing else, so it works for the whole window. "Done" is also the app's
+  /// close, so it answers the reminder only while the reminder is the newest thing waiting: no
+  /// tool opened or closed since, and no other question asked since (VoiceQuestions).
   func takesReply(_ text: String) -> Bool {
     guard answerable != nil, let intent = ReminderGrammar.parse(text) else { return false }
     switch intent {
     case .done:
+      guard questions.isNewest(.reminderAlert) else { return false }
       done()
       return true
     case .snooze(let minutes):

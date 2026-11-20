@@ -194,7 +194,11 @@ final class TextReader {
   /// "It's dark" before OCR, with hysteresis (phone camera only).
   @ObservationIgnored var darkWatch = DarkWatch()
   /// After the dark warning: "Shall I turn the torch on?" waits for yes or no.
-  private(set) var torchOfferPending = false
+  private(set) var torchOfferPending = false {
+    didSet { if torchOfferPending { questions.ask(.torch) } else if oldValue { questions.settle(.torch) } }
+  }
+  /// Who asked last: "yes" goes to the torch offer only while it is the newest question.
+  @ObservationIgnored var questions: VoiceQuestions = .shared
   /// The torch is offered once per run.
   @ObservationIgnored private var torchOffered = false
   /// Haptic cues for framing verdicts (phone camera only).
@@ -353,6 +357,14 @@ final class TextReader {
       self.read()
     }
   }
+
+  /// Read text closed, or another tool opened: the offer lapses. The panel's button goes too.
+  func dropTorchOffer() {
+    torchOfferPending = false
+  }
+
+  /// "yes" or "no" now would answer the torch offer: it is waiting and no newer question is.
+  var torchOfferTakesAnswer: Bool { torchOfferPending && questions.isNewest(.torch) }
 
   func declineTorchOffer() {
     guard torchOfferPending else { return }

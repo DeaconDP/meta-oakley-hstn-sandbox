@@ -97,9 +97,7 @@ final class LightTool: SpeakUpTool {
   // MARK: SpeakUpTool
 
   var helpLine: String {
-    "In light mode, a tone rises with brightness. Turn the phone slowly to find the light. You can say: how bright is it, "
-      + "where's the light, is it blinking, tone off, or tone on. Say what colour is this to name the colour of what's in the "
-      + "middle of the view, and again to check again. Say light mode to go back to the tone."
+    "Light and colour. Say how bright is it, where's the light, or tone off. Say what colour is this, or light mode for the tone."
   }
 
   func start(source: any ReadFrameSource) {

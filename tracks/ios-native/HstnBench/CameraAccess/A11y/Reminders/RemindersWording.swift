@@ -9,10 +9,8 @@ enum RemindersWording {
   static let start = "Say remind me at 6 to take the bins out, what's due this week, or I took my evening pill."
 
   static let help =
-    "Reminders. Say remind me in 20 minutes to, remind me at 6 to, or remind me tomorrow at 9 to, then what. "
-    + "Say what reminders do I have, what's due this week, cancel the bins reminder, snooze, or done. "
-    + "For your medicine log: I took my evening pill, did I take my evening pill, or when did I last take it. "
-    + "What was I doing tells you your last steps."
+    "Reminders. Say remind me at 6 to take the bins out, what's due this week, or I took my evening pill. "
+    + "When a reminder goes off, say done or snooze."
 
   /// The line a reminder says when it goes off, from the words the user gave and nothing else.
   static func fired(_ text: String) -> String { "Reminder: \(yours(text))." }

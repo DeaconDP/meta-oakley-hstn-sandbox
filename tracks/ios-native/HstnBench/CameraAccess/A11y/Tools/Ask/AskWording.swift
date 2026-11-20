@@ -29,9 +29,7 @@ enum AskWording {
   static let notUnderstood = "Ask me what a word means, who someone is, what happened, or what the text said about something."
 
   static let start = "Ask me about what was just read. For example: what does a word mean, who is someone, or recap."
-  static let help =
-    "You can ask: what does a word mean. Spell it. Who is someone. What did it say about something, then next. "
-    + "Recap, or what happened last time. After an answer, say more."
+  static let help = "Ask about the text. Ask what a word means or who someone is, or say recap. After an answer, say more."
   static let dictionaryCredit =
     "Definitions from WordNet 3.0, Copyright 2006 by Princeton University. All rights reserved. Used under the WordNet licence."
   static let privacyOnDevice = "Questions are answered on this phone. Nothing is sent anywhere."

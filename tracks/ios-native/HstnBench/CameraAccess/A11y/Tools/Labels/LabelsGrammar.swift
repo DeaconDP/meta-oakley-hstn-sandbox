@@ -157,7 +157,13 @@ enum LabelsGrammar {
   private static let myList = "(?:my )?(?:allergens|allergies|allergy list|list)"
 
   private static let foodRules: [(LabelsRegex, @Sendable (String) -> LabelsCommand)] = [
-    (LabelsRegex("\\bremind me\\b|\\b(?:set|add|make|create) (?:a |up a |me a )?reminder\\b|^reminder$"), { _ in .remind }),
+    (
+      LabelsRegex(
+        "^(?:yes )?(?:remind me|(?:set|add|make|create) (?:a |up a |me a )?reminder|reminder)(?: (?:about|for|of) (?:it|this|that))?"
+          + "(?: (?:before|when) (?:it|this|that|they) (?:goes off|go off|expires|expire|runs out|run out|is out of date|goes out of date|is due)"
+          + "| before (?:the )?(?:date|use by(?: date)?|best before(?: date)?|expiry(?: date)?))?$"),
+      { _ in .remind }
+    ),
     (
       LabelsRegex(
         "^(?:what are|whats|what is|tell me|list|read|say|read out)? ?my (?:allergens|allergies|allergy list)$|^what am i allergic to$|"
@@ -191,6 +197,11 @@ enum LabelsGrammar {
     ),
   ]
 
+  /// "Remind me before it goes off": this pack's date. The first of the food rules.
+  private static var foodReminder: LabelsRegex { foodRules[0].0 }
+  /// Any reminder said to the app.
+  private static let generalReminder = LabelsRegex("^(?:yes )?(?:remind me|(?:set|add|make|create) (?:a |up a |me a )?reminder|reminder) ")
+
   /// Bare words that move through the cooking steps while they're being read.
   static func stepCommand(_ transcript: String) -> LabelsCommand? {
     switch LabelsPhrases.normalize(transcript) {
@@ -211,6 +222,9 @@ enum LabelsGrammar {
     guard !t.isEmpty else { return nil }
     // Doses first, before anything else can claim the words.
     if dose.contains(t) { return .dose }
+    // Any other reminder ("remind me at 6 to call Mum", "remind me to check the date") is the
+    // Reminders tool's, from anywhere (ToolHub): never a food date or cooking question here.
+    if !foodReminder.contains(t), generalReminder.contains(t) { return nil }
     for (regex, make) in foodRules {
       guard let m = regex.first(in: t) else { continue }
       return make(LabelsString.trimmed(m.group(1)))

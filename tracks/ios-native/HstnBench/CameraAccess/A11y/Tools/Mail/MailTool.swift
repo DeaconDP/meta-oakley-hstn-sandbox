@@ -79,8 +79,13 @@ final class MailTool: SpeakUpTool {
   private(set) var explanation: String?
   private(set) var explanationIsAI = false
   private(set) var isExplainingOnline = false
-  /// What a "yes" or "no" would answer.
-  private(set) var pendingQuestion: PendingQuestion = .none
+  /// What a "yes" or "no" would answer. Noted in VoiceQuestions, so a newer question elsewhere wins.
+  private(set) var pendingQuestion: PendingQuestion = .none {
+    didSet { if pendingQuestion == .none { questions.settle(.mail) } else { questions.ask(.mail) } }
+  }
+  @ObservationIgnored var questions: VoiceQuestions = .shared
+  /// The next start says nothing: whoever opened it is about to speak ("my letters" from the home).
+  @ObservationIgnored var quietStart = false
 
   enum PendingQuestion: Equatable, Sendable {
     case none
@@ -96,8 +101,7 @@ final class MailTool: SpeakUpTool {
   }
 
   var helpLine: String {
-    "Mail reader. Say: what is this letter, read it all, who is it from, how much, when is it due, "
-      + "is it a scam, explain this letter, remind me three days before, my letters, next page, new letter, repeat, or stop."
+    "Mail reader. Say what is this letter, how much, when is it due, explain this letter, remind me three days before, or my letters."
   }
 
   /// A stream frame older than this isn't used for the second look.
@@ -158,6 +162,10 @@ final class MailTool: SpeakUpTool {
       source.cameraKind == .phone
       ? "Hold the phone flat over a letter or envelope, about 30 centimetres above it"
       : "Hold a letter or envelope in front of you, about an arm's length away"
+    if quietStart {
+      quietStart = false
+      return
+    }
     say("Mail reader. \(how), then say what is this letter.", earcon: .ready)
   }
 
@@ -183,9 +191,14 @@ final class MailTool: SpeakUpTool {
   }
 
   func handle(transcript: String) -> Bool {
-    if let command = LetterGrammar.parse(transcript), perform(letter: command) {
-      BenchClock.shared.note("mail letter command")
-      return true
+    if let command = LetterGrammar.parse(transcript) {
+      // "yes" and "no" answer the mail reader only when its question is the newest one waiting
+      // (not the app's, and no reminder added or gone off since).
+      let isAnswer = command == .yes || command == .no
+      if !isAnswer || questions.isNewest(.mail), perform(letter: command) {
+        BenchClock.shared.note("mail letter command")
+        return true
+      }
     }
     guard let command = MailGrammar.parse(transcript) else { return false }
     BenchClock.shared.note("mail voice command=\(command.rawValue)")

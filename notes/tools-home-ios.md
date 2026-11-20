@@ -1,6 +1,6 @@
 # Tools home (iOS)
 
-2026-11-20. The iPhone app is now a tools app. The main screen lists six tools. Each opens a panel with a Close button. Voice opens, switches and closes them. Glasses are an optional extra.
+2026-11-20. The iPhone app is now a tools app. The main screen lists six tools (seven since Reminders, notes/reminders-ios.md). Each opens a panel with a Close button. Voice opens, switches and closes them. Glasses are an optional extra.
 
 Code is in `tracks/ios-native/HstnBench/CameraAccess/`. Screenshots (App Store build, Simulator): `design/screens/ios-tools-home.png`, `design/screens/ios-tool-open.png`.
 
@@ -40,17 +40,48 @@ None of the new phrases clash with old ones. "light on" is still the torch; "is 
 
 ## Routing order
 
+Updated 2026-11-20 after letters, reminders, food check and phone reading were merged. The same list is at the top of `A11y/Tools/ToolHub.swift`.
+
 `VoiceControl.inject(transcript:)` on the main screen:
 
-1. A waiting yes-or-no question takes yes, no and continue.
+1. The app's own yes-or-no question (camera access, glasses registration) takes yes, no and continue, unless a tool asked a yes-or-no question after it. Then the tool hears it first.
 2. `ToolHub.route(text, command:)`. The text has the wake word taken off, and passes the same gates as commands (`VoiceCommandParser.addressedText`): while the app speaks, only "reader, ..." counts, and the app's own speech is dropped.
-   - Another tool's name switches tools.
-   - The always-on commands are left to the app: stop, close, main menu, help, where am I, list tools, faster, slower, settings by voice, status, the camera and torch commands, connect, disconnect.
-   - Then the open tool's `handle(transcript:)`. So "read", "repeat", "back", "next", "how much" reach Mail first.
-   - Then "watch for X" from anywhere.
-   - With Read text open, a question ("what does ephemeral mean") goes to Ask without leaving the page.
-   - The open tool's own name again, unused by it, restarts its first line.
+   1. A reminder that just went off: "snooze" for 30 minutes, and "done" while the reminder is the newest question.
+   2. "Undo" just after a reminder was added from another tool, while that is the newest question.
+   3. Another tool's name switches tools. The always-on commands are left to the app: stop, close, main menu, help, where am I, list tools, faster, slower, settings by voice, status, the camera and torch commands, connect, disconnect.
+   4. The open tool's `handle(transcript:)`. So "read", "repeat", "back", "next", "how much", "next step" and "yes" to its own question reach it first.
+   5. "Watch for X" from anywhere.
+   6. "My letters", "what letters do I have", "read the letter from <sender>" from anywhere: opens Mail quietly, then its letters log.
+   7. "Remind me ...", "what's due this week", "I took my evening pill", "what was I doing?" from anywhere. From the home, Reminders opens. Inside a tool, it answers in place.
+   8. "Big text" outside Read text. From the home it opens Read text's big text. Inside another tool it says "Big text is for pages in Read text."
+   9. With Read text open, a question ("what does ephemeral mean") goes to Ask without leaving the page.
+   10. The open tool's own name again, unused by it, restarts its first line.
 3. Otherwise the screen's commands, then the common ones, as before.
+
+## Voice clashes (2026-11-20)
+
+`A11y/Voice/VoiceQuestions.swift` keeps who asked last. The app's yes-or-no, the mail reader's reminder offer and "forget all letters", Read text's torch offer, "Say undo to cancel" and "Say done, or snooze" each note when they ask and when they're settled. A short answer goes to the newest one still waiting.
+
+| Words | Who wants them | Resolved |
+|---|---|---|
+| "yes", "no" | The app's question, the mail reader's offer, the torch offer | The newest question wins. If the newest one doesn't take it, the next one does. A tool's question goes when the tool closes. |
+| "yes" after "remind me at 6 to ..." inside Mail | The mail reader's offer | The reminder just added is newer, so "yes" isn't the offer's. "Undo" takes the reminder back, then "yes" is the offer's again. |
+| "undo", "cancel that" | Reminders | Works from any tool right after a reminder was added there. Opening or closing a tool ends that. |
+| "done" | A reminder that just went off, and the app's close | "Done" answers the reminder only while it is the newest question: no tool opened or closed, nothing else asked since. Otherwise it closes. "Snooze" means nothing else, so it keeps the 30 minutes. |
+| "next step", "previous step", "repeat step" | Read text's steps, Labels' cooking steps | The open tool only. Each keeps its own place. A tool without steps doesn't take them. |
+| "big text" | Read text | Inside another tool it says where big text is. From the home it opens Read text's big text. |
+| "remind me ..." | Labels ("remind me before it goes off"), Mail ("remind me three days before"), Reminders | Labels and Mail keep their own reminder words. Any other "remind me" is the Reminders tool's, answered in place. Labels no longer reads "remind me to check the date" as a date question. |
+
+Tests: `CameraAccessTests/VoiceClashTests.swift` and `LettersTests.swift > LetterVoiceClashTests`.
+
+Results (Mac, Xcode 27.2, iOS 27.0 Simulator "SpeakUp Final2 iPhone 17", `-parallel-testing-enabled NO`). CameraAccess, SpeakUp and SpeakUp Share build. SpeakUp has its own derived data.
+
+- The merged tree before these changes: 707 unit tests, 0 failures.
+- After: 732 unit tests passed, 0 failed (skipping `DATGlassesDisplayMockTests.testTheCardRendersOnTheMockDisplay`). 25 are new.
+- UI tests in three batches: 44 run, 43 passed, 0 failed, 1 skipped (`StoreScreenshotsUITests` unless `TEST_RUNNER_SPEAKUP_SCREENSHOTS=1`).
+- `StoreScreenshotsUITests` now scrolls the Tools heading up, so `design/screens/ios-tools-home.png` shows all seven tools.
+
+Help is shorter: each tool's help is one or two sentences, then "Say close to go back to the tools." A test keeps each under 40 words. In the App Store build, help, settings and the menu lines never mention glasses.
 
 Global "stop" still cuts speech. The screen also calls `ToolHub.stopForGlobal()`, so the tone, watch loop or barcode search goes quiet and the tool stays open.
 

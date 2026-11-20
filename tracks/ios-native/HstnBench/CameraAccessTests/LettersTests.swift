@@ -7,6 +7,7 @@
  */
 
 import CoreGraphics
+import SwiftUI
 @testable import CameraAccess
 import UIKit
 // ast-grep-ignore: swift-testing/swift/no-new-xctest
@@ -682,5 +683,174 @@ final class LettersMailToolTests: XCTestCase {
     XCTAssertEqual(explainer.calls.first?.0, online.record?.text)
     online.stop()
     withExtendedLifetime(camera) {}
+  }
+}
+
+// MARK: - Voice clashes: the mail reader's questions and letters from anywhere
+
+@MainActor
+private final class QuietNotifier: ReminderNotifying {
+  func requestPermission() async -> Bool { true }
+  func permission() async -> Bool? { true }
+  func add(_ notification: ReminderNotification) async -> Bool { true }
+  func remove(ids: [String]) {}
+}
+
+@MainActor
+private final class PlainTool: SpeakUpTool {
+  let toolID: ToolID
+  init(_ id: ToolID) { toolID = id }
+  func start(source: ReadFrameSource) {}
+  func stop() {}
+  func handle(transcript: String) -> Bool { false }
+  var helpLine: String { "" }
+  func makePanel() -> AnyView { AnyView(EmptyView()) }
+}
+
+/// "yes" and "no" go to the newest question: the mail reader's offer, the app's own question, or a
+/// reminder added since. "my letters" and "read the letter from ..." work from anywhere.
+@MainActor
+final class LetterVoiceClashTests: XCTestCase {
+  private var camera: Camera!
+
+  override func setUp() async throws {
+    try await super.setUp()
+    camera = Camera()
+    VoiceQuestions.shared.reset()
+  }
+
+  override func tearDown() async throws {
+    Announcer.shared.stop()
+    VoiceQuestions.shared.reset()
+    try await super.tearDown()
+  }
+
+  private func mailTool(store: LettersStore, reminders: any ReminderScheduling) -> MailTool {
+    let photo = visionPage(Letters.bill())
+    let mail = MailTool(
+      recognize: { _ in RecognizedFrame(page: photo, quality: .unknown, ocrMilliseconds: 1) }, letters: store,
+      reminders: { reminders }, online: { nil }, now: { at(2026, 11, 10) })
+    mail.calendar = london
+    mail.recentText = RecentText(defaults: nil)
+    return mail
+  }
+
+  private func look(_ mail: MailTool) async {
+    mail.perform(.newLetter)
+    for _ in 0..<200 where mail.phase == .looking {
+      try? await Task.sleep(for: .milliseconds(20))
+    }
+  }
+
+  private func makeHub(mail: MailTool, reminders: RemindersTool? = nil) -> ToolHub {
+    ToolHub(source: camera) { id -> any SpeakUpTool in
+      switch id {
+      case .mail: mail
+      case .reminders: reminders ?? PlainTool(id)
+      default: PlainTool(id)
+      }
+    }
+  }
+
+  /// The app asked (glasses registration, say) after the mail reader's offer: "yes" is the app's.
+  /// Once that's answered, "yes" is the offer's again.
+  func testYesGoesToTheNewestQuestion() async {
+    let reminders = FakeReminders()
+    let mail = mailTool(store: temporaryStore(), reminders: reminders)
+    mail.start(source: camera)
+    await look(mail)
+    XCTAssertEqual(mail.pendingQuestion, .reminder)
+    XCTAssertTrue(VoiceQuestions.shared.isNewest(.mail))
+
+    VoiceQuestions.shared.ask(.app)
+    XCTAssertFalse(mail.handle(transcript: "yes"), "the app asked last")
+    XCTAssertFalse(mail.handle(transcript: "no"))
+    XCTAssertEqual(mail.pendingQuestion, .reminder, "the offer still waits")
+
+    VoiceQuestions.shared.settle(.app)
+    XCTAssertTrue(mail.handle(transcript: "yes"))
+    await mail.reminderTask?.value
+    XCTAssertEqual(reminders.scheduled.count, 1)
+    XCTAssertFalse(VoiceQuestions.shared.isWaiting(.mail))
+    mail.stop()
+  }
+
+  /// A reminder added from the mail reader is newer than the offer: "yes" isn't the offer's then,
+  /// and "undo" takes the reminder back without leaving the letter. After that, "yes" is the
+  /// offer's again.
+  func testAReminderAddedInTheMailReaderComesBeforeTheOffer() async {
+    let letterReminders = FakeReminders()
+    let mail = mailTool(store: temporaryStore(), reminders: letterReminders)
+    let store = ReminderStore(fileURL: nil, notifier: QuietNotifier(), clock: ReminderClock(now: { at(2026, 11, 10, 14) }, calendar: london))
+    var lines: [String] = []
+    let reminders = RemindersTool(store: store, alerts: ReminderAlerts(), activity: ActivityLog()) { line, _ in lines.append(line) }
+    let hub = makeHub(mail: mail, reminders: reminders)
+    hub.open(.mail)
+    await look(mail)
+    XCTAssertEqual(mail.pendingQuestion, .reminder)
+
+    XCTAssertTrue(hub.route("remind me at 6 pm to call the bank", command: nil))
+    XCTAssertEqual(hub.openTool, .mail)
+    for _ in 0..<250 where lines.last?.hasPrefix("Reminder at") != true { try? await Task.sleep(for: .milliseconds(20)) }
+    XCTAssertEqual(lines.last, "Reminder at 6 pm today: call the bank. Say undo to cancel.")
+
+    XCTAssertFalse(hub.route("yes", command: nil), "the newest question is the reminder just added, not the offer")
+    XCTAssertTrue(letterReminders.scheduled.isEmpty)
+
+    XCTAssertTrue(hub.route("undo", command: nil))
+    for _ in 0..<250 where !store.reminders.isEmpty { try? await Task.sleep(for: .milliseconds(20)) }
+    XCTAssertTrue(store.reminders.isEmpty)
+    XCTAssertEqual(hub.openTool, .mail)
+
+    XCTAssertTrue(hub.route("yes", command: nil), "the offer is the newest question again")
+    await mail.reminderTask?.value
+    XCTAssertEqual(letterReminders.scheduled.count, 1)
+    hub.close(announce: false)
+  }
+
+  /// Opening another tool drops the offer: "yes" back in the mail reader isn't a reminder.
+  func testSwitchingToolsDropsTheOffer() async {
+    let letterReminders = FakeReminders()
+    let mail = mailTool(store: temporaryStore(), reminders: letterReminders)
+    let hub = makeHub(mail: mail)
+    hub.open(.mail)
+    await look(mail)
+    XCTAssertEqual(mail.pendingQuestion, .reminder)
+    hub.open(.read)
+    XCTAssertEqual(mail.pendingQuestion, .none)
+    XCTAssertFalse(VoiceQuestions.shared.isWaiting(.mail))
+    hub.open(.mail)
+    XCTAssertFalse(hub.route("yes", command: nil))
+    XCTAssertTrue(letterReminders.scheduled.isEmpty)
+    hub.close(announce: false)
+  }
+
+  /// "my letters", "what letters do I have" and "read the letter from ..." open the mail reader
+  /// and its letters log from the home or from another tool.
+  func testLettersFromAnywhere() {
+    let store = temporaryStore()
+    XCTAssertTrue(store.save(saved(sender: "Harbour Bank", id: "bank", savedAt: at(2026, 11, 1))))
+    let mail = mailTool(store: store, reminders: FakeReminders())
+    let hub = makeHub(mail: mail)
+
+    XCTAssertTrue(hub.route("my letters", command: nil))
+    XCTAssertEqual(hub.openTool, .mail)
+    XCTAssertTrue(mail.showingLetters)
+    XCTAssertFalse(mail.quietStart, "the quiet start was used up")
+
+    hub.open(.labels)
+    XCTAssertTrue(hub.route("read the letter from Harbour Bank", command: nil))
+    XCTAssertEqual(hub.openTool, .mail)
+    XCTAssertEqual(mail.savedFocus?.id, "bank")
+
+    hub.open(.read)
+    XCTAssertTrue(hub.route("what letters do I have", command: nil))
+    XCTAssertEqual(hub.openTool, .mail)
+    XCTAssertTrue(mail.showingLetters)
+
+    hub.close(announce: false)
+    XCTAssertFalse(hub.route("read the council letter", command: nil), "that one is the mail reader's own")
+    XCTAssertNil(hub.openTool)
+    mail.stop()
   }
 }

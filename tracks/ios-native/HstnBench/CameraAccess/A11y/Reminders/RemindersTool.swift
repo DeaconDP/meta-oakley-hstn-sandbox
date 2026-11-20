@@ -39,7 +39,12 @@ final class RemindersTool: SpeakUpTool {
   @ObservationIgnored private let alerts: ReminderAlerts
   @ObservationIgnored private let activity: ActivityLog
   @ObservationIgnored private let speak: @MainActor (String, Earcon) -> Void
-  @ObservationIgnored private var undo: Undo?
+  /// What "undo" takes back. Noted in VoiceQuestions: "Say undo to cancel" is a question too, and
+  /// "undo" reaches it from any tool while it is the newest one.
+  @ObservationIgnored private var undo: Undo? {
+    didSet { if undo != nil { questions.ask(.reminderAdded) } else { questions.settle(.reminderAdded) } }
+  }
+  @ObservationIgnored var questions: VoiceQuestions = .shared
 
   init(
     store: ReminderStore? = nil, alerts: ReminderAlerts = .shared, activity: ActivityLog = .shared,
@@ -80,11 +85,19 @@ final class RemindersTool: SpeakUpTool {
 
   func makePanel() -> AnyView { AnyView(RemindersPanel(tool: self)) }
 
-  /// From ToolHub with any screen showing. Opens Reminders first, except "what was I doing?".
+  /// From ToolHub with any screen showing. On the tools home it opens Reminders first (except
+  /// "what was I doing?"). With another tool open it answers in place, so "remind me at 6 to call
+  /// the bank" from the mail reader keeps the letter on screen.
   func handleFromAnywhere(_ text: String, hub: ToolHub) -> Bool {
-    guard let intent = parse(text), intent.worksFromAnywhere else { return false }
+    guard let intent = parse(text) else { return false }
+    // "Undo" right after a reminder was added from another tool: takes it back, in place.
+    if intent == .undo {
+      guard undo != nil, questions.isNewest(.reminderAdded) else { return false }
+    } else if !intent.worksFromAnywhere {
+      return false
+    }
     let openTool = hub.openTool
-    if intent != .whatWasIDoing, hub.openTool != .reminders {
+    if intent != .whatWasIDoing, intent != .undo, openTool == nil {
       quietStart = true
       hub.open(.reminders)
     }

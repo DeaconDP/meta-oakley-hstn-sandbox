@@ -19,7 +19,13 @@ final class StoreScreenshotsUITests: XCTestCase {
     let app = XCUIApplication(bundleIdentifier: "com.deaco.speakup")
     app.launchArguments = ["--ui-testing"]
     app.launch()
-    XCTAssertTrue(app.staticTexts["tools_home_title"].waitForExistence(timeout: 20))
+    let title = app.staticTexts["tools_home_title"]
+    XCTAssertTrue(title.waitForExistence(timeout: 20))
+    Thread.sleep(forTimeInterval: 1.5)
+    // Seven tools don't fit under the status card: bring the Tools heading near the top first.
+    title.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+      .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)))
+    XCTAssertTrue(app.buttons["tool_open_reminders"].waitForExistence(timeout: 5))
     Thread.sleep(forTimeInterval: 1.5)
     attach(app, "ios-tools-home")
 

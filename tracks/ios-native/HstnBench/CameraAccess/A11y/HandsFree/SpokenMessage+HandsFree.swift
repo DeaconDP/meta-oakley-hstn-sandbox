@@ -34,9 +34,10 @@ extension SpokenMessage {
 
   static let mainMenuCamera = "Main menu. Say read, list tools, or open and a tool's name."
 
-  static let mainMenuHome = "Main menu. Your glasses aren't connected. Say connect, or use the phone."
+  static let mainMenuHome =
+    GlassesSupport.isBuiltIn ? "Main menu. Your glasses aren't connected. Say connect, or use the phone." : "Main menu. Say use the phone."
 
-  static let mainMenuWelcome = "This is setup. Say phone, or connect."
+  static let mainMenuWelcome = GlassesSupport.isBuiltIn ? "This is setup. Say phone, or connect." : "This is setup. Say phone."
 
   /// "Goodbye". iOS has no way for an app to quit itself (Apple QA1561), so the app stops listening
   /// and lets go of the cameras, and says how to leave.
@@ -49,8 +50,13 @@ extension SpokenMessage {
   /// The same, when bare commands aren't safe (see VoiceCommand).
   static let sessionResumedWakeWord = "Hello again. I'm listening. Say reader, help at any time."
 
-  static let settingsOpened =
-    "Settings. You can say faster, slower, short answers, detailed answers, glasses display off, or hands-free off. Say close when you're done."
+  /// The App Store build (SPEAKUP_NO_DAT) has no glasses, so it doesn't offer the glasses display.
+  static let settingsOpened = settingsOpenedLine(glassesSupported: GlassesSupport.isBuiltIn)
+
+  static func settingsOpenedLine(glassesSupported: Bool) -> String {
+    let glasses = glassesSupported ? " glasses display off," : ""
+    return "Settings. You can say faster, slower, short answers, detailed answers,\(glasses) or hands-free off. Say close when you're done."
+  }
 
   static let settingsClosed = "Settings closed."
 
@@ -61,10 +67,11 @@ extension SpokenMessage {
   static func toolClosed(_ tool: ToolID) -> String { "\(tool.title) closed. Main menu." }
 
   static func toolHelp(_ tool: ToolID, _ toolLine: String) -> String {
-    "\(toolLine) Say close to go back to the tools, stop to quiet it, or open and another tool's name."
+    "\(toolLine) Say close to go back to the tools."
   }
 
-  static let readerNeedsGlasses = "The reader needs your glasses. Say connect first."
+  static let readerNeedsGlasses =
+    GlassesSupport.isBuiltIn ? "The reader needs your glasses. Say connect first." : "Say use the phone first, then open a tool."
 
   // MARK: Tools
 
@@ -76,7 +83,9 @@ extension SpokenMessage {
   }()
 
   static let toolsListNotConnected =
-    "SpeakUp has three tools. Reader reads printed text aloud, once your glasses are connected. Say connect first. Status checks your glasses. Settings changes voice and answers."
+    GlassesSupport.isBuiltIn
+    ? "SpeakUp has three tools. Reader reads printed text aloud, once your glasses are connected. Say connect first. Status checks your glasses. Settings changes voice and answers."
+    : "SpeakUp has seven tools. Say use the phone first, then list tools."
 
   // MARK: Connection
 
