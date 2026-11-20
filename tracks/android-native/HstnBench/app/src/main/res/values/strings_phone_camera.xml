@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Glasses optional: the phone camera on screen (notes/phone-camera.md). What the phone camera says
+     out loud is in tools/core/CameraSource.kt (PhoneCameraWording), pinned by JVM tests. -->
+<resources>
+    <!-- Setup screen -->
+    <string name="setup_use_phone_button" description="Setup screen button: use the phone camera, no glasses">Use my phone\'s camera</string>
+    <string name="setup_use_phone_description" description="TalkBack: the use-phone button">Use my phone\'s camera. No glasses needed. Opens the tools now.</string>
+    <string name="setup_choice_message" description="Above the two setup buttons">SpeakUp works with your phone\'s camera. Glasses are optional: connecting them opens the Meta AI app once.</string>
+
+    <!-- Camera screen: the source switch -->
+    <string name="source_switch_label" description="Label of the camera source switch">Camera</string>
+    <string name="source_switch_phone" description="Camera source option">Phone</string>
+    <string name="source_switch_glasses" description="Camera source option">Glasses</string>
+    <string name="source_switch_auto" description="Camera source setting option">Automatic</string>
+    <string name="source_switch_auto_hint" description="Under the automatic option">Glasses when they\'re connected, otherwise the phone.</string>
+    <string name="source_switch_setting_heading" description="Settings menu heading for the camera source">Camera source</string>
+    <string name="source_switch_hint_phone" description="Under the camera switch when the phone is in use">Using the phone\'s back camera.</string>
+    <string name="source_switch_hint_glasses" description="Under the camera switch when the glasses are in use">Using your glasses\' camera.</string>
+    <string name="source_switch_glasses_setup" description="Glasses option when the glasses aren't set up">Glasses: set up first. Say connect my glasses.</string>
+
+    <!-- Camera screen: phone preview and status -->
+    <string name="phone_preview_description" description="TalkBack: the phone camera preview">Live view from the phone camera</string>
+    <string name="phone_camera_off_title" description="Placeholder when the phone camera is off">Phone camera off</string>
+    <string name="phone_camera_off_subtitle" description="Placeholder subtitle when the phone camera is off">Open a tool, or tap Turn on camera.</string>
+    <string name="phone_camera_on_button" description="Toolbox button: start the phone camera">Turn on camera</string>
+    <string name="phone_camera_on_description" description="TalkBack: start the phone camera">Turn on the phone\'s camera.</string>
+    <string name="phone_status_on" description="Status chip">Camera: phone, on</string>
+    <string name="phone_status_off" description="Status chip">Camera: phone, off</string>
+    <string name="setup_glasses_button" description="Toolbox button before glasses are set up">Connect my glasses</string>
+    <string name="setup_glasses_description" description="TalkBack: connect glasses from the toolbox">Connect my glasses. Opens the Meta AI app once to approve the connection.</string>
+</resources>

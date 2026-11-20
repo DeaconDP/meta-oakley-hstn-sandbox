@@ -35,6 +35,8 @@ final class CameraViewModel {
   /// The device stream has reported at least once, so `hasActiveDevice` is real, not the
   /// initial false. Spoken status and launch actions wait for this.
   private(set) var hasDeviceReport: Bool = false
+  /// The active glasses have a display (Meta Ray-Ban Display), for the hands-free card.
+  private(set) var activeDeviceSupportsDisplay: Bool = false
 
   // MARK: - Session state (bound directly to the SDK)
 
@@ -336,12 +338,15 @@ final class CameraViewModel {
   private func observeDeviceState(_ deviceId: DeviceIdentifier?) {
     deviceStateTokenBag.clear()
     guard let deviceId, let device = wearables.deviceForIdentifier(deviceId) else {
+      activeDeviceSupportsDisplay = false
       batteryLevel = nil
       donState = .unknown
       hingeState = .unknown
       return
     }
     // Current values first: the listener may not replay them.
+    activeDeviceSupportsDisplay = device.supportsDisplay()
+    hostDisplaySessionIfNeeded()
     batteryLevel = device.batteryLevel
     donState = device.donState
     hingeState = device.hingeState
@@ -368,7 +373,11 @@ final class CameraViewModel {
 
   private func handleDeviceState(_ state: DeviceState) {
     if batteryLevel != state.batteryLevel { batteryLevel = state.batteryLevel }
-    if donState != state.donState { donState = state.donState }
+    if donState != state.donState {
+      // DAT known issue: inputs stop after the glasses come off and go back on; adding them again fixes it.
+      if state.donState == .donned, donState == .doffed { DATGlassesInputs.shared.reattach() }
+      donState = state.donState
+    }
     if hingeState != state.hingeState { hingeState = state.hingeState }
   }
 
@@ -423,13 +432,42 @@ final class CameraViewModel {
     sessionState = state
     if state == .started {
       benchClock.end("session_start")
-      if let deviceSession { VoiceControl.shared.attachGlasses(session: deviceSession, wearables: wearables) }
+      if let deviceSession {
+        VoiceControl.shared.attachGlasses(session: deviceSession, wearables: wearables)
+        attachGlassesDisplay(session: deviceSession)
+        DATGlassesInputs.shared.attach(to: deviceSession)
+      }
     }
     if state == .stopped {
       VoiceControl.shared.detachGlasses()
+      HandsFreeSurface.shared.glasses.detach()
+      DATGlassesInputs.shared.detach()
       endBackgroundStopErrorSuppression()
       cleanupSession()
     }
+  }
+
+  /// Hands-free card on a Ray-Ban Display (HandsFreeSurface). Glasses without a display get nothing;
+  /// a failure only loses the mirror, never the session or the audio.
+  private func attachGlassesDisplay(session: DeviceSession) {
+    guard session.device?.supportsDisplay() == true else { return }
+    do {
+      let display = try DATGlassesDisplay.attach(to: session)
+      HandsFreeSurface.shared.glasses.attach(display, showing: HandsFreeSurface.shared.card)
+    } catch {
+      NSLog("[SpeakUp] glasses display unavailable: \(error)")
+    }
+  }
+
+  /// In hands-free, glasses with a display get a session as soon as they're around, so the card can
+  /// show before anything is read. No stream: reading adds that. Glasses without a display are left
+  /// alone, as before.
+  func hostDisplaySessionIfNeeded() {
+    let preferences = A11yPreferences.shared
+    guard preferences.handsFree, preferences.glassesDisplayEnabled, activeDeviceSupportsDisplay, !hasSession,
+      UIApplication.shared.applicationState != .background
+    else { return }
+    startSession()
   }
 
   private func handleSessionError(_ error: DeviceSessionError) {

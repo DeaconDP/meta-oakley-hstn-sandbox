@@ -89,7 +89,8 @@ class SettingsGrammarTest {
           "turn on glasses controls" to C.ControlsOn(true),
           "when I hold the capture button, read my mail" to C.MapButton("captureHold", "read my mail"),
           "share my setup" to C.ShareSetup,
-          "open settings" to C.OpenSettings,
+          "open the settings screen" to C.OpenSettings,
+          "make it my own" to C.OpenSettings,
           "same speed everywhere" to C.SameSpeedEverywhere,
       )
 
@@ -150,7 +151,8 @@ class SettingsGrammarTest {
       val other =
           GlobalGrammar.parse(said) ?: VoiceCommands.parse(said) ?: MailGrammar.parse(n) ?: WatchGrammar.parse(n, Phrases.light(said))
               ?: LabelsGrammar.parse(n) ?: LightGrammar.parse(n)
-      if (other != null) clashes += "$said -> $other"
+      // Hands-free's "short answers" is the same setting: the settings grammar runs first and wins.
+      if (other != null && other !is com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlobalCommand.SetVerbosity) clashes += "$said -> $other"
     }
     assertTrue(clashes.joinToString("\n"), clashes.isEmpty())
   }

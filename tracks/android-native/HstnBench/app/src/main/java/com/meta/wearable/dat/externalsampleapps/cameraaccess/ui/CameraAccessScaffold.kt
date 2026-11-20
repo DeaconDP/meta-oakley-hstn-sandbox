@@ -11,11 +11,12 @@
 // This scaffold demonstrates a typical DAT application navigation pattern based on device
 // registration state from the DAT API.
 //
-// DAT State-Based Navigation:
-// - HomeScreen: When NOT registered (uiState.isRegistered = false) Shows initial registration UI
-//   calling Wearables.startRegistration()
-// - CameraScreen: When registered (uiState.isRegistered = true) Shows the full-bleed camera screen
-//   that walks the SDK lifecycle: start session, start preview, capture/record, stop, end session.
+// Navigation (glasses optional, notes/phone-camera.md):
+// - HomeScreen (setup): not registered and the user hasn't chosen yet. Offers "Use my phone's
+//   camera" next to "Connect my glasses" (Wearables.startRegistration()).
+// - CameraScreen: registered, or the phone was chosen (setup's "use my phone", or the camera source
+//   setting PHONE). On the glasses it walks the SDK lifecycle: start session, start preview,
+//   capture/record, stop, end session; on the phone it shows the CameraX preview.
 //
 // The scaffold also provides a debug menu (in DEBUG builds) that gives access to
 // MockDeviceKitScreen for testing DAT functionality without physical devices.
@@ -67,6 +68,8 @@ import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.BuildConfig
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.SetupVoice
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.HandsFreeStore
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.CameraSourceRules
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolRequest
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 
@@ -85,9 +88,13 @@ fun CameraAccessScaffold(
 
   val context = LocalContext.current
   val setupVoice: SetupVoice = viewModel()
+  val modeStore = remember { HandsFreeStore.get(context) }
+  val mode by modeStore.settings.collectAsStateWithLifecycle()
+  val showSetup = CameraSourceRules.showSetup(uiState.isRegistered, mode.cameraSource, mode.phoneChosen)
 
-  // Observe recent errors and show snackbar. Errors are also spoken: with TalkBack on, TalkBack
-  // reads the snackbar (a polite live region), so we don't speak it a second time.
+  // Observe recent errors and show snackbar. In hands-free mode errors are also spoken (SetupVoice
+  // .announce only speaks then): with TalkBack on, TalkBack reads the snackbar (a polite live
+  // region), so we don't speak it a second time.
   LaunchedEffect(uiState.recentError?.id) {
     uiState.recentError?.let { error ->
       if (!isTouchExplorationOn(context)) setupVoice.announce(error.message)
@@ -98,7 +105,7 @@ fun CameraAccessScaffold(
 
   Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
     Box(modifier = Modifier.fillMaxSize()) {
-      if (uiState.isRegistered) {
+      if (!showSetup) {
         CameraScreen(
             wearablesViewModel = viewModel,
             onRequestWearablesPermission = onRequestWearablesPermission,
@@ -106,8 +113,8 @@ fun CameraAccessScaffold(
             launchTool = launchTool,
         )
       } else {
-        // Not connected to Meta AI yet: the setup screen talks and listens (setup/SetupVoice), on
-        // every launch. A voice-first launch into a tool names the tool in the welcome.
+        // First run (not registered, no camera chosen): the setup screen talks and listens
+        // (setup/SetupVoice). A voice-first launch into a tool names the tool in the welcome.
         HomeScreen(
             viewModel = viewModel,
             setupVoice = setupVoice,

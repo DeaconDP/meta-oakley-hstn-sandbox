@@ -169,6 +169,7 @@ final class AppVoice {
 
   @ObservationIgnored private var cachedVoice: AVSpeechSynthesisVoice?
   @ObservationIgnored private var isLoaded = false
+  @ObservationIgnored private var isLoading = false
   @ObservationIgnored private var observer: NSObjectProtocol?
   @ObservationIgnored private let preferences = A11yPreferences.shared
 
@@ -184,14 +185,32 @@ final class AppVoice {
 
   /// The voice to put on an utterance. The first lookup is slow enough to delay the first word, so
   /// prepare() runs it ahead of time; if that hasn't finished, it happens here.
+  /// While prepare()'s lookup is still running, the British default stands in: a second lookup on
+  /// the main thread at the same time deadlocked inside TextToSpeech on the iOS 27 Simulator
+  /// (both waited in axUnsafeForcedSync; notes/tools-home-ios.md).
   var voice: AVSpeechSynthesisVoice? {
-    if !isLoaded { apply(Self.installedVoices()) }
+    if let chosen = chosenVoice { return chosen }
+    if !isLoaded, !isLoading { apply(Self.installedVoices()) }
     return cachedVoice ?? AVSpeechSynthesisVoice(language: "en-GB")
   }
+
+  /// The voice the user picked (A11yPreferences.appVoiceIdentifier), if it is still installed.
+  /// Cached by identifier, so the lookup runs once per choice.
+  private var chosenVoice: AVSpeechSynthesisVoice? {
+    guard let identifier = preferences.trialVoiceIdentifier ?? preferences.appVoiceIdentifier else { return nil }
+    if chosenCache?.identifier != identifier { chosenCache = AVSpeechSynthesisVoice(identifier: identifier) }
+    return chosenCache
+  }
+
+  @ObservationIgnored private var chosenCache: AVSpeechSynthesisVoice?
 
   /// For settings: "Voice: Serena, British".
   var displayString: String {
     if preferences.useVoiceOverVoice, UIAccessibility.isVoiceOverRunning { return "Voice: VoiceOver's voice" }
+    if let chosen = chosenVoice {
+      return "Voice: \(chosen.name.split(separator: " ").first.map(String.init) ?? chosen.name), "
+        + VoiceSelection.accentName(language: chosen.language)
+    }
     guard let choice else { return "Voice: system default" }
     return VoiceSelection.displayString(for: choice.voice)
   }
@@ -203,13 +222,19 @@ final class AppVoice {
   }
 
   private func refreshInBackground() {
+    isLoading = true
     Task.detached(priority: .utility) { [weak self] in
       let voices = Self.installedVoices()
-      await self?.apply(voices)
+      await self?.finishLoading(voices)
     }
   }
 
-  nonisolated private static func installedVoices() -> [VoiceDescriptor] {
+  private func finishLoading(_ voices: [VoiceDescriptor]) {
+    isLoading = false
+    apply(voices)
+  }
+
+  nonisolated static func installedVoices() -> [VoiceDescriptor] {
     AVSpeechSynthesisVoice.speechVoices().map { voice in
       let gender: VoiceDescriptor.Gender =
         switch voice.gender {
@@ -249,8 +274,10 @@ final class AppVoice {
 
   /// Once, ever: says and shows how to download a British woman's voice. A line cut off before its
   /// end comes back next launch, as with the disclaimer. Queued, so it follows the status line.
-  func offerDownloadIfNeeded() {
-    guard !LaunchOptions.isAutomatedTest else { return }
+  /// `speak: false` (the toolbox, which has no start-up narration) only shows the banner; it counts
+  /// as heard once dismissed.
+  func offerDownloadIfNeeded(speak: Bool = true) {
+    guard !LaunchOptions.isAutomatedTest, preferences.appVoiceIdentifier == nil else { return }
     _ = voice  // make sure the lookup has happened
     let followsVoiceOver = preferences.useVoiceOverVoice && UIAccessibility.isVoiceOverRunning
     guard
@@ -259,6 +286,7 @@ final class AppVoice {
     else { return }
     let current = choice.map { VoiceSelection.baseName($0.voice) }
     downloadNotice = SpokenMessage.voiceDownloadOnScreen(current: current)
+    guard speak else { return }
     Announcer.shared.announce(SpokenMessage.voiceDownload(current: current), earcon: .attention, interrupt: false) {
       [weak self] finished in
       if finished { self?.preferences.voiceDownloadNoticeHeard = true }

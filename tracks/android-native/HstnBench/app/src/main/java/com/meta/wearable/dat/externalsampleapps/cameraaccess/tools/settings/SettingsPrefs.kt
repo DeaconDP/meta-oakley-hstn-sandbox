@@ -12,6 +12,7 @@
 //   book_reader/read_furniture -> speech.tools.book.pageNumbers
 //   book_reader/auto_turn      -> speech.tools.book.autoTurn
 //   tools/watch_tick_seconds   -> sounds.watchTickSeconds
+//   mode/verbosity             -> speech.verbosity (hands-free "short answers"; ToolHub mirrors it back)
 // The bookmark (book_reader/bookmark) and the setup-flow prefs stay where they are.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings
@@ -40,9 +41,10 @@ class SettingsPrefs(context: Context) : SetupStorage {
   fun oldPrefs(): OldPrefs? {
     val tools = app.getSharedPreferences("tools", Context.MODE_PRIVATE)
     val book = app.getSharedPreferences("book_reader", Context.MODE_PRIVATE)
+    val mode = app.getSharedPreferences("mode", Context.MODE_PRIVATE)
     val any =
         tools.contains("speech_rate") || tools.contains("watch_tick_seconds") || book.contains("speech_rate") ||
-            book.contains("read_furniture") || book.contains("auto_turn")
+            book.contains("read_furniture") || book.contains("auto_turn") || mode.contains("verbosity")
     if (!any) return null
     return OldPrefs(
         toolsRate = if (tools.contains("speech_rate")) tools.getFloat("speech_rate", 1f) else null,
@@ -50,6 +52,7 @@ class SettingsPrefs(context: Context) : SetupStorage {
         pageNumbers = if (book.contains("read_furniture")) book.getBoolean("read_furniture", false) else null,
         autoTurn = if (book.contains("auto_turn")) book.getBoolean("auto_turn", true) else null,
         watchTickSeconds = if (tools.contains("watch_tick_seconds")) tools.getInt("watch_tick_seconds", 10) else null,
+        verbosity = mode.getString("verbosity", null),
     )
   }
 

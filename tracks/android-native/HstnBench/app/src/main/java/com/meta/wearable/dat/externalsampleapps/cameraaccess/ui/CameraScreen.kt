@@ -15,6 +15,16 @@
 // It is also the router for the everyday tools: ToolHub.activeTool picks which tool screen covers
 // the live preview (which keeps streaming underneath), the bottom bar has a button per registered
 // tool, and while any tool is open ToolHub listens (so switching tools by voice keeps the mic).
+//
+// The home area depends on the mode (notes/hands-free-mode.md): the toolbox (default) shows the
+// tools with what each does, the hands-free switch, a push-to-talk mic button and the SDK features;
+// hands-free shows the voice menu panel and the switch, and replaces the camera-permission dialog
+// with speech. The settings menu (top right) has the hands-free and glasses display switches.
+//
+// Glasses optional (notes/phone-camera.md): with the phone as the camera the background is the
+// CameraX preview, both home panels show the camera switch (Phone | Glasses), and the glasses-only
+// parts (session and stream chips, the SDK capture row, start session, the "On the glasses" card,
+// the display switch) are hidden. The settings menu also saves the camera source.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
@@ -43,6 +53,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -72,6 +85,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -96,6 +110,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.MicStatusLine
+import androidx.compose.runtime.CompositionLocalProvider
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.LocalPushToTalk
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.PushToTalk
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolAccent
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolHub
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolRegistry
@@ -111,6 +128,12 @@ import androidx.compose.ui.semantics.heading
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.camera.CameraUiState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.camera.CameraViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
+import androidx.camera.view.PreviewView
+import androidx.compose.ui.viewinterop.AndroidView
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.MainActivity
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.PermState
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.SetupVoice
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.CameraSource
 
 // Night scrims behind the top/bottom bars so the controls stay legible over the live feed. Hoisted
 // so they're allocated once instead of on every bar recomposition (the recording timer ticks).
@@ -144,7 +167,27 @@ fun CameraScreen(
   val activity = LocalActivity.current
   var showSettingsMenu by remember { mutableStateOf(false) }
   val application = (LocalActivity.current as ComponentActivity).application
-  val hub: ToolHub = viewModel(factory = ToolHub.Factory(application, cameraViewModel))
+  val hub: ToolHub =
+      viewModel(factory = ToolHub.Factory(application, cameraViewModel, registered = wearablesUi.isRegistered))
+  val cameraSource by hub.cameraSource.collectAsStateWithLifecycle()
+  val usingPhone = cameraSource == CameraSource.PHONE
+  val phoneStreaming by hub.phoneCamera.isStreaming.collectAsStateWithLifecycle()
+  LaunchedEffect(wearablesUi.isRegistered) { hub.setRegistered(wearablesUi.isRegistered) }
+  // The phone camera runs only while this activity is started; ToolHub asks for its permission
+  // through the activity, and "connect my glasses" before setup opens Meta AI.
+  val cameraLifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(hub, cameraLifecycleOwner) {
+    hub.phoneCamera.attachHost(cameraLifecycleOwner.lifecycle)
+    hub.requestCameraPermission = {
+      (activity as? MainActivity)?.requestCameraPermission() ?: PermState.BLOCKED
+    }
+    hub.onConnectGlasses = { (activity as? SetupVoice.Host)?.startRegistration() }
+    onDispose {
+      hub.phoneCamera.detachHost(cameraLifecycleOwner.lifecycle)
+      hub.requestCameraPermission = null
+      hub.onConnectGlasses = null
+    }
+  }
   val activeTool by hub.activeTool.collectAsStateWithLifecycle()
   val showCustomise by hub.showSettings.collectAsStateWithLifecycle()
   val shareContext = LocalContext.current
@@ -152,6 +195,10 @@ fun CameraScreen(
     hub.onShareSetup = { json, code -> shareSetup(shareContext, json, code) }
     onDispose { hub.onShareSetup = null }
   }
+  val modeSettings by hub.mode.settings.collectAsStateWithLifecycle()
+  val pushToTalk by hub.pushToTalkActive.collectAsStateWithLifecycle()
+  // Hands-free (saved, or a voice-first visit into a tool) vs the toolbox.
+  val handsFree = modeSettings.handsFree || (launchTool != null && hub.isHandsFree)
   // The home voice menu: voice runs for this whole screen, not only while a tool is open, so a
   // blind user never needs the buttons (notes/tools-layer.md > Home voice menu). Off for the
   // touch-driven bench tests and with `--ez home_voice false`.
@@ -188,9 +235,10 @@ fun CameraScreen(
         hub.closeVoice()
       }
     }
-    // The voice path replaces the camera-permission prompt: ToolHub says why, then Meta AI opens.
-    LaunchedEffect(ui.showCameraPermissionRedirectConfirm) {
-      if (ui.showCameraPermissionRedirectConfirm) {
+    // Hands-free: the voice path replaces the camera-permission prompt: ToolHub says why, then
+    // Meta AI opens. The toolbox keeps the dialog.
+    LaunchedEffect(ui.showCameraPermissionRedirectConfirm, handsFree) {
+      if (ui.showCameraPermissionRedirectConfirm && handsFree) {
         cameraViewModel.confirmCameraPermissionRedirect(onRequestWearablesPermission)
       }
     }
@@ -201,12 +249,16 @@ fun CameraScreen(
   val isUpdateRequired = wearablesUi.isFirmwareUpdateRequired
 
   Box(modifier = modifier.fillMaxSize().background(SpeakUpColors.Night)) {
-    PreviewBackground(
-        ui = ui,
-        hasActiveDevice = wearablesUi.hasActiveDevice,
-        isUpdateRequired = isUpdateRequired,
-        onSurfaceChanged = cameraViewModel::setSurface,
-    )
+    if (usingPhone) {
+      PhonePreview(hub = hub, streaming = phoneStreaming)
+    } else {
+      PreviewBackground(
+          ui = ui,
+          hasActiveDevice = wearablesUi.hasActiveDevice,
+          isUpdateRequired = isUpdateRequired,
+          onSurfaceChanged = cameraViewModel::setSurface,
+      )
+    }
 
     // Tap outside the open settings menu dismisses it.
     if (showSettingsMenu) {
@@ -223,7 +275,12 @@ fun CameraScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
       TopBar(
+          // Above the home panel, so the settings menu isn't drawn under it.
+          modifier = Modifier.zIndex(1f),
           ui = ui,
+          phoneStatus =
+              if (usingPhone) stringResource(if (phoneStreaming) R.string.phone_status_on else R.string.phone_status_off)
+              else null,
           isDisconnectEnabled = wearablesUi.registrationState == RegistrationState.REGISTERED,
           showSettingsMenu = showSettingsMenu,
           onToggleSettings = { showSettingsMenu = !showSettingsMenu },
@@ -232,15 +289,65 @@ fun CameraScreen(
             showSettingsMenu = false
           },
           onCustomise = { hub.setShowSettings(true) },
+          settings =
+              if (homeVoice) {
+                {
+                  HandsFreeSwitch(on = handsFree, onChange = { hub.setHandsFree(it) })
+                  if (!usingPhone) {
+                    GlassesDisplaySwitch(on = modeSettings.glassesDisplay, onChange = { hub.setGlassesDisplay(it) })
+                  }
+                  CameraSourceSettingGroup(setting = modeSettings.cameraSource, onChange = { hub.mode.setCameraSource(it) })
+                }
+              } else {
+                null
+              },
       )
 
-      if (homeVoice && activeTool == null) HomeVoicePanel(hub)
-
-      Spacer(modifier = Modifier.weight(1f))
+      val toolbox = homeVoice && activeTool == null && !handsFree
+      if (homeVoice && activeTool == null) {
+        Column(
+            modifier =
+                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          if (handsFree) {
+            HomeVoicePanel(hub)
+            CameraSourceSwitch(
+                current = cameraSource,
+                glassesReady = wearablesUi.isRegistered,
+                onSelect = { hub.useCamera(it) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            HandsFreeSwitch(
+                on = true,
+                onChange = { hub.setHandsFree(it) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+          } else {
+            ToolboxPanel(
+                hub = hub,
+                usingPhone = usingPhone,
+                glassesReady = wearablesUi.isRegistered,
+                isStreaming = if (usingPhone) phoneStreaming else ui.isStreaming,
+                isConnecting = !usingPhone && (ui.isBusy || ui.isStartingStream),
+                pushToTalk = pushToTalk,
+                onConnect = {
+                  if (usingPhone) hub.turnOnPhoneCamera()
+                  else cameraViewModel.connectAndStream(onRequestWearablesPermission)
+                },
+                onSetUpGlasses = { (activity as? SetupVoice.Host)?.startRegistration() },
+                onOpenTool = { hub.open(ToolRequest(it)) },
+            )
+          }
+        }
+      } else {
+        Spacer(modifier = Modifier.weight(1f))
+      }
 
       BottomBar(
           ui = ui,
-          isUpdateRequired = isUpdateRequired,
+          usingPhone = usingPhone,
+          isUpdateRequired = isUpdateRequired && !usingPhone,
           hasActiveDevice = wearablesUi.hasActiveDevice,
           onStartSession = cameraViewModel::startSession,
           onEndSession = cameraViewModel::endSession,
@@ -251,6 +358,8 @@ fun CameraScreen(
           onToggleMic = cameraViewModel::toggleMic,
           onOpenTool = { hub.open(ToolRequest(it)) },
           onUpdateFirmware = { activity?.let { wearablesViewModel.openFirmwareUpdate(it) } },
+          // The toolbox lists the tools above, with what each does.
+          showTools = !toolbox,
       )
     }
 
@@ -287,25 +396,29 @@ fun CameraScreen(
           }
         }
       }
-      key(request.tool) {
-        ToolRegistry.spec(request.tool)
-            .content(
-                ToolScreenContext(
-                    hub = hub,
-                    request = request,
-                    onClose = { hub.closeTool() },
-                    onRequestWearablesPermission = onRequestWearablesPermission,
-                    onRequestRecordAudioPermission = onRequestRecordAudioPermission,
-                ),
-            )
+      // The toolbox: tool screens show the push-to-talk button (hands-free: the mic is always on).
+      val talk = if (homeVoice && !handsFree) PushToTalk(pushToTalk) { hub.pushToTalk() } else null
+      CompositionLocalProvider(LocalPushToTalk provides talk) {
+        key(request.tool) {
+          ToolRegistry.spec(request.tool)
+              .content(
+                  ToolScreenContext(
+                      hub = hub,
+                      request = request,
+                      onClose = { hub.closeTool() },
+                      onRequestWearablesPermission = onRequestWearablesPermission,
+                      onRequestRecordAudioPermission = onRequestRecordAudioPermission,
+                  ),
+              )
+        }
       }
     }
 
     // Make it your own: over everything, including an open tool.
     if (showCustomise) CustomiseScreen(hub, onClose = { hub.setShowSettings(false) })
 
-    // Touch-only mode keeps the bench's prompt; with the home menu the voice path replaces it.
-    if (ui.showCameraPermissionRedirectConfirm && !homeVoice) {
+    // The toolbox and the touch bench keep the prompt; hands-free replaces it with speech.
+    if (ui.showCameraPermissionRedirectConfirm && !(homeVoice && handsFree)) {
       AlertDialog(
           onDismissRequest = { cameraViewModel.cancelCameraPermissionRedirect() },
           title = { Text(stringResource(R.string.camera_permission_redirect_title)) },
@@ -388,7 +501,233 @@ private fun HomeVoicePanel(hub: ToolHub) {
   }
 }
 
+// MARK: - Toolbox home
+
+/**
+ * The toolbox (hands-free off): the tools with what each does, the hands-free switch, the
+ * push-to-talk mic button (one command, the same grammar as hands-free), a connect button, the
+ * last thing said and heard, and what the glasses SDK offers. Tags: "toolbox_panel",
+ * "toolbox_connect", "home_status", "home_voice_heard", plus each tool's button tag.
+ */
+@Composable
+private fun ToolboxPanel(
+    hub: ToolHub,
+    usingPhone: Boolean,
+    glassesReady: Boolean,
+    isStreaming: Boolean,
+    isConnecting: Boolean,
+    pushToTalk: Boolean,
+    onConnect: () -> Unit,
+    onSetUpGlasses: () -> Unit,
+    onOpenTool: (ToolId) -> Unit,
+) {
+  val status by hub.homeStatus.collectAsStateWithLifecycle()
+  val heard by hub.homeHeard.collectAsStateWithLifecycle()
+  Column(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("toolbox_panel"),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
+    Column(
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .background(SpeakUpColors.Dusk.copy(alpha = 0.94f))
+                .border(1.dp, SpeakUpColors.DuskLine, MaterialTheme.shapes.medium)
+                .padding(SpeakUpDimens.CardPadding),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            painter = painterResource(R.drawable.speakup_mark),
+            contentDescription = null,
+            tint = SpeakUpColors.SignalYellow,
+            modifier = Modifier.size(28.dp),
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = stringResource(R.string.hf_toolbox_heading),
+            color = SpeakUpColors.Paper,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.semantics { heading() },
+        )
+      }
+      Text(
+          text = stringResource(R.string.hf_toolbox_intro),
+          color = SpeakUpColors.PaperMuted,
+          style = MaterialTheme.typography.bodyMedium,
+      )
+      PushToTalkButton(listening = pushToTalk, onClick = { hub.pushToTalk() })
+      if (status.isNotEmpty()) {
+        Text(
+            text = status,
+            color = ToolAccent,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.testTag("home_status"),
+        )
+      }
+      if (heard.isNotEmpty()) {
+        Text(
+            text = stringResource(R.string.voice_heard, heard),
+            color = SpeakUpColors.PaperMuted,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.testTag("home_voice_heard"),
+        )
+      }
+      if (!isStreaming) {
+        val connectDescription =
+            stringResource(if (usingPhone) R.string.phone_camera_on_description else R.string.hf_connect_button_description)
+        SpeakUpButton(
+            label = stringResource(if (usingPhone) R.string.phone_camera_on_button else R.string.hf_connect_button),
+            onClick = onConnect,
+            icon = Icons.Filled.Link,
+            kind = ButtonKind.SECONDARY,
+            enabled = !isConnecting,
+            modifier =
+                Modifier.fillMaxWidth().testTag("toolbox_connect").semantics {
+                  contentDescription = connectDescription
+                },
+        )
+      }
+    }
+
+    CameraSourceSwitch(current = if (usingPhone) CameraSource.PHONE else CameraSource.GLASSES, glassesReady = glassesReady, onSelect = { hub.useCamera(it) })
+    if (!glassesReady) {
+      // Glasses are an upgrade: one tap away, never in the way.
+      val setUpDescription = stringResource(R.string.setup_glasses_description)
+      SpeakUpButton(
+          label = stringResource(R.string.setup_glasses_button),
+          onClick = onSetUpGlasses,
+          icon = Icons.Filled.Link,
+          kind = ButtonKind.SECONDARY,
+          modifier =
+              Modifier.fillMaxWidth().testTag("toolbox_setup_glasses").semantics {
+                contentDescription = setUpDescription
+              },
+      )
+    }
+
+    HandsFreeSwitch(on = false, onChange = { hub.setHandsFree(it) })
+
+    Text(
+        text = stringResource(R.string.tools_heading),
+        color = SpeakUpColors.Paper,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.semantics { heading() },
+    )
+    for (spec in ToolRegistry.all) {
+      ToolboxToolRow(
+          name = stringResource(spec.nameRes),
+          description = stringResource(toolDescription(spec.id)),
+          icon = spec.icon,
+          tag = spec.buttonTag,
+          onClick = { onOpenTool(spec.id) },
+      )
+    }
+
+    if (!usingPhone) {
+      Text(
+          text = stringResource(R.string.hf_sdk_heading),
+          color = SpeakUpColors.Paper,
+          style = MaterialTheme.typography.titleMedium,
+          modifier = Modifier.semantics { heading() },
+      )
+      SpeakUpCard(modifier = Modifier.fillMaxWidth()) {
+        for (line in listOf(R.string.hf_sdk_camera, R.string.hf_sdk_speech, R.string.hf_sdk_health, R.string.hf_sdk_display)) {
+          Text(text = stringResource(line), color = SpeakUpColors.Paper, style = MaterialTheme.typography.bodyMedium)
+        }
+      }
+    }
+  }
+}
+
+private fun toolDescription(id: ToolId): Int =
+    when (id) {
+      ToolId.BOOK -> R.string.hf_tool_book
+      ToolId.MAIL -> R.string.hf_tool_mail
+      ToolId.WATCH -> R.string.hf_tool_watch
+      ToolId.LABELS -> R.string.hf_tool_labels
+      ToolId.LIGHT -> R.string.hf_tool_light
+    }
+
+/** One tool in the toolbox: a large button with its name and one line about what it does. */
+@Composable
+private fun ToolboxToolRow(
+    name: String,
+    description: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tag: String,
+    onClick: () -> Unit,
+) {
+  Row(
+      modifier =
+          Modifier.fillMaxWidth()
+              .heightIn(min = SpeakUpDimens.HeroButtonHeight)
+              .clip(MaterialTheme.shapes.medium)
+              .background(SpeakUpColors.Dusk)
+              .border(2.dp, SpeakUpColors.PaperMuted, MaterialTheme.shapes.medium)
+              .clickable(onClick = onClick)
+              .padding(horizontal = 16.dp, vertical = 10.dp)
+              .testTag(tag),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(14.dp),
+  ) {
+    Icon(imageVector = icon, contentDescription = null, tint = SpeakUpColors.SignalYellow, modifier = Modifier.size(30.dp))
+    Column(modifier = Modifier.weight(1f)) {
+      Text(text = name, color = SpeakUpColors.Paper, style = MaterialTheme.typography.titleMedium)
+      Text(text = description, color = SpeakUpColors.PaperMuted, style = MaterialTheme.typography.bodyMedium)
+    }
+  }
+}
+
 // MARK: - Preview background
+
+/** The phone camera's live view (CameraX PreviewView), or a placeholder while it's off. */
+@Composable
+private fun PhonePreview(hub: ToolHub, streaming: Boolean) {
+  val description = stringResource(R.string.phone_preview_description)
+  Box(modifier = Modifier.fillMaxSize()) {
+    AndroidView(
+        factory = { ctx ->
+          PreviewView(ctx).apply {
+            // A TextureView: composes cleanly under the tool screens and scrims.
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            hub.phoneCamera.setSurfaceProvider(surfaceProvider)
+          }
+        },
+        modifier = Modifier.fillMaxSize().testTag("phone_preview").semantics { contentDescription = description },
+    )
+    DisposableEffect(hub) { onDispose { hub.phoneCamera.setSurfaceProvider(null) } }
+    if (!streaming) {
+      Column(
+          modifier = Modifier.fillMaxSize().background(SpeakUpColors.Night).padding(24.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.Center,
+      ) {
+        Icon(
+            imageVector = Icons.Filled.PhotoCamera,
+            contentDescription = null,
+            tint = SpeakUpColors.SignalYellow,
+            modifier = Modifier.size(88.dp),
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.phone_camera_off_title),
+            color = SpeakUpColors.Paper,
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.phone_camera_off_subtitle),
+            color = SpeakUpColors.PaperMuted,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+        )
+      }
+    }
+  }
+}
 
 @Composable
 private fun PreviewBackground(
@@ -544,16 +883,20 @@ private fun StatusPlaceholder(
 
 @Composable
 private fun TopBar(
+    modifier: Modifier = Modifier,
     ui: CameraUiState,
+    /** With the phone camera: one status line instead of the DAT session and stream chips. */
+    phoneStatus: String? = null,
     isDisconnectEnabled: Boolean,
     showSettingsMenu: Boolean,
     onToggleSettings: () -> Unit,
     onDisconnect: () -> Unit,
     onCustomise: () -> Unit,
+    settings: (@Composable () -> Unit)? = null,
 ) {
   Row(
       modifier =
-          Modifier.fillMaxWidth()
+          modifier.fillMaxWidth()
               .background(TopScrimBrush)
               .statusBarsPadding()
               .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -567,18 +910,27 @@ private fun TopBar(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-      StatusChip(
-          label = stringResource(R.string.status_session),
-          value = ui.sessionStateText,
-          active = ui.isSessionActive,
-          present = ui.hasSession,
-      )
-      StatusChip(
-          label = stringResource(R.string.status_stream),
-          value = ui.streamStateText,
-          active = ui.isStreaming,
-          present = ui.hasStream,
-      )
+      if (phoneStatus != null) {
+        val on = phoneStatus == stringResource(R.string.phone_status_on)
+        StateDotLabel(
+            text = phoneStatus,
+            dot = if (on) SpeakUpColors.ListenCyan else SpeakUpColors.PaperMuted,
+            filled = on,
+        )
+      } else {
+        StatusChip(
+            label = stringResource(R.string.status_session),
+            value = ui.sessionStateText,
+            active = ui.isSessionActive,
+            present = ui.hasSession,
+        )
+        StatusChip(
+            label = stringResource(R.string.status_stream),
+            value = ui.streamStateText,
+            active = ui.isStreaming,
+            present = ui.hasStream,
+        )
+      }
     }
 
     Spacer(modifier = Modifier.width(12.dp))
@@ -624,13 +976,33 @@ private fun TopBar(
         )
       }
       if (showSettingsMenu) {
-        SwitchButton(
-            label = stringResource(R.string.unregister_button_title),
-            onClick = onDisconnect,
-            modifier = Modifier.align(Alignment.TopEnd).offset(y = 64.dp).width(220.dp),
-            isDestructive = true,
-            enabled = isDisconnectEnabled,
-        )
+        // Settings (the mode switches) above Disconnect.
+        Column(
+            modifier =
+                Modifier.align(Alignment.TopEnd)
+                    .offset(y = 64.dp)
+                    .width(300.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(SpeakUpColors.Night.copy(alpha = 0.96f))
+                    .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          if (settings != null) {
+            Text(
+                text = stringResource(R.string.hf_settings_heading),
+                color = SpeakUpColors.Paper,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() },
+            )
+            settings()
+          }
+          SwitchButton(
+              label = stringResource(R.string.unregister_button_title),
+              onClick = onDisconnect,
+              isDestructive = true,
+              enabled = isDisconnectEnabled,
+          )
+        }
       }
     }
   }
@@ -654,6 +1026,7 @@ private fun StatusChip(label: String, value: String, active: Boolean, present: B
 @Composable
 private fun BottomBar(
     ui: CameraUiState,
+    usingPhone: Boolean,
     isUpdateRequired: Boolean,
     hasActiveDevice: Boolean,
     onStartSession: () -> Unit,
@@ -665,6 +1038,7 @@ private fun BottomBar(
     onToggleMic: () -> Unit,
     onOpenTool: (ToolId) -> Unit,
     onUpdateFirmware: () -> Unit,
+    showTools: Boolean = true,
 ) {
   Column(
       modifier =
@@ -683,28 +1057,33 @@ private fun BottomBar(
     } else {
       // Tools need a live stream (they capture photos or read frames). The book reader keeps its
       // full-width button; the others share rows of two.
-      ToolButtons(ui = ui, onOpenTool = onOpenTool)
-      CaptureRow(
-          ui = ui,
-          onStartPreview = onStartPreview,
-          onStopPreview = onStopPreview,
-          onCapturePhoto = onCapturePhoto,
-          onToggleRecording = onToggleRecording,
-          onToggleMic = onToggleMic,
-      )
-      AnchoredPrimaryButton(
-          ui = ui,
-          hasActiveDevice = hasActiveDevice,
-          onStartSession = onStartSession,
-          onEndSession = onEndSession,
-      )
+      if (showTools) ToolButtons(ui = ui, usingPhone = usingPhone, onOpenTool = onOpenTool)
+      // The SDK's own capture and session controls are glasses-only.
+      if (!usingPhone) {
+        CaptureRow(
+            ui = ui,
+            onStartPreview = onStartPreview,
+            onStopPreview = onStopPreview,
+            onCapturePhoto = onCapturePhoto,
+            onToggleRecording = onToggleRecording,
+            onToggleMic = onToggleMic,
+        )
+        AnchoredPrimaryButton(
+            ui = ui,
+            hasActiveDevice = hasActiveDevice,
+            onStartSession = onStartSession,
+            onEndSession = onEndSession,
+        )
+      }
     }
   }
 }
 
 @Composable
-private fun ToolButtons(ui: CameraUiState, onOpenTool: (ToolId) -> Unit) {
-  val visible = Modifier.alpha(if (ui.hasSession) 1f else 0f)
+private fun ToolButtons(ui: CameraUiState, usingPhone: Boolean, onOpenTool: (ToolId) -> Unit) {
+  // On the phone a tool starts the camera itself, so the buttons are always there.
+  val visible = Modifier.alpha(if (ui.hasSession || usingPhone) 1f else 0f)
+  val enabled = ui.isStreaming || usingPhone
   val (book, others) = ToolRegistry.all.partition { it.id == ToolId.BOOK }
   Column(modifier = visible, verticalArrangement = Arrangement.spacedBy(10.dp)) {
     Text(
@@ -719,7 +1098,7 @@ private fun ToolButtons(ui: CameraUiState, onOpenTool: (ToolId) -> Unit) {
           icon = spec.icon,
           label = stringResource(spec.buttonRes),
           contentDescription = stringResource(spec.buttonDescriptionRes),
-          enabled = ui.isStreaming,
+          enabled = enabled,
           primary = true,
           onClick = { onOpenTool(spec.id) },
       )
@@ -732,7 +1111,7 @@ private fun ToolButtons(ui: CameraUiState, onOpenTool: (ToolId) -> Unit) {
               icon = spec.icon,
               label = stringResource(spec.buttonRes),
               contentDescription = stringResource(spec.buttonDescriptionRes),
-              enabled = ui.isStreaming,
+              enabled = enabled,
               primary = true,
               onClick = { onOpenTool(spec.id) },
           )

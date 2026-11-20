@@ -84,18 +84,24 @@ final class A11yAudioSession: @unchecked Sendable {
       buffers[earcon] = EarconSynth.render(earcon.notes, timbre: earcon.timbre, format: format)
     }
     tickBuffer = EarconSynth.renderTick(format: format)
+    // The app's own voice joins the earcons here when the user's ears settings need it (AudioBus).
+    AudioBus.shared.install(on: engine, earconNode: earconNode, tickNode: tickNode) { [self] in startEngine() }
     engine.prepare()
     self.engine = engine
     observeSession(engine: engine)
   }
 
-  func playEarcon(_ earcon: Earcon) {
+  /// `requestedAt`: the uptime of the main-actor call, for the 100 ms earcon budget (AudioBusMetrics).
+  func playEarcon(_ earcon: Earcon, requestedAt: UInt64? = nil) {
     dispatchPrecondition(condition: .onQueue(queue))
     prepareEngine()
-    guard let buffer = buffers[earcon], startEngine() else { return }
+    // Pan and volume from the Ears and Sounds settings, and any one-off side cue.
+    let buffer = AudioBus.shared.earconBuffer(for: earcon, standard: buffers[earcon])
+    guard let buffer, startEngine() else { return }
     // .interrupts: a newer state replaces an older tone instead of queueing behind it.
     earconNode.scheduleBuffer(buffer, at: nil, options: .interrupts)
     earconNode.play()
+    if let requestedAt { AudioBus.recordEarcon(requestedAt: requestedAt) }
     scheduleIdleCheck(after: earcon.duration)
   }
 
@@ -278,6 +284,7 @@ final class A11yAudioSession: @unchecked Sendable {
         queue.async { [self] in
           // A category that isn't ours means something else took the session. Don't switch it back
           // from under it just to keep ticking; the next earcon restarts things.
+          AudioBus.shared.engineStopped()
           let category = AVAudioSession.sharedInstance().category
           guard category == .playback || inputHold != nil else { return }
           resumeTick()
@@ -291,6 +298,7 @@ final class A11yAudioSession: @unchecked Sendable {
           if began {
             isActive = false
             isDucking = false
+            AudioBus.shared.engineStopped()
           } else {
             resumeTick()
           }

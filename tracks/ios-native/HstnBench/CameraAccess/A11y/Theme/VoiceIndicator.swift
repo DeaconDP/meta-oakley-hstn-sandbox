@@ -1,5 +1,5 @@
 /*
- * VoiceIndicator - voice is the default input, so the screen always says how it's doing
+ * VoiceIndicator - the screen always says how listening is doing (hands-free, or push to talk)
  *
  * VoiceIndicatorModel is pure: VoiceControl's state in, words, a mascot mood and at most one fix out.
  * The view only binds to it. A bar beside the mascot is Listen Cyan while listening and Voice Coral
@@ -18,10 +18,12 @@ struct VoiceIndicatorModel: Equatable {
     case turnOn
     case askPermission
     case openSettings
+    case startAgain
 
     var title: String {
       switch self {
-      case .turnOn: "Turn on"
+      case .startAgain: "Start again"
+      case .turnOn: "Hands-free on"
       case .askPermission: "Allow"
       case .openSettings: "Open Settings"
       }
@@ -29,7 +31,8 @@ struct VoiceIndicatorModel: Equatable {
 
     var hint: String {
       switch self {
-      case .turnOn: "Turns voice control back on."
+      case .startAgain: "Starts listening again, and uses the camera when you read."
+      case .turnOn: "Turns hands-free on, so the app is always listening."
       case .askPermission: "Asks to use the microphone and speech recognition."
       case .openSettings: "Opens Settings for this app."
       }
@@ -69,8 +72,14 @@ struct VoiceIndicatorModel: Equatable {
     speechPermission: VoicePermission,
     isSpeaking: Bool,
     heard: VoiceCommand?,
-    canPrompt: Bool
+    canPrompt: Bool,
+    sessionEnded: Bool = false
   ) -> VoiceIndicatorModel {
+    if sessionEnded {
+      return VoiceIndicatorModel(
+        title: "SpeakUp has stopped", detail: "Tap Start again, or leave the app and come back.", mood: .idle,
+        fix: .startAgain)
+    }
     switch status {
     case .listening:
       if let heard {
@@ -87,7 +96,7 @@ struct VoiceIndicatorModel: Equatable {
       return VoiceIndicatorModel(title: "Listening paused", detail: reason, mood: .idle, fix: nil)
     case .off:
       return VoiceIndicatorModel(
-        title: "Voice control is off", detail: "Every button still works.", mood: .idle, fix: .turnOn)
+        title: "Hands-free is off", detail: "Tap the mic for one command.", mood: .idle, fix: .turnOn)
     case .unavailable:
       let denied = micPermission == .denied || speechPermission == .denied
       var fix: Fix?
@@ -121,7 +130,8 @@ struct VoiceIndicatorView: View {
       speechPermission: voice.speechPermission,
       isSpeaking: Announcer.shared.isSpeaking,
       heard: heard,
-      canPrompt: !LaunchOptions.isAutomatedTest)
+      canPrompt: !LaunchOptions.isAutomatedTest,
+      sessionEnded: voice.isSessionEnded)
   }
 
   var body: some View {
@@ -182,8 +192,10 @@ struct VoiceIndicatorView: View {
 
   private func perform(_ fix: VoiceIndicatorModel.Fix) {
     switch fix {
+    case .startAgain:
+      voice.resumeSession()
     case .turnOn:
-      voice.setEnabled(true)
+      voice.setHandsFree(true)
     case .askPermission:
       Task { await voice.requestPermissions() }
     case .openSettings:
@@ -231,7 +243,10 @@ struct SayLine: View {
         .font(.rounded(.footnote, weight: .semibold))
         .foregroundStyle(Theme.inkSoft)
         .fixedSize(horizontal: false, vertical: true)
-        .accessibilityHidden(true)
+        // Not hidden: text on screen that VoiceOver can't reach fails the accessibility audit
+        // ("Potentially inaccessible text"), and it is how a VoiceOver user learns the commands.
+        .accessibilityLabel("You can say " + phrases.joined(separator: ", "))
+        .accessibilityIdentifier("say_line")
     }
   }
 }

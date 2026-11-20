@@ -1,7 +1,7 @@
 // BookReaderViewModel - the read-a-book loop
 //
-//   frame sizes ─► FrameSizeMotion ─► PageTurnDetector ─┐   (or the Next page button)
-//                                                       ▼
+//   camera.motion (frame sizes or differences) ─► PageTurnDetector ─┐   (or Next page)
+//                                                                   ▼
 //   capturePage (GA in-stream photo) ─► ML Kit OCR ─► PageProcessor (framing, layout, dedup)
 //        ├─ Read      ─► queue the page's chunks; speak now if idle
 //        ├─ SamePage  ─► earcon (and a spoken note if the user asked for it)
@@ -38,7 +38,6 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.Bookmark
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ask.AskGrammar
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ask.AskMemory
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.FrameSignal
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.FrameSizeMotion
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.PageOutcome
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.PageProcessor
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.PageTurnDetector
@@ -162,7 +161,6 @@ class BookReaderViewModel(
 
   private val processor = PageProcessor()
   private val detector = PageTurnDetector()
-  private val motion = FrameSizeMotion()
   private val ocr = MlKitOcr()
   private val earcons = hub.earcons
 
@@ -185,8 +183,8 @@ class BookReaderViewModel(
     hub.settings.addListener(settingsListener)
     // Page-turn detection from the stream. Cheap per frame; events hop to main.
     viewModelScope.launch(Dispatchers.Default) {
-      camera.frameSizes.collect { frame ->
-        val change = motion.onFrame(frame.bytes, frame.isCodecConfig) ?: return@collect
+      // Whichever camera is in use: frame sizes on the glasses, frame differences on the phone.
+      camera.motion.collect { change ->
         val event = synchronized(detector) { detector.onFrame(FrameSignal(change)) }
         if (event != null) withContext(Dispatchers.Main) { onTurnEvent(event) }
       }
@@ -668,6 +666,9 @@ class BookReaderViewModel(
         if (_uiState.value.phase == ReaderPhase.READING) pause()
         return false
       }
+      // Hands-free commands ("status", "connect", "hands-free off"...): ToolHub's. The book's own
+      // "where am I" and "back" are caught by its grammar before these.
+      else -> return false
     }
     return true
   }

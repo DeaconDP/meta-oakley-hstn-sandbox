@@ -18,6 +18,36 @@
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<!-- Reach (notes/reach-ios.md): "Open in SpeakUp" / "Copy to SpeakUp" for photos and PDFs from Files and other apps. The app gets its own copy (not opened in place), reads it on the phone and deletes it. -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>PDF</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.adobe.pdf</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Image</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.image</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -28,6 +58,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>hstnbench</string>
+				<string>speakup</string>
 			</array>
 		</dict>
 	</array>
@@ -76,7 +107,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>This app needs access to save photos captured from your glasses.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to stream from your phone's camera as a mock device feed.</string>
+	<string>SpeakUp uses your iPhone's camera to see the page, letter or label you want read aloud. Pictures are read on this phone and aren't kept, unless you turn on the natural voice, which sends the page to OpenAI to read.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SpeakUp listens for your spoken commands, such as "read" and "stop", and records sound from your glasses' microphone alongside video. Commands are recognised on this phone and nothing you say is stored.</string>
 		<key>NSSpeechRecognitionUsageDescription</key>

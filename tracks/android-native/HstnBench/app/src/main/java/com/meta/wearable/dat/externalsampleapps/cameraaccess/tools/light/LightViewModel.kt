@@ -96,6 +96,9 @@ class LightViewModel(application: Application, hub: ToolHub) :
   override fun onAttached(request: ToolRequest) {
     super.onAttached(request)
     attached = true
+    // Brightness is what this tool measures: hold the camera's exposure and white balance still
+    // (the phone camera; the glasses ignore it). Released when the tool goes.
+    hub.camera.lockExposure(true)
   }
 
   override fun onOpened(request: ToolRequest, reason: OpenReason) {
@@ -112,12 +115,14 @@ class LightViewModel(application: Application, hub: ToolHub) :
 
   override fun onLeaving() {
     attached = false
+    hub.camera.lockExposure(false)
     stopProbe()
     colourJob?.cancel()
   }
 
   override fun onDetached() {
     attached = false
+    hub.camera.lockExposure(false)
     stopProbe()
     colourJob?.cancel()
   }

@@ -9,29 +9,39 @@
 import SwiftUI
 
 struct CameraNarration: ViewModifier {
-  let viewModel: CameraViewModel
+  let viewModel: any GlassesCamera
   let narrator: CameraNarrator
   let updateRequired: @MainActor () -> Bool
+  /// The camera permission prompt's Continue and Cancel, so the question can be answered by voice.
+  let permissionYes: @MainActor () -> Void
+  let permissionNo: @MainActor () -> Void
 
   func body(content: Content) -> some View {
     content
       .onChange(of: viewModel.a11yPhase) { old, new in
         narrator.phaseChanged(from: old, to: new, viewModel: viewModel)
       }
-      .onChange(of: viewModel.donState) { old, new in
-        narrator.donStateChanged(from: old, to: new, viewModel: viewModel)
+      .onChange(of: viewModel.wear) { old, new in
+        narrator.wearChanged(from: old, to: new, viewModel: viewModel)
       }
-      .onChange(of: viewModel.hingeState) { old, new in
-        narrator.hingeStateChanged(from: old, to: new, viewModel: viewModel)
+      .onChange(of: viewModel.hinge) { old, new in
+        narrator.hingeChanged(from: old, to: new, viewModel: viewModel)
       }
       .onChange(of: viewModel.batteryLevel) { old, new in
         narrator.batteryChanged(from: old, to: new)
       }
       .onChange(of: viewModel.showError) { _, shown in
-        if shown { narrator.errorShown(viewModel) }
+        guard shown else { return }
+        narrator.errorShown(viewModel)
+        // Hands-free has no alert to dismiss; the action stays for "try again".
+        if A11yPreferences.shared.handsFree { viewModel.dismissError() }
       }
       .onChange(of: viewModel.showCameraPermissionRedirectConfirm) { _, shown in
-        if shown { narrator.cameraPermissionPromptShown() }
+        if shown {
+          narrator.cameraPermissionPromptShown(yes: permissionYes, no: permissionNo)
+        } else {
+          VoiceControl.shared.clearQuestion()
+        }
       }
       .onDisappear { narrator.screenDisappeared() }
   }

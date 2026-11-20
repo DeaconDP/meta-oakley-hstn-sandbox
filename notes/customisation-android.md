@@ -50,7 +50,7 @@ All English, normalised by `Phrases` (fillers dropped; "right", "now" and "ok" k
 | Tips | "fewer tips", "no more tips", "normal tips" |
 | Profiles | "switch to out and about", "use the reading profile", "home profile", "save this as kitchen", "which profile am I on", "list my profiles"; answering a suggestion: "yes" / "no" |
 | Glasses controls | "what do my buttons do", "turn on glasses controls", "when I hold the capture button, read my mail", "when I swipe forward, faster", "when I tap, stop" |
-| Screen, sharing | "open settings", "settings", "share my setup" |
+| Screen, sharing | "make it my own", "customise", "open the settings screen", "share my setup" ("settings", "my settings" and "open settings" stay hands-free's spoken settings report) |
 
 Refused, with a spoken reason: a shortcut phrase that already means something ("stop already means the pause command. Pick another word."), a target nothing understands, a shortcut pointing at another shortcut, more than 50 shortcuts, hiding every tool, an address word that is a command.
 
@@ -105,6 +105,7 @@ Done once, the first time the store loads with no document (`SettingsPrefs.oldPr
 | `book_reader` / `read_furniture` | `speech.tools.book.pageNumbers` (only stored when true) |
 | `book_reader` / `auto_turn` | `speech.tools.book.autoTurn` (only stored when false) |
 | `tools` / `watch_tick_seconds` | `sounds.watchTickSeconds` |
+| `mode` / `verbosity` (hands-free "short answers") | `speech.verbosity`; ToolHub mirrors the store's value back into `HandsFreeStore` so the mode card and "settings" report stay right |
 
 The bookmark and recap (`book_reader` / `bookmark`, `ask_memory`) and the setup-flow prefs stay where they were. Storage is one SharedPreferences file `speakup_settings`, key `setup_json` (DataStore would add a dependency and an async hop for a few-kilobyte document that ToolSpeaker needs synchronously at start-up). The audio bus switch is device-only (`audio_bus`). Instrumented tests clear `speakup_settings` and call `SettingsPrefs.resetForTests()` in their set-up.
 
@@ -134,13 +135,21 @@ No option switches off "can't tell", the medicine and money refusals or face blu
 
 ## Tests
 
-JVM (`./gradlew testDebugUnitTest` in `tracks/android-native/HstnBench`, on this Windows PC with `sdk.dir` in `local.properties`): **341 tests, 0 failures** (301 before this work, 40 new):
+JVM (`./gradlew testDebugUnitTest` in `tracks/android-native/HstnBench`, on this Windows PC with `sdk.dir` in `local.properties`): **341 tests, 0 failures** on the original base (301 before this work, 40 new); **390, 0 failures** after merging `customise-everything` (hands-free mode and phone camera, 350 of their own):
 - `SettingsStoreTest` (14): migration without loss, book rate = main rate isn't an override, defaults and starters, session-only tweaks and keep, undo across keep/reset, per-area reset, lock (survives restart, blocks undo/reset/switch/import), profiles (switch, kept tweak into the profile, save, undo, words shared), learned suggestion (asks at 3, never applies, "no" stops it), export/import round trip by JSON and code, tolerant import (bad text, newer schema, unknown and safety-sounding fields ignored, bare areas object), schema field names, "what's my setup" differences only, clear speech caps the rate.
 - `SettingsGrammarTest` (7): 70 example phrases, shortcut comma handling, context words (voice trial, yes/no, conversation mode hears only "carry on"), profile names (and "start reading" stays the book's), room chatter, no clashes with the other grammars, the global speed phrases stay global.
 - `ShortcutsAndVoiceTest` (13): alias add and rewrite, split without a comma, routine build and read-back, conflict/unknown/nested refusals, forget/list, every change speaks its value + the one-time keep hint, the book's own speed, trying voices (next/back/keep/cancel), locked replies, the learned question waiting for yes, shortcuts/menu/buttons/conversation by speech, pan/balance/mono/cue maths, mixing, clipping, earcon PCM, bus latency budget.
 - `SettingsExtrasTest` (6): first-sentence trimming for short replies, a one-change code under 120 characters that imports with starters intact, TTS PCM decoding and resampling, the command catalogue, tip pacing gaps, menu normalisation.
 
 Also built: `assembleDebug` and `assembleDebugAndroidTest`. Instrumented tests were **not run**: no API 31+ device or emulator is reachable from this PC (adb sees only the Galaxy S7, SM-G930F, Android 8.0). The instrumented tests were updated to clear the new settings file.
+
+## Merged with hands-free mode (customise-everything)
+
+- Hands-free's "short answers / normal / detailed" (`GlobalCommand.SetVerbosity`, `HandsFreeStore.verbosity`) is now the settings store's `speech.verbosity`: the command goes through `SettingsVoice` (session-only until "keep that"), `ToolHub.verbosity` reads the store (per-tool override included), and the store's value is mirrored into `HandsFreeStore`. "Shorter" and "more detail" are claimed by both grammars; the settings grammar runs first and steps one level.
+- The toolbox (hands-free off) keeps its quiet start: welcomes and "Main menu." are only spoken when `policy.narrateStartup`, still through `brief()` and `sayFamiliar()`.
+- Push to talk and glasses-display buttons (`ToolHub.runCommand`) go through the same shortcut rewrite, conversation mode and settings grammar as the mic, without the echo check.
+- Glasses controls use the camera source selector's session (`sources.deviceSession`), so they stay off while the phone camera is in use.
+- Hands-free on/off, glasses display and camera source stay in `HandsFreeStore` (device/mode settings, not part of the shared schema).
 
 ## What's left
 

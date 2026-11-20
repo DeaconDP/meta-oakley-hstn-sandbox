@@ -21,7 +21,11 @@ class SetupFlowTest {
   fun welcomeSaysWhatIsMissing() {
     val noMic = SetupFlow().apply { permissions(PermState.GRANTED, PermState.BLOCKED) }
     assertEquals(say(SetupLine.WELCOME_NO_MIC), noMic.ready(0))
-    val noBluetooth = SetupFlow().apply { permissions(PermState.ASKABLE, PermState.GRANTED) }
+    // Nearby devices isn't asked for at launch any more (glasses optional): not asked yet is normal,
+    // only a permanent refusal is mentioned up front.
+    val notAskedYet = SetupFlow().apply { permissions(PermState.ASKABLE, PermState.GRANTED) }
+    assertEquals(say(SetupLine.WELCOME), notAskedYet.ready(0))
+    val noBluetooth = SetupFlow().apply { permissions(PermState.BLOCKED, PermState.GRANTED) }
     assertEquals(say(SetupLine.WELCOME_NO_BLUETOOTH), noBluetooth.ready(0))
   }
 
@@ -126,5 +130,17 @@ class SetupFlowTest {
   fun errorsAreSpokenThenListening() {
     val flow = SetupFlow().granted()
     assertEquals(listOf(SetupAction.Say(SetupLine.TEXT, Next.LISTEN, "Oops")), flow.error("Oops"))
+  }
+
+  @Test
+  fun useMyPhoneSkipsMetaAi() {
+    val flow = SetupFlow().apply { permissions(PermState.ASKABLE, PermState.GRANTED) }
+    flow.ready(0)
+    for (p in listOf("use my phone", "Use the phone camera", "phone", "use my phone's camera", "I don't have glasses",
+        "no glasses", "just the phone")) {
+      assertEquals(p, say(SetupLine.USING_PHONE, Next.USE_PHONE), SetupFlow().granted().heard(p, 1_000))
+    }
+    // Choosing the phone never asks for Nearby devices.
+    assertEquals(say(SetupLine.USING_PHONE, Next.USE_PHONE), flow.heard("use my phone", 1_000))
   }
 }

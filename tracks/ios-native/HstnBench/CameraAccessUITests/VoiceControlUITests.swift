@@ -48,11 +48,31 @@ final class VoiceControlUITests: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["onboarding_\(step)"].waitForExistence(timeout: 10), "Expected step \(step)")
   }
 
+  /// The toolbox is the default: the mic is off until the mic button is tapped.
   func testUITestLaunchDoesNotListenOrPrompt() {
     launch([])
-    XCTAssertEqual(app.staticTexts["voice_test_status"].label, "unavailable")
+    XCTAssertEqual(app.staticTexts["voice_test_status"].label, "off")
+    XCTAssertTrue(app.buttons["push_to_talk_button"].waitForExistence(timeout: 10))
     let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
     XCTAssertFalse(springboard.alerts.firstMatch.waitForExistence(timeout: 2), "No permission dialog in a UI test")
+  }
+
+  /// Hands-free wants to listen, but a UI test never opens the mic. No mic button: it's always on.
+  func testHandsFreeLaunchWantsToListenButDoesNotInATest() {
+    launch(["--hands-free"])
+    XCTAssertTrue(app.switches["hands_free_toggle"].waitForExistence(timeout: 10))
+    XCTAssertEqual(app.staticTexts["voice_test_status"].label, "unavailable")
+    XCTAssertFalse(app.buttons["push_to_talk_button"].exists)
+  }
+
+  func testHandsFreeOffByVoiceShowsTheMicButton() {
+    launch(["--hands-free"])
+    XCTAssertTrue(app.switches["hands_free_toggle"].waitForExistence(timeout: 10))
+    // Hands-free speaks its opening line at launch, and while the app speaks only "reader, ..." counts.
+    say("reader, touch mode")
+    waitForLastCommand("handsFreeOff")
+    XCTAssertTrue(app.buttons["push_to_talk_button"].waitForExistence(timeout: 5))
+    XCTAssertEqual(app.staticTexts["voice_test_status"].label, "off")
   }
 
   func testConnectByVoiceReachesTheCameraScreen() {
@@ -101,14 +121,16 @@ final class VoiceControlUITests: XCTestCase {
     let settings = app.buttons["settings_button"]
     XCTAssertTrue(settings.waitForExistence(timeout: 20))
     settings.tap()
-    let toggle = app.buttons["voice_control_toggle"]
+    let toggle = app.switches["hands_free_toggle"]
     XCTAssertTrue(toggle.waitForExistence(timeout: 5))
     XCTAssertTrue(app.buttons["use_voiceover_voice_toggle"].exists)
+    XCTAssertTrue(app.buttons["glasses_display_toggle"].exists)
     XCTAssertTrue(app.staticTexts["voice_name_label"].label.hasPrefix("Voice: "))
-    XCTAssertEqual(toggle.label, "Turn voice control off")
-    toggle.tap()
+    XCTAssertEqual(toggle.value as? String, "0", "the toolbox is the default")
+    // The switch itself sits at the trailing edge; the label beside it doesn't flip it.
+    toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+    XCTAssertEqual(app.staticTexts["voice_test_status"].label, "unavailable", "hands-free wants the mic; tests never open it")
+    toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
     XCTAssertEqual(app.staticTexts["voice_test_status"].label, "off")
-    toggle.tap()  // Leave the default for the next test.
-    XCTAssertEqual(app.staticTexts["voice_test_status"].label, "unavailable")
   }
 }

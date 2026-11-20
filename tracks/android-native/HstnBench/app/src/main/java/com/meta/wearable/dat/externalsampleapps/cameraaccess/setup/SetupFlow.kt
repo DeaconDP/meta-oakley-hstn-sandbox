@@ -1,9 +1,10 @@
 // SetupFlow - the spoken conversation on the setup screen, as pure logic
 //
-// The app shows the setup screen until it is registered with the Meta AI app. A blind user can't see
-// the one "Connect my glasses" button, so the screen talks: a short welcome, then it listens for
-// connect / help / repeat / open settings / quit (SetupGrammar). "Connect" speaks the handoff and
-// opens Meta AI. Coming back still unconnected gets "not connected yet, say connect to try again".
+// The app shows the setup screen on the first run, until the user picks a camera: "use my phone"
+// (no Meta AI, no Bluetooth; notes/phone-camera.md) or "connect my glasses" (registration with the
+// Meta AI app). A blind user can't see the buttons, so the screen talks: a short welcome, then it
+// listens for use my phone / connect / help / repeat / open settings / quit (SetupGrammar).
+// "Connect" speaks the handoff and opens Meta AI. Coming back still unconnected gets "not connected yet, say connect to try again".
 // Quiet users get two gentle reminders (IdleNudge), then silence. Lines that need the microphone
 // or Bluetooth say how to fix them instead.
 //
@@ -28,6 +29,8 @@ enum class PermState {
 /** Everything the setup screen says. SetupVoice maps each to a string in strings_setup_voice.xml. */
 enum class SetupLine {
   WELCOME,
+  /** "Use my phone": said before the tools open. */
+  USING_PHONE,
   WELCOME_NO_MIC,
   WELCOME_NO_BLUETOOTH,
   RESUMED,
@@ -51,6 +54,8 @@ enum class SetupLine {
 /** What happens after a line has been spoken. */
 enum class Next {
   LISTEN,
+  /** Leave setup for the tools, on the phone camera. */
+  USE_PHONE,
   START_REGISTRATION,
   ASK_PERMISSIONS,
   OPEN_SETTINGS,
@@ -105,7 +110,9 @@ class SetupFlow(
     nudge.userActed(nowMs)
     val line =
         when {
-          bluetooth != PermState.GRANTED -> SetupLine.WELCOME_NO_BLUETOOTH
+          // Nearby devices isn't asked for until the user picks the glasses, so only a permanent
+          // refusal is worth mentioning up front.
+          bluetooth == PermState.BLOCKED -> SetupLine.WELCOME_NO_BLUETOOTH
           mic != PermState.GRANTED -> SetupLine.WELCOME_NO_MIC
           else -> SetupLine.WELCOME
         }
@@ -121,7 +128,7 @@ class SetupFlow(
     leftDuringHandoff = false
     return when {
       wasHandingOff -> say(SetupLine.NOT_CONNECTED_YET)
-      bluetooth != PermState.GRANTED -> say(SetupLine.WELCOME_NO_BLUETOOTH)
+      bluetooth == PermState.BLOCKED -> say(SetupLine.WELCOME_NO_BLUETOOTH)
       mic != PermState.GRANTED -> say(SetupLine.WELCOME_NO_MIC)
       else -> say(SetupLine.RESUMED)
     }
@@ -151,6 +158,7 @@ class SetupFlow(
     }
     nudge.userActed(nowMs)
     return when (command) {
+      SetupCommand.USE_PHONE -> say(SetupLine.USING_PHONE, Next.USE_PHONE)
       SetupCommand.CONNECT -> connect()
       SetupCommand.HELP -> say(SetupLine.HELP)
       SetupCommand.REPEAT -> say(lastLine ?: SetupLine.WELCOME)

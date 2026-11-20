@@ -26,6 +26,20 @@
 //              while a tool is open. With no tool open, transcripts go to GlobalGrammar.parseHome
 //              ("read my mail" opens it, "what can I say", "close the app" leaves). "Main menu" in
 //              any tool comes back here. See notes/tools-layer.md > Home voice menu.
+//   camera     CameraSourceSelector (notes/phone-camera.md): the tools' PageCamera is the phone
+//              (PhoneCamera, CameraX) or the glasses (CameraViewModel), switchable at runtime ("use
+//              the phone", "use the glasses"). With the phone there is no session, no connect
+//              narration, no glasses health and no reconnect loop; the phone's own pitfalls are
+//              spoken instead (permission, camera in use, too dark: "torch on").
+//   mode       hands-free or toolbox (notes/hands-free-mode.md, HandsFreeStore, HandsFreePolicy).
+//              Everything above runs in both, except: in the toolbox the mic is off until
+//              [pushToTalk] (one command, same grammar), and there is no start-up narration, no
+//              screen-change narration, no silence reminders, no spoken pitfalls with no tool open,
+//              and no automatic reconnecting at home. A tool launched straight in (alias, deep
+//              link, extra) is a voice-first visit and behaves as hands-free until the app is left.
+//   surface    HandsFreeSurface: the card (screen, state line, last heard, hints) for the phone
+//              screen and, in hands-free mode, a glasses display (GlassesDisplaySink). Tools publish
+//              through [say]/[warn] (the state line) and [publishCard]; never the display API.
 //
 // The UI decides which tool screen shows from [activeTool]; each tool screen attaches its
 // ViewModel (ToolScreenEffects). Main thread only, except where noted.
@@ -70,10 +84,24 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Sett
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Setup
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SetupSpeech
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Shortcuts
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Verbosity
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.VoiceChoice
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Words
 import java.util.Locale
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlassesCard
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HandsFreePolicy
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HandsFreeRules
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ModeChange
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.Verbosity
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.CameraSource
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.DarkWatch
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.PhoneCameraWording
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.PermState
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -86,16 +114,25 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ToolHub(
     application: Application,
-    /** The glasses camera (CameraViewModel). */
-    val camera: PageCamera,
+    /** The glasses camera (CameraViewModel, also the GlassesLink). */
+    glasses: PageCamera,
+    /** Registered with Meta AI when the screen opened (AUTO picks the glasses then). */
+    initiallyRegistered: Boolean = true,
 ) : AndroidViewModel(application), ToolSpeaker.Listener {
 
   companion object {
     private const val TAG = "ToolHub"
     private const val MACRO_STEP_WAIT_MS = 8_000L
     private const val LINK_WAIT_MS = 20_000L
+    /** The phone camera opens in well under a second; this covers a slow first bind. */
+    private const val PHONE_WAIT_MS = 6_000L
+    /** After a camera switch, the old camera stopping isn't a lost stream. */
+    private const val SWITCH_GRACE_MS = 8_000L
+    /** Placeholder glasses reading while on the phone (glasses alerts are dropped then). */
+    private val NO_GLASSES = GlassesSnapshot(paired = true, connected = false)
     private const val SORRY_GAP_MS = 8_000L
     private const val SORRY_MAX_WORDS = 6
     private const val STREAM_LOST_SAY_DELAY_MS = 1_500L
@@ -103,6 +140,8 @@ class ToolHub(
     private const val RECONNECT_EVERY_MS = 4_000L
     private const val NUDGE_CHECK_MS = 1_000L
     private const val SPOKEN_LOG_SIZE = 50
+    /** Push to talk: how long to wait for the one command. */
+    private const val PUSH_TO_TALK_MS = 8_000L
     const val MIN_RATE = 0.5f
     const val MAX_RATE = 3f
 
@@ -120,6 +159,49 @@ class ToolHub(
   /** Every "Make it your own" setting (shared with the book reader and the settings screen). */
   val settings: SettingsStore = SettingsPrefs.store(application)
   private val settingsPrefs = SettingsPrefs.prefs(application)
+
+  /** The saved mode and the settings hands-free can change by voice. */
+  val mode: HandsFreeStore = HandsFreeStore.get(application)
+
+  // MARK: - Cameras (notes/phone-camera.md)
+
+  private val registered = MutableStateFlow(initiallyRegistered)
+
+  /** The phone's back camera (CameraX). The camera screen attaches its lifecycle and preview. */
+  val phoneCamera = PhoneCamera(application, viewModelScope)
+
+  /** Which camera the tools use, and the switch between them. */
+  val sources =
+      CameraSourceSelector(
+          scope = viewModelScope,
+          glasses = glasses,
+          phone = phoneCamera,
+          setting =
+              mode.settings
+                  .map { it.cameraSource }
+                  .stateIn(viewModelScope, SharingStarted.Eagerly, mode.settings.value.cameraSource),
+          registered = registered,
+      )
+
+  /** The tools' camera: whichever source is in use. */
+  val camera: PageCamera = sources
+
+  private val glassesLink: GlassesLink? = sources.glassesLink
+
+  /** The camera in use. */
+  val cameraSource: StateFlow<CameraSource> = sources.source
+
+  /**
+   * Set by the camera screen: asks Android for the camera permission (after ToolHub said why, in
+   * hands-free mode). Returns GRANTED, ASKABLE (refused) or BLOCKED (Android won't ask again).
+   */
+  var requestCameraPermission: (suspend () -> PermState)? = null
+
+  /** Set by the camera screen: start Meta AI registration ("connect my glasses" before setup). */
+  var onConnectGlasses: (() -> Unit)? = null
+
+  private val darkWatch = DarkWatch()
+  private var switchedAtMs = 0L
 
   // MARK: - What tools use directly
 
@@ -143,6 +225,22 @@ class ToolHub(
   /** Which microphone voice control is using. */
   val microphone: StateFlow<Microphone> = voice.microphone
 
+  /** Phone screen mirror and glasses display (in hands-free mode, when the glasses have one). */
+  val surface = HandsFreeSurface(viewModelScope)
+
+  private val displaySink =
+      GlassesDisplaySink(
+          session = { sources.deviceSession },
+          wanted = { policy.handsFree && mode.settings.value.glassesDisplay && !sources.usingPhone },
+          heardLabel = application.getString(R.string.hf_card_heard),
+          // A button on the glasses = saying its phrase.
+          onHint = { phrase -> viewModelScope.launch { runCommand(phrase) } },
+      )
+
+  private val _pushToTalk = MutableStateFlow(false)
+  /** The push-to-talk button is listening for its one command. */
+  val pushToTalkActive: StateFlow<Boolean> = _pushToTalk.asStateFlow()
+
   private val _activeTool = MutableStateFlow<ToolRequest?>(null)
   /** The tool whose screen is showing, or null for the camera screen. */
   val activeTool: StateFlow<ToolRequest?> = _activeTool.asStateFlow()
@@ -153,9 +251,15 @@ class ToolHub(
   var phoneNow: PhoneSnapshot? = null
     private set
 
-  /** A short note is being spoken (sayAside); tools reading text wait for it. */
-  var isSpeakingAside = false
-    private set
+  /**
+   * A short note is being spoken or is queued (sayAside); tools reading text wait for it. Counted,
+   * not a flag: asides queue behind each other ("Connecting…" then the welcome), and the first one
+   * finishing mustn't report quiet while the next is still playing.
+   */
+  val isSpeakingAside: Boolean
+    get() = asidesPending > 0
+
+  private var asidesPending = 0
 
   /** The stream dropped while a tool was open and hasn't come back yet. */
   var streamLost = false
@@ -254,6 +358,30 @@ class ToolHub(
   private var launchedStraightIn = false
   private var requestPermission: (suspend (Permission) -> PermissionStatus)? = null
   private var phoneAllowed: (suspend () -> Boolean)? = null
+  /** Continuous listening (hands-free) and its silence reminders. */
+  private var listenJob: Job? = null
+  private var nudgeJob: Job? = null
+  private var pushJob: Job? = null
+  /** This visit is voice-first whatever the saved mode (a tool launched straight in). */
+  private var visitVoiceFirst = false
+  /** "Disconnect" was said: don't reconnect until "connect". */
+  private var userDisconnected = false
+  // The card's parts (HandsFreeSurface).
+  private var cardState = ""
+  private var cardHeard = ""
+  private var cardHints: List<String>? = null
+
+  /** What the current mode means (the saved setting, or a voice-first visit). */
+  val policy: HandsFreePolicy
+    get() = HandsFreeRules.effective(mode.handsFree, visitVoiceFirst)
+
+  /** Hands-free right now: always listening and narrating. */
+  val isHandsFree: Boolean
+    get() = policy.handsFree
+
+  /** "Short/normal/detailed answers". Tools that can say more or less read this. */
+  val verbosity: Verbosity
+    get() = Verbosity.valueOf(settings.current.verbosityFor(host?.toolId?.id).name)
 
   init {
     settings.addListener(settingsListener)
@@ -267,14 +395,76 @@ class ToolHub(
     applySettings()
     // Glasses controls follow the stream (they need a started session).
     viewModelScope.launch { camera.isStreaming.collect { updateControls() } }
-    // A fold or session end stops the stream; the open tool decides whether that matters.
+    // A fold or session end stops the stream; the open tool decides whether that matters. With no
+    // tool open only hands-free mode reconnects by itself; "disconnect" means stay disconnected.
     viewModelScope.launch {
       camera.isStreaming.drop(1).collect { streaming ->
         val h = host
-        if (!streaming && (h?.onStreamLost() ?: isHome)) onStreamLost()
+        if (!streaming && !isRealLoss()) {
+          updateCard()
+          return@collect
+        }
+        if (!streaming && !userDisconnected && (h?.onStreamLost() ?: (isHome && policy.reconnectAtHome))) {
+          onStreamLost()
+        }
         if (streaming && streamLost) onStreamBack()
+        updateCard()
       }
     }
+    surface.sink = displaySink
+    // Display errors are logged by the surface and said once here; speech carries on regardless.
+    surface.onSinkError = { if (policy.handsFree) sayAside(str(R.string.hf_display_failed)) }
+    viewModelScope.launch { camera.link.collect { updateCard() } }
+    viewModelScope.launch { _activeTool.collect { cardState = ""; cardHints = null; updateCard() } }
+    viewModelScope.launch { microphone.collect { updateCard() } }
+    // The display comes up when it's wanted and the glasses are streaming; goes blank when not.
+    viewModelScope.launch {
+      var wasWanted = false
+      mode.settings.collect { s ->
+        val wanted = policy.handsFree && s.glassesDisplay
+        if (wanted && !wasWanted) surface.refresh()
+        if (!wanted && wasWanted) surface.releaseSink()
+        wasWanted = wanted
+      }
+    }
+    viewModelScope.launch { camera.link.drop(1).collect { if (it == CameraLink.STREAMING) surface.refresh() } }
+    // A camera switch (voice, settings, AUTO fallback, registration): the old camera stopping isn't
+    // a lost stream; the card follows.
+    viewModelScope.launch {
+      sources.source.drop(1).collect {
+        switchedAtMs = SystemClock.elapsedRealtime()
+        Log.i(TAG, "camera source=$it")
+        updateCard()
+      }
+    }
+    // Phone camera in the dark: suggest the torch once (not in the light tool, which measures it).
+    viewModelScope.launch {
+      phoneCamera.meanLuma.collect { luma ->
+        if (luma < 0f || !sources.usingPhone || host == null || host?.toolId == ToolId.LIGHT ||
+            phoneCamera.hasTorch != true || !camera.isStreaming.value) {
+          return@collect
+        }
+        if (darkWatch.update(luma, SystemClock.elapsedRealtime(), phoneCamera.torchOn.value)) {
+          Log.i(TAG, "too dark: luma=$luma")
+          sayAside(PhoneCameraWording.TOO_DARK)
+        }
+      }
+    }
+  }
+
+  /** The app is registered with Meta AI (the camera screen keeps this up to date). */
+  fun setRegistered(on: Boolean) {
+    registered.value = on
+  }
+
+  /**
+   * Not streaming any more: does it count as a loss? Not just after a camera switch, and not when
+   * the phone camera was stopped on purpose or closed because the app went to the background.
+   */
+  private fun isRealLoss(): Boolean {
+    if (SystemClock.elapsedRealtime() - switchedAtMs < SWITCH_GRACE_MS) return false
+    if (sources.usingPhone && (!phoneCamera.wanted || phoneCamera.pausedInBackground)) return false
+    return true
   }
 
   // MARK: - Opening, switching and closing tools
@@ -289,6 +479,7 @@ class ToolHub(
     if (_activeTool.value != null) host?.onLeaving()
     pendingReason = if (voiceFirst) OpenReason.LAUNCHED else OpenReason.TAPPED
     launchedStraightIn = voiceFirst
+    if (voiceFirst) visitVoiceFirst = true
     _activeTool.value = request
   }
 
@@ -369,8 +560,13 @@ class ToolHub(
     if (!isVoiceOpen) return
     if (cutOff) hush()
     _homeHeard.value = ""
-    _homeStatus.value = str(R.string.home_back)
-    sayFamiliar(str(R.string.home_back), Earcon.SWITCH)
+    // The toolbox shows the menu; only hands-free says it (screen changes are narrated).
+    if (policy.narrateStartup) {
+      _homeStatus.value = str(R.string.home_back)
+      sayFamiliar(str(R.string.home_back), Earcon.SWITCH)
+    } else {
+      _homeStatus.value = ""
+    }
   }
 
   /**
@@ -388,6 +584,7 @@ class ToolHub(
     _activeTool.value = null
     launchedStraightIn = false
     closeVoice()
+    visitVoiceFirst = false
     onExitApp?.invoke()
   }
 
@@ -412,13 +609,20 @@ class ToolHub(
     applySettings()
     engineAvailable?.let { tool.onEngineState(it) }
     tool.onAttached(request)
+    // The phone camera is cheap to open: have it live behind any tool (the toolbox doesn't start
+    // the camera on the home screen).
+    if (sources.usingPhone && !camera.isStreaming.value && !userDisconnected && !phoneCamera.wanted) {
+      viewModelScope.launch { startPhoneCamera() }
+    }
     // Voice already running: this is a switch (or a re-open); the tool talks now. Otherwise
     // openVoice does the welcome first and then calls onOpened.
     if (welcomed) {
       val reason = pendingReason
       if (reason == OpenReason.SWITCHED) {
         tool.texts().welcomeAfterSwitch.takeIf { it.isNotBlank() }?.let { sayAside(it) }
-      } else {
+      } else if (policy.narrateStartup) {
+        // A tool tapped open in the toolbox doesn't announce itself (its screen does); it still
+        // speaks its results.
         sayAside(brief(tool.texts().welcome))
       }
       tool.onOpened(request, reason)
@@ -437,11 +641,16 @@ class ToolHub(
   // MARK: - Voice lifecycle
 
   /**
-   * Starts listening while any tool is open (the UI calls it once, not per tool, so switching keeps
-   * the mic). [voiceFirst]: launched straight into a tool, so bring the link up without dialogs and
-   * narrate each step. [home]: the home voice menu; voice runs for the whole camera screen (until
-   * [closeVoice]) and, if no tool is open, the link comes up the voice-first way and the menu
-   * welcomes the user.
+   * Starts the runtime while any tool is open (the UI calls it once, not per tool, so switching
+   * keeps the mic). [voiceFirst]: launched straight into a tool, so bring the link up without
+   * dialogs and narrate each step. [home]: the home menu; this runs for the whole camera screen
+   * (until [closeVoice]) and, if no tool is open, in hands-free mode the link comes up the
+   * voice-first way and the menu welcomes the user.
+   *
+   * The mode decides the rest (HandsFreePolicy): hands-free listens all the time and narrates; the
+   * toolbox only watches health and links, and listens when [pushToTalk] is pressed. Without the
+   * home menu (the touch bench, `--ez home_voice false`) the old behaviour applies: a tool listens
+   * while it's open.
    */
   fun openVoice(
       voiceFirst: Boolean,
@@ -451,47 +660,59 @@ class ToolHub(
   ) {
     if (voiceJob?.isActive == true) return
     homeMenu = home
+    if (!home) visitVoiceFirst = true
     requestPermission = requestWearablesPermission
     phoneAllowed = requestRecordAudio
     voiceJob = viewModelScope.launch {
       // Everything that can go wrong around the tool is spoken when it changes.
       launch {
         try {
-          watch.both().collect { (g, p) ->
-            glassesNow = g
-            phoneNow = p
-            onHealth(health.update(g, p))
-          }
+          // On the phone only the phone's own readings matter (battery); no glasses health.
+          sources.source
+              .flatMapLatest { s -> if (s == CameraSource.PHONE) watch.phone().map { NO_GLASSES to it } else watch.both() }
+              .collect { (g, p) ->
+                if (!sources.usingPhone) glassesNow = g
+                phoneNow = p
+                onHealth(health.update(g, p))
+              }
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
           Log.w(TAG, "health watch failed", e)
         }
       }
-      // A quiet user gets told what the tool is waiting for.
-      launch { remindWhenQuiet() }
-      // Permission trouble, whoever started the connection.
+      // Permission trouble, whoever started the connection. In the toolbox the screen's own
+      // "Continue to Meta AI" prompt explains it; a refusal still matters to an open tool.
       launch {
         camera.link.drop(1).collect { link ->
           when (link) {
-            CameraLink.NEEDS_PERMISSION -> sayAside(str(R.string.voice_camera_permission))
-            CameraLink.CAMERA_DENIED -> warn(host?.texts()?.cameraDenied ?: str(R.string.tool_camera_denied))
+            CameraLink.NEEDS_PERMISSION ->
+                if (policy.replaceDialogs) sayAside(str(R.string.voice_camera_permission))
+            // The phone path explains its own refusals (startPhoneCamera, explainPhone).
+            CameraLink.CAMERA_DENIED ->
+                if ((policy.handsFree || host != null) && !sources.usingPhone) {
+                  warn(host?.texts()?.cameraDenied ?: str(R.string.tool_camera_denied))
+                }
             else -> Unit
           }
         }
       }
       if (home && _activeTool.value == null) {
-        // The home menu: connect the voice-first way (no dialogs, narrated), then welcome.
         nudge.userActed(SystemClock.elapsedRealtime())
-        if (!camera.isStreaming.value) {
-          bringUpLink(
-              requestWearablesPermission,
-              connecting = { str(R.string.tool_reconnecting) },
-              ready = { host?.texts()?.ready ?: homeWelcome() },
-              onReady = { text -> if (host == null) homeSay(text) else sayAside(text) },
-          )
-        } else {
-          homeSay(homeWelcome())
+        if (policy.narrateStartup) {
+          // Hands-free menu: connect the voice-first way (no dialogs, narrated), then welcome.
+          val first = firstRunLine()
+          if (!camera.isStreaming.value) {
+            first?.let { homeSay(it) }
+            bringUpLink(
+                requestWearablesPermission,
+                connecting = { str(R.string.tool_reconnecting) },
+                ready = { host?.texts()?.ready ?: homeWelcome() },
+                onReady = { text -> if (host == null) homeSay(text) else sayAside(text) },
+            )
+          } else {
+            homeSay(listOfNotNull(first, homeWelcome()).joinToString(" "))
+          }
         }
         // A tool tapped open while the link came up hasn't been told to start yet.
         host?.let { h -> hostRequest?.let { h.onOpened(it, pendingReason) } }
@@ -509,21 +730,121 @@ class ToolHub(
         host?.let { h -> hostRequest?.let { h.onOpened(it, pendingReason) } }
       }
       welcomed = true
-      // Glasses speech rides the session, so wait (briefly) for one before choosing a mic.
-      withTimeoutOrNull(LINK_WAIT_MS) { camera.link.first { it >= CameraLink.CONNECTED } }
+      if (policy.alwaysListening) startListening()
+    }
+  }
+
+  /** "Hands-free is on. Say hands-free off for touch only." once, on the first run with TalkBack. */
+  private fun firstRunLine(): String? =
+      if (mode.takeAnnouncement()) str(R.string.hf_first_run) else null
+
+  /**
+   * Continuous listening: glasses speech once the session is up (waiting briefly for one), else the
+   * phone. Every final transcript goes to [onUtterance]. Plus the silence reminders.
+   */
+  private fun startListening() {
+    if (listenJob?.isActive == true) return
+    val rp = requestPermission ?: return
+    val phone = phoneAllowed ?: return
+    pushJob?.cancel()
+    if (policy.idleReminders) nudgeJob = viewModelScope.launch { remindWhenQuiet() }
+    listenJob = viewModelScope.launch {
+      // Glasses speech rides the session, so wait (briefly) for one before choosing a mic. On the
+      // phone camera there's no session to wait for.
+      withTimeoutOrNull(LINK_WAIT_MS) {
+        combine(sources.source, camera.link) { s, l -> s == CameraSource.PHONE || l >= CameraLink.CONNECTED }
+            .first { it }
+      }
       val mic =
           voice.start(
-              session = camera.deviceSession,
-              glassesAllowed = { glassesMicAllowed(requestWearablesPermission) },
-              phoneAllowed = requestRecordAudio,
+              session = sources.deviceSession,
+              glassesAllowed = { glassesMicAllowed(rp) },
+              phoneAllowed = phone,
           )
       Log.i(TAG, "voice microphone=$mic")
       when (mic) {
         Microphone.GLASSES -> Unit
-        Microphone.PHONE -> sayAside(str(R.string.voice_using_phone_mic))
+        // Obvious when the phone is the camera too.
+        Microphone.PHONE -> if (!sources.usingPhone) sayAside(str(R.string.voice_using_phone_mic))
         Microphone.NONE -> sayAside(str(R.string.voice_unavailable))
       }
       voice.utterances.collect { onUtterance(it.text, it.isFinal) }
+    }
+  }
+
+  private fun stopListening() {
+    listenJob?.cancel()
+    listenJob = null
+    nudgeJob?.cancel()
+    nudgeJob = null
+    voice.stop()
+  }
+
+  /** Push to talk has a mic up and is waiting for its command (after the READY earcon). */
+  @Volatile
+  var pushToTalkReady = false
+    private set
+
+  /** Continuous listening is on (hands-free). */
+  val isListening: Boolean
+    get() = listenJob?.isActive == true
+
+  /**
+   * The toolbox's mic button: listen for one command (glasses first, then the phone), run it
+   * through the same grammar as hands-free, then turn the mic off. Pressed again while listening, it
+   * cancels. In hands-free mode the mic is already on, so it just stops the speech.
+   */
+  fun pushToTalk() {
+    if (isListening) {
+      hush()
+      return
+    }
+    if (pushJob?.isActive == true) {
+      pushJob?.cancel()
+      return
+    }
+    val rp = requestPermission
+    if (rp == null) {
+      reply(str(R.string.hf_ptt_not_ready))
+      return
+    }
+    hush()
+    nudge.userActed(SystemClock.elapsedRealtime())
+    pushJob = viewModelScope.launch {
+      _pushToTalk.value = true
+      try {
+        val mic =
+            voice.start(
+                session = sources.deviceSession,
+                glassesAllowed = { glassesMicAllowed(rp) },
+                phoneAllowed = phoneAllowed ?: { false },
+            )
+        if (mic == Microphone.NONE) {
+          voice.stop()
+          warn(str(R.string.hf_ptt_no_mic))
+          return@launch
+        }
+        earcons.play(Earcon.READY)
+        pushToTalkReady = true
+        val heard =
+            withTimeoutOrNull(PUSH_TO_TALK_MS) {
+              voice.utterances.first { it.isFinal && it.text.isNotBlank() }
+            }
+        voice.stop()
+        pushToTalkReady = false
+        _pushToTalk.value = false
+        if (heard == null) {
+          reply(str(R.string.hf_ptt_nothing))
+          return@launch
+        }
+        Log.i(TAG, "push to talk heard=\"${heard.text}\"")
+        runCommand(heard.text)
+      } finally {
+        pushToTalkReady = false
+        // Unless that command turned hands-free on, the mic goes off again.
+        if (!isListening) voice.stop()
+        _pushToTalk.value = false
+      }
     }
   }
 
@@ -535,31 +856,50 @@ class ToolHub(
     homeMenu = false
     reconnectJob?.cancel()
     reconnectLoop?.cancel()
+    pushJob?.cancel()
     requestPermission = null
     phoneAllowed = null
-    voice.stop()
+    stopListening()
   }
 
   val isVoiceOpen: Boolean
     get() = voiceJob?.isActive == true
 
+  /**
+   * Brings the camera in use up with no dialogs, then [onReady] with [ready]. Glasses: narrated
+   * ("Connecting to your glasses"); if they don't stream within the link wait and the setting is
+   * AUTO, "Glasses not connected. Using the phone camera." and the phone takes over. Phone: no
+   * connect narration (it opens in under a second); its pitfalls are explained if it can't start.
+   */
   private suspend fun bringUpLink(
-      requestPermission: suspend (Permission) -> PermissionStatus,
+      requestPermission: (suspend (Permission) -> PermissionStatus)?,
       connecting: () -> String,
       ready: () -> String,
       onReady: (String) -> Unit = { sayAside(it) },
   ) {
+    if (sources.usingPhone) {
+      bringUpPhone(ready, onReady)
+      return
+    }
+    val link = glassesLink
+    if (requestPermission == null || link == null) {
+      explainNoGlasses()
+      return
+    }
     val narration = viewModelScope.launch {
-      camera.link.collect { link ->
-        if (link == CameraLink.CONNECTING) sayAside(connecting())
+      camera.link.collect { l ->
+        if (l == CameraLink.CONNECTING) sayAside(connecting())
       }
     }
-    camera.connectAndStream(requestPermission)
-    val up = withTimeoutOrNull(LINK_WAIT_MS) { camera.isStreaming.first { it } }
+    link.connectAndStream(requestPermission)
+    val outcome = sources.awaitStreaming(LINK_WAIT_MS)
     narration.cancel()
-    if (up == true) {
+    if (outcome == CameraSourceSelector.Outcome.UP) {
       earcons.play(Earcon.PAGE_DONE)
       onReady(ready())
+    } else if (outcome == CameraSourceSelector.Outcome.FELL_BACK) {
+      fellBackToPhone()
+      bringUpPhone(ready, onReady)
     } else {
       explainNoGlasses()
       // Keep waiting quietly; welcome the user when the glasses turn up (unless they left).
@@ -569,6 +909,76 @@ class ToolHub(
         if (listening == null || listening.isActive) onReady(ready())
       }
     }
+  }
+
+  /** The phone half of [bringUpLink]. */
+  private suspend fun bringUpPhone(ready: () -> String, onReady: (String) -> Unit) {
+    if (startPhoneCamera() && sources.awaitStreaming(PHONE_WAIT_MS) == CameraSourceSelector.Outcome.UP) {
+      earcons.play(Earcon.PAGE_DONE)
+      onReady(phoneLine(ready()))
+    } else {
+      explainPhone()
+    }
+  }
+
+  /** AUTO gave up on the glasses: end their session attempt and say so. */
+  private fun fellBackToPhone() {
+    Log.i(TAG, "glasses didn't come up: falling back to the phone camera")
+    switchedAtMs = SystemClock.elapsedRealtime()
+    glassesLink?.endSession()
+    earcons.play(Earcon.SWITCH)
+    sayAside(PhoneCameraWording.FELL_BACK)
+    restartVoice()
+  }
+
+  /** A line written for the glasses ("Your glasses are ready."), said right for the phone. */
+  private fun phoneLine(text: String): String =
+      if (text.contains("glasses", ignoreCase = true)) PhoneCameraWording.ready(host?.toolId) else text
+
+  /**
+   * Starts the phone camera, asking for the permission first if needed (said out loud before
+   * Android's dialog in hands-free mode). A permanent refusal isn't asked again: [explainPhone]
+   * says how to fix it in Settings. False if it can't start.
+   */
+  private suspend fun startPhoneCamera(): Boolean {
+    if (!phoneCamera.hasPermission()) {
+      val ask = requestCameraPermission
+      if (ask == null) {
+        phoneCamera.reportPermissionRefused(blocked = false)
+        return false
+      }
+      if (policy.replaceDialogs) {
+        sayAside(PhoneCameraWording.ASK_PERMISSION)
+        awaitQuiet()
+      }
+      when (ask()) {
+        PermState.GRANTED -> Unit
+        PermState.BLOCKED -> {
+          phoneCamera.reportPermissionRefused(blocked = true)
+          return false
+        }
+        PermState.ASKABLE -> {
+          phoneCamera.reportPermissionRefused(blocked = false)
+          return false
+        }
+      }
+    }
+    darkWatch.reset()
+    phoneCamera.start()
+    return true
+  }
+
+  /** Waits (up to 8 s) for the asides to finish, so a dialog doesn't cover the explanation. */
+  private suspend fun awaitQuiet() {
+    withTimeoutOrNull(8_000L) { while (isSpeakingAside) delay(100) }
+  }
+
+  /** The most specific reason the phone camera isn't streaming, spoken. */
+  fun explainPhone() {
+    earcons.play(Earcon.ERROR)
+    val line = PhoneCameraWording.problem(phoneCamera.problem.value)
+    showStatus(line)
+    sayAside(line)
   }
 
   private suspend fun glassesMicAllowed(
@@ -594,9 +1004,9 @@ class ToolHub(
    */
   fun onUtterance(text: String, isFinal: Boolean) = onUtterance(text, isFinal, fromShortcut = false)
 
-  private fun onUtterance(heard: String, isFinal: Boolean, fromShortcut: Boolean) {
+  private fun onUtterance(heard: String, isFinal: Boolean, fromShortcut: Boolean, checkEcho: Boolean = !fromShortcut) {
     val now = SystemClock.elapsedRealtime()
-    if (!fromShortcut && echo.isEcho(heard, now)) {
+    if (checkEcho && echo.isEcho(heard, now)) {
       if (isFinal) Log.i(TAG, "voice echo ignored: \"$heard\"")
       return
     }
@@ -640,6 +1050,20 @@ class ToolHub(
         }
       }
     }
+    dispatch(text, isFinal, now, fromShortcut)
+  }
+
+  /**
+   * A command that didn't come from the open mic (push to talk, a glasses-display button): the same
+   * grammar and handling (shortcuts, conversation mode, settings), without the echo check.
+   */
+  fun runCommand(text: String) = onUtterance(text, true, fromShortcut = false, checkEcho = false)
+
+  private fun dispatch(text: String, isFinal: Boolean, now: Long, fromShortcut: Boolean) {
+    if (isFinal) {
+      cardHeard = text
+      updateCard()
+    }
     if (isHome) {
       onHomeUtterance(text, isFinal, now)
       return
@@ -671,6 +1095,7 @@ class ToolHub(
 
   /** ToolHub's default for each global command. Tools override with ToolHost.onGlobal. */
   fun handleGlobal(h: ToolHost, command: GlobalCommand) {
+    if (handleAnywhere(command)) return
     when (command) {
       is GlobalCommand.Open ->
           if (command.request.tool == h.toolId) {
@@ -693,10 +1118,45 @@ class ToolHub(
       GlobalCommand.Help ->
           reply(if (hasHomeMenu) h.texts().help + " " + str(R.string.home_help_in_tool) else h.texts().help)
       GlobalCommand.Battery -> reply(batteryReport())
-      GlobalCommand.Close -> closeByVoice()
+      // "Back" in a tool is "close": up one level.
+      GlobalCommand.Close, GlobalCommand.Back -> closeByVoice()
       GlobalCommand.Home -> goHome()
       GlobalCommand.ExitApp -> exitApp()
+      else -> Unit
     }
+  }
+
+  /**
+   * The hands-free commands that mean the same in the menu and in every tool (notes/hands-free-mode.md
+   * > What hands-free covers). True if handled.
+   */
+  private fun handleAnywhere(command: GlobalCommand): Boolean {
+    when (command) {
+      GlobalCommand.ListTools -> reply(listTools())
+      GlobalCommand.WhereAmI -> reply(whereAmI())
+      GlobalCommand.Status -> reply(statusReport())
+      GlobalCommand.Settings -> reply(settingsReport())
+      GlobalCommand.Connect -> connectByVoice()
+      GlobalCommand.Disconnect -> disconnectByVoice()
+      is GlobalCommand.SetVerbosity -> {
+        // One verbosity: the settings store's (applySettings mirrors it into the mode store).
+        val r =
+            settingsVoice.handle(
+                SettingsCommand.SetVerbosity(
+                    com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Verbosity.valueOf(command.verbosity.name),
+                ),
+                host?.toolId?.id,
+            )
+        reply(if (settings.locked) r.text else verbosityLine(command.verbosity))
+      }
+      is GlobalCommand.GlassesDisplay -> setGlassesDisplay(command.on)
+      is GlobalCommand.HandsFree -> setHandsFree(command.on)
+      is GlobalCommand.UseCamera -> useCamera(command.source)
+      GlobalCommand.WhichCamera -> reply(PhoneCameraWording.which(sources.source.value, camera.isStreaming.value))
+      is GlobalCommand.Torch -> torch(command.on)
+      else -> return false
+    }
+    return true
   }
 
   // MARK: - Home voice menu
@@ -717,6 +1177,7 @@ class ToolHub(
     }
     val command = GlobalGrammar.parseHome(text)
     Log.i(TAG, "voice heard=\"$text\" tool=home global=$command")
+    if (command != null && handleAnywhere(command)) return
     when (command) {
       null -> sayNotUnderstood(text, busy = false)
       // As if switched to from another tool: earcon, the tool's name, then the tool talks.
@@ -728,20 +1189,24 @@ class ToolHub(
       is GlobalCommand.Faster -> changeRate(null) { it + command.step }
       is GlobalCommand.Slower -> changeRate(null) { it - command.step }
       is GlobalCommand.SetRate -> changeRate(null) { command.rate }
-      GlobalCommand.Help -> homeReply(str(R.string.home_help))
+      GlobalCommand.Help -> homeReply(str(if (policy.handsFree) R.string.home_help else R.string.hf_help_toolbox))
       GlobalCommand.Battery -> homeReply(batteryReport())
-      // Nothing above the menu: "close", "goodbye", "quit" leave the app.
+      // Nothing above the menu: "back" says so; "close", "goodbye", "quit" leave the app.
+      GlobalCommand.Back -> homeReply(str(R.string.hf_back_at_home))
       GlobalCommand.Close, GlobalCommand.ExitApp -> exitApp()
+      else -> Unit
     }
   }
 
-  /** "Main menu. Say read my book, ..." */
+  /** "Main menu. Say read my book, ..." ("Main menu." with short answers; the user's own menu if changed). */
   private fun homePrompt(): String =
-      menuOptions()?.let { getApplication<Application>().getString(R.string.home_prompt_custom, it) } ?: str(R.string.home_prompt)
+      if (verbosity == Verbosity.SHORT) str(R.string.home_back)
+      else menuOptions()?.let { getApplication<Application>().getString(R.string.home_prompt_custom, it) } ?: str(R.string.home_prompt)
 
-  /** The welcome with the user's menu, if they changed it. */
+  /** "SpeakUp is ready. Say read my book, ..." (the user's own menu, if they changed it). */
   private fun homeWelcome(): String =
-      menuOptions()?.let { getApplication<Application>().getString(R.string.home_welcome_custom, it) } ?: str(R.string.home_welcome)
+      if (verbosity == Verbosity.SHORT) str(R.string.hf_welcome_short)
+      else menuOptions()?.let { getApplication<Application>().getString(R.string.home_welcome_custom, it) } ?: str(R.string.home_welcome)
 
   /** "read my mail, labels, light" when the menu was reordered or tools hidden; null for the default. */
   private fun menuOptions(): String? {
@@ -761,11 +1226,13 @@ class ToolHub(
   /** The menu's spoken line, also shown on the camera screen. */
   private fun homeSay(text: String) {
     _homeStatus.value = text
+    setCardState(text)
     sayAside(text)
   }
 
   private fun homeReply(text: String) {
     _homeStatus.value = text
+    setCardState(text)
     reply(text)
   }
 
@@ -784,6 +1251,328 @@ class ToolHub(
     lastSorryMs = now
     reply(str(R.string.voice_not_understood))
   }
+
+  // MARK: - Hands-free mode
+
+  /**
+   * Switches hands-free on or off (the switch, voice, push to talk). Plays the switch earcon and says
+   * so in both modes. On: the mic stays on and the screen changes are narrated from now on. Off:
+   * the mic goes off (push to talk from now on) and the glasses display goes blank.
+   */
+  fun setHandsFree(on: Boolean) {
+    val change = HandsFreeRules.change(policy.handsFree, on)
+    mode.setHandsFree(on)
+    if (!on) visitVoiceFirst = false
+    Log.i(TAG, "hands-free $change")
+    earcons.play(Earcon.SWITCH)
+    when (change) {
+      ModeChange.TURNED_ON -> {
+        reply(str(R.string.hf_turned_on))
+        if (isVoiceOpen) {
+          // As if the app had opened hands-free: in the menu the glasses come up, narrated.
+          val rp = requestPermission
+          if (rp != null && _activeTool.value == null && !camera.isStreaming.value && !userDisconnected) {
+            viewModelScope.launch {
+              bringUpLink(rp, connecting = { str(R.string.tool_reconnecting) }, ready = { homeWelcome() }, onReady = { homeSay(it) })
+            }
+          }
+          startListening()
+        }
+      }
+      ModeChange.TURNED_OFF -> {
+        stopListening()
+        reply(str(R.string.hf_turned_off))
+      }
+      ModeChange.ALREADY_ON -> reply(str(R.string.hf_already_on))
+      ModeChange.ALREADY_OFF -> reply(str(R.string.hf_already_off))
+    }
+    if (_activeTool.value == null) _homeStatus.value = lastSaid.orEmpty()
+  }
+
+  /** "Glasses display on/off" (voice or the settings switch). */
+  fun setGlassesDisplay(on: Boolean) {
+    mode.setGlassesDisplay(on)
+    earcons.play(Earcon.SWITCH)
+    reply(
+        str(
+            when {
+              !on -> R.string.hf_display_off
+              !displaySink.supported() -> R.string.hf_display_none
+              !policy.handsFree -> R.string.hf_display_on_toolbox
+              else -> R.string.hf_display_on
+            },
+        ),
+    )
+  }
+
+  /** "There are five tools: ..." */
+  fun listTools(): String {
+    val names = ToolRegistry.all.map { toolName(it.id) }
+    val list = (names.dropLast(1).joinToString(", ") + " " + str(R.string.hf_and) + " " + names.last()).lowercase()
+    val app = getApplication<Application>()
+    return app.getString(R.string.hf_tools_list, names.size, list) + " " +
+        str(if (policy.handsFree) R.string.hf_tools_say else R.string.hf_tools_tap)
+  }
+
+  /** "You're in the mail reader. Glasses connected, camera on. Hands-free is on." */
+  fun whereAmI(): String {
+    val app = getApplication<Application>()
+    val tool = _activeTool.value
+    val where =
+        if (tool == null) str(R.string.hf_where_home)
+        else app.getString(R.string.hf_where_tool, toolName(tool.tool).lowercase())
+    return listOf(
+            where,
+            connectionLine(),
+            str(if (policy.handsFree) R.string.hf_mode_hands_free else R.string.hf_mode_toolbox),
+        )
+        .joinToString(" ")
+  }
+
+  /** "Glasses connected, camera on. Listening through your glasses. <battery>" */
+  fun statusReport(): String {
+    val mic =
+        when (microphone.value) {
+          Microphone.GLASSES -> str(R.string.voice_mic_glasses) + "."
+          Microphone.PHONE -> str(R.string.voice_mic_phone) + "."
+          Microphone.NONE -> if (policy.handsFree) str(R.string.voice_mic_none) + "." else ""
+        }
+    return listOf(connectionLine(), mic, batteryReport()).filter { it.isNotEmpty() }.joinToString(" ")
+  }
+
+  /** "1.25 times speed. Normal answers. Glasses display on. Hands-free is on." */
+  fun settingsReport(): String {
+    val app = getApplication<Application>()
+    val s = mode.settings.value
+    return listOf(
+            app.getString(R.string.voice_rate, formatRate(sharedRate)),
+            verbosityLine(s.verbosity),
+            PhoneCameraWording.setting(s.cameraSource, sources.source.value),
+            str(if (s.glassesDisplay) R.string.hf_setting_display_on else R.string.hf_setting_display_off),
+            str(if (policy.handsFree) R.string.hf_mode_hands_free else R.string.hf_mode_toolbox),
+        )
+        .joinToString(" ")
+  }
+
+  // MARK: - Camera source (notes/phone-camera.md)
+
+  /**
+   * "Use the phone" / "use the glasses" (or the screen's camera switch): stop the old camera, say
+   * which one is in use, and bring the new one up if anything was using the old one (a tool open,
+   * hands-free, or it was streaming), or always for the phone. Tools collecting frames carry on
+   * with the new camera.
+   */
+  fun useCamera(target: CameraSource) {
+    val now = sources.source.value
+    if (target == CameraSource.GLASSES && !registered.value) {
+      warn(PhoneCameraWording.GLASSES_NOT_SET_UP)
+      return
+    }
+    userDisconnected = false
+    if (now == target) {
+      reply(if (target == CameraSource.PHONE) PhoneCameraWording.ALREADY_PHONE else PhoneCameraWording.ALREADY_GLASSES)
+      if (!camera.isStreaming.value && (host != null || policy.handsFree || target == CameraSource.PHONE)) {
+        viewModelScope.launch { bringUpLink(requestPermission, { str(R.string.tool_reconnecting) }, { cameraOnLine() }) }
+      }
+      return
+    }
+    val wasActive = camera.isStreaming.value || host != null || policy.handsFree
+    Log.i(TAG, "use camera $now -> $target (active=$wasActive)")
+    earcons.play(Earcon.SWITCH)
+    hush()
+    switchedAtMs = SystemClock.elapsedRealtime()
+    streamLost = false
+    reconnectLoop?.cancel()
+    reconnectJob?.cancel()
+    if (now == CameraSource.PHONE) {
+      phoneCamera.stop()
+    } else {
+      surface.releaseSink()
+      glassesLink?.endSession()
+    }
+    sources.use(target)
+    sayAside(if (target == CameraSource.PHONE) PhoneCameraWording.USING_PHONE else PhoneCameraWording.USING_GLASSES)
+    restartVoice()
+    if (wasActive || target == CameraSource.PHONE) {
+      viewModelScope.launch {
+        bringUpLink(
+            requestPermission,
+            connecting = { str(R.string.tool_reconnecting) },
+            ready = { cameraOnLine() },
+            onReady = { text ->
+              sayAside(text)
+              restartVoice()
+            },
+        )
+      }
+    }
+  }
+
+  private fun cameraOnLine(): String =
+      if (sources.usingPhone) PhoneCameraWording.CAMERA_ON else str(R.string.hf_connected)
+
+  /** "Torch on/off": the phone camera's light. */
+  fun torch(on: Boolean) {
+    if (!sources.usingPhone) {
+      reply(PhoneCameraWording.TORCH_GLASSES)
+      return
+    }
+    if (!camera.isStreaming.value) {
+      reply(PhoneCameraWording.problem(phoneCamera.problem.value))
+      return
+    }
+    if (!phoneCamera.setTorch(on)) {
+      reply(PhoneCameraWording.NO_TORCH)
+      return
+    }
+    reply(if (on) PhoneCameraWording.TORCH_ON else PhoneCameraWording.TORCH_OFF)
+  }
+
+  /** The toolbox's "Turn on camera" with the phone in use: start it, explaining only on failure. */
+  fun turnOnPhoneCamera() {
+    userDisconnected = false
+    viewModelScope.launch { if (!startPhoneCamera()) explainPhone() }
+  }
+
+  /** "Connect my glasses" before setup: say what happens, then open Meta AI. */
+  fun startGlassesSetup() {
+    val go = onConnectGlasses
+    if (go == null) {
+      reply(PhoneCameraWording.GLASSES_NOT_SET_UP)
+      return
+    }
+    reply(PhoneCameraWording.OPENING_META_AI)
+    viewModelScope.launch {
+      awaitQuiet()
+      go()
+    }
+  }
+
+  private fun verbosityLine(v: Verbosity): String =
+      str(
+          when (v) {
+            Verbosity.SHORT -> R.string.hf_verbosity_short
+            Verbosity.NORMAL -> R.string.hf_verbosity_normal
+            Verbosity.DETAILED -> R.string.hf_verbosity_detailed
+          },
+      )
+
+  /** One sentence about the glasses link. */
+  private fun connectionLine(): String {
+    if (sources.usingPhone) {
+      return if (userDisconnected && !camera.isStreaming.value) PhoneCameraWording.CAMERA_OFF
+      else PhoneCameraWording.connection(camera.isStreaming.value)
+    }
+    val g = glassesNow
+    return str(
+        when {
+          userDisconnected && !camera.isStreaming.value -> R.string.hf_link_disconnected_by_user
+          camera.isStreaming.value -> R.string.hf_link_streaming
+          camera.link.value == CameraLink.CONNECTING || camera.link.value == CameraLink.STARTING_STREAM ->
+              R.string.hf_link_connecting
+          camera.link.value >= CameraLink.CONNECTED -> R.string.hf_link_connected
+          phoneNow?.bluetoothOn == false -> R.string.health_bluetooth_off
+          g?.connected == true -> R.string.hf_link_connected
+          else -> R.string.hf_link_none
+        },
+    )
+  }
+
+  /** "Connect": bring the session and camera up, narrated, no dialogs. */
+  private fun connectByVoice() {
+    userDisconnected = false
+    if (sources.usingPhone) {
+      when {
+        !camera.isStreaming.value -> {
+          earcons.play(Earcon.ACK)
+          hush()
+          viewModelScope.launch { bringUpLink(null, { "" }, { PhoneCameraWording.CAMERA_ON }) }
+        }
+        // The phone camera is already on: "connect" now means the glasses.
+        !registered.value -> startGlassesSetup()
+        else -> reply(PhoneCameraWording.PHONE_ON_SAY_GLASSES)
+      }
+      return
+    }
+    if (camera.isStreaming.value) {
+      reply(str(R.string.hf_already_connected))
+      return
+    }
+    val rp = requestPermission
+    if (rp == null) {
+      reply(str(R.string.hf_ptt_not_ready))
+      return
+    }
+    earcons.play(Earcon.ACK)
+    hush()
+    viewModelScope.launch {
+      bringUpLink(rp, connecting = { str(R.string.tool_reconnecting) }, ready = { str(R.string.hf_connected) })
+    }
+  }
+
+  /** "Disconnect": end the glasses session (the app stays registered with Meta AI). */
+  private fun disconnectByVoice() {
+    if (sources.usingPhone) {
+      if (!phoneCamera.wanted && !camera.isStreaming.value) {
+        reply(PhoneCameraWording.ALREADY_OFF)
+        return
+      }
+      userDisconnected = true
+      streamLost = false
+      phoneCamera.stop()
+      reply(PhoneCameraWording.CAMERA_OFF)
+      return
+    }
+    if (glassesLink?.deviceSession == null && !camera.isStreaming.value) {
+      reply(str(R.string.hf_already_disconnected))
+      return
+    }
+    userDisconnected = true
+    streamLost = false
+    reconnectLoop?.cancel()
+    reconnectJob?.cancel()
+    surface.releaseSink()
+    glassesLink?.endSession()
+    reply(str(R.string.hf_disconnected))
+  }
+
+  // MARK: - The card (phone screen mirror, glasses display)
+
+  /**
+   * For tools: what the card shows besides the status line. [state] replaces the state line (null
+   * keeps it); [hints] are up to three phrases that work now (null = the defaults: help, main menu).
+   */
+  fun publishCard(state: String? = null, hints: List<String>? = null) {
+    state?.let { cardState = it }
+    cardHints = hints
+    updateCard()
+  }
+
+  private fun setCardState(text: String) {
+    cardState = text
+    updateCard()
+  }
+
+  private fun updateCard() {
+    val tool = _activeTool.value
+    val screen = if (tool == null) str(R.string.hf_card_menu) else toolName(tool.tool)
+    val state = cardState.ifEmpty { cardLinkLine() }
+    val hints =
+        cardHints
+            ?: str(if (tool == null) R.string.hf_hints_home else R.string.hf_hints_tool).split('|')
+    surface.publish(GlassesCard.of(screen, state, cardHeard, hints))
+  }
+
+  private fun cardLinkLine(): String =
+      str(
+          when {
+            !camera.isStreaming.value && sources.usingPhone -> R.string.hf_card_phone_off
+            !camera.isStreaming.value && camera.link.value == CameraLink.CONNECTING -> R.string.hf_card_connecting
+            !camera.isStreaming.value -> R.string.hf_card_disconnected
+            microphone.value != Microphone.NONE -> R.string.hf_card_listening
+            else -> R.string.hf_card_ready
+          },
+      )
 
   // MARK: - Asking about the text
 
@@ -825,7 +1614,7 @@ class ToolHub(
       Log.i(TAG, "conversation mode, not said: \"$text\"")
       return
     }
-    isSpeakingAside = true
+    asidesPending++
     speaker.speak(text, "aside")
   }
 
@@ -855,11 +1644,12 @@ class ToolHub(
   }
 
   /** How much the open tool (or the menu) should say: short, normal or detailed. */
-  fun verbosity(tool: ToolId? = host?.toolId): Verbosity = settings.current.verbosityFor(tool?.id)
+  fun verbosity(tool: ToolId? = host?.toolId): com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Verbosity =
+      settings.current.verbosityFor(tool?.id)
 
   /** [text] cut to its first sentence when the user asked for short replies. */
   fun brief(text: String, tool: ToolId? = host?.toolId): String {
-    return if (verbosity(tool) == Verbosity.SHORT) SetupSpeech.firstSentence(text) else text
+    return if (verbosity(tool) == com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Verbosity.SHORT) SetupSpeech.firstSentence(text) else text
   }
 
   private fun remember(text: String) {
@@ -899,12 +1689,13 @@ class ToolHub(
   private fun showStatus(text: String) {
     val h = host
     if (h != null) h.onStatus(text) else if (isHome) _homeStatus.value = text
+    setCardState(text)
   }
 
   /** Stops speech now, drops what's queued, and tells the echo guard it ended. */
   fun hush() {
     speaker.stop()
-    isSpeakingAside = false
+    asidesPending = 0 // stop() drops the queue, so none of them will report done
     echo.finished(SystemClock.elapsedRealtime())
   }
 
@@ -958,6 +1749,9 @@ class ToolHub(
       nudge.userActed(SystemClock.elapsedRealtime())
     }
     updateControls()
+    // Hands-free's "short answers" and the settings store share one value.
+    val v = Verbosity.valueOf(s.speech.verbosity.name)
+    if (mode.settings.value.verbosity != v) mode.setVerbosity(v)
     _settingsView.value = settingsViewNow()
   }
 
@@ -1061,7 +1855,7 @@ class ToolHub(
   }
 
   private fun updateControls() {
-    val session = camera.deviceSession
+    val session = sources.deviceSession
     if (settings.current.controls.enabled && camera.isStreaming.value && session != null) controls.attach(session)
     else if (!settings.current.controls.enabled) controls.detach()
   }
@@ -1093,7 +1887,7 @@ class ToolHub(
     // ToolHub's own lines that no tool waits for (conversation mode, earcons said as words).
     if (tag.startsWith("~")) return
     if (tag == "aside") {
-      isSpeakingAside = false
+      asidesPending = (asidesPending - 1).coerceAtLeast(0)
       host?.onAsideDone()
     } else {
       host?.onSpoken(tag)
@@ -1140,6 +1934,16 @@ class ToolHub(
   private fun onStreamLost() {
     earcons.play(Earcon.ERROR)
     streamLost = true
+    if (sources.usingPhone) {
+      // No reconnect loop: CameraX reopens by itself when the camera is free again.
+      viewModelScope.launch {
+        delay(STREAM_LOST_SAY_DELAY_MS)
+        if (camera.isStreaming.value) return@launch
+        if (host == null && !isHome) return@launch
+        sayAside(PhoneCameraWording.problem(phoneCamera.problem.value))
+      }
+      return
+    }
     val pausedByGlasses = camera.link.value == CameraLink.PAUSED
     if (!pausedByGlasses) keepTryingToReconnect()
     viewModelScope.launch {
@@ -1164,7 +1968,7 @@ class ToolHub(
   private fun keepTryingToReconnect() {
     if (reconnectLoop?.isActive == true) return
     reconnectLoop = viewModelScope.launch {
-      while (streamLost && voiceJob?.isActive == true) {
+      while (streamLost && !userDisconnected && voiceJob?.isActive == true) {
         delay(RECONNECT_EVERY_MS)
         if (camera.isStreaming.value) break
         val g = glassesNow
@@ -1174,7 +1978,8 @@ class ToolHub(
           it == CameraLink.CONNECTING || it == CameraLink.STARTING_STREAM ||
               it == CameraLink.NEEDS_PERMISSION || it == CameraLink.CAMERA_DENIED
         }
-        if (reachable && !busy) requestPermission?.let { camera.connectAndStream(it) }
+        if (sources.usingPhone) break
+        if (reachable && !busy) requestPermission?.let { glassesLink?.connectAndStream(it) }
       }
     }
   }
@@ -1184,9 +1989,14 @@ class ToolHub(
     streamLost = false
     host?.onStreamBack()
     if (voiceJob?.isActive != true) return
+    if (host == null && !policy.speakAlertsAtHome) return
     earcons.play(Earcon.PAGE_DONE)
+    if (sources.usingPhone) {
+      say(PhoneCameraWording.CAMERA_BACK)
+      return
+    }
     say(host?.texts()?.cameraBack ?: str(R.string.tool_camera_back))
-    restartVoiceOnGlasses()
+    restartVoice()
   }
 
   /**
@@ -1195,13 +2005,29 @@ class ToolHub(
    * ask for permission); the tool should then say so itself.
    */
   fun reconnectThen(then: () -> Unit): Boolean {
-    val rp = requestPermission ?: return false
     if (reconnectJob?.isActive == true) return true
+    if (sources.usingPhone) {
+      userDisconnected = false
+      reconnectJob = viewModelScope.launch {
+        if (startPhoneCamera() && sources.awaitStreaming(PHONE_WAIT_MS) == CameraSourceSelector.Outcome.UP) then()
+        else explainPhone()
+      }
+      return true
+    }
+    val rp = requestPermission ?: return false
+    val link = glassesLink ?: return false
     sayAside(host?.texts()?.connecting ?: str(R.string.tool_reconnecting))
-    camera.connectAndStream(rp)
+    link.connectAndStream(rp)
     reconnectJob = viewModelScope.launch {
-      val up = withTimeoutOrNull(LINK_WAIT_MS) { camera.isStreaming.first { it } }
-      if (up == true) then() else explainNoGlasses()
+      when (sources.awaitStreaming(LINK_WAIT_MS)) {
+        CameraSourceSelector.Outcome.UP -> then()
+        CameraSourceSelector.Outcome.FELL_BACK -> {
+          fellBackToPhone()
+          if (startPhoneCamera() && sources.awaitStreaming(PHONE_WAIT_MS) == CameraSourceSelector.Outcome.UP) then()
+          else explainPhone()
+        }
+        CameraSourceSelector.Outcome.DOWN -> explainNoGlasses()
+      }
     }
     return true
   }
@@ -1212,6 +2038,10 @@ class ToolHub(
 
   /** The most specific reason the glasses can't be reached, spoken. */
   fun explainNoGlasses() {
+    if (sources.usingPhone) {
+      explainPhone()
+      return
+    }
     earcons.play(Earcon.ERROR)
     val g = glassesNow
     val p = phoneNow
@@ -1228,12 +2058,15 @@ class ToolHub(
     )
   }
 
-  private fun restartVoiceOnGlasses() {
+  /** Moves the always-on mic to the glasses (session up) or the phone (no session). */
+  private fun restartVoice() {
+    // Only the always-on mic moves; push to talk picks the glasses next time it's pressed.
+    if (!isListening) return
     val rp = requestPermission ?: return
     viewModelScope.launch {
       voice.stop()
       voice.start(
-          session = camera.deviceSession,
+          session = sources.deviceSession,
           glassesAllowed = { glassesMicAllowed(rp) },
           phoneAllowed = phoneAllowed ?: { false },
       )
@@ -1244,11 +2077,17 @@ class ToolHub(
 
   private fun onHealth(alerts: List<HealthAlert>) {
     for (alert in alerts) {
+      // On the phone camera only the phone's battery matters.
+      if (sources.usingPhone && alert !is HealthAlert.PhoneBattery) continue
       Log.i(TAG, "health=$alert")
       lastAlertMs = SystemClock.elapsedRealtime()
       val override = host?.onHealthAlert(alert)
       val app = getApplication<Application>()
       fun text(@StringRes id: Int) = override ?: str(id)
+      // The toolbox with no tool open shows pitfalls on the screen without speaking them.
+      val speak = host != null || policy.speakAlertsAtHome
+      fun warn(line: String) = if (speak) this.warn(line) else showStatus(line)
+      fun say(line: String) = if (speak) this.say(line) else showStatus(line)
       when (alert) {
         HealthAlert.BluetoothOff -> warn(text(R.string.health_bluetooth_off))
         HealthAlert.BluetoothOn -> say(text(R.string.health_bluetooth_on))
@@ -1256,8 +2095,11 @@ class ToolHub(
         HealthAlert.GlassesDisconnected -> warn(text(R.string.health_disconnected))
         HealthAlert.GlassesConnected -> {
           say(text(R.string.health_connected))
-          // Bring the camera back by itself; onStreamBack says when it's ready.
-          if (!camera.isStreaming.value) requestPermission?.let { camera.connectAndStream(it) }
+          // Bring the camera back by itself; onStreamBack says when it's ready. Not after
+          // "disconnect", and not in the toolbox's menu (the user connects when they want).
+          if (!camera.isStreaming.value && !userDisconnected && (host != null || policy.reconnectAtHome)) {
+            requestPermission?.let { glassesLink?.connectAndStream(it) }
+          }
         }
         HealthAlert.GlassesRemoved -> warn(text(R.string.health_removed))
         HealthAlert.GlassesWornAgain -> say(text(R.string.health_worn_again))
@@ -1283,7 +2125,7 @@ class ToolHub(
   /** Glasses and phone battery, as a sentence. */
   fun batteryReport(): String {
     val app = getApplication<Application>()
-    val g = glassesNow?.takeIf { it.connected }?.battery
+    val g = glassesNow?.takeIf { it.connected && !sources.usingPhone }?.battery
     val p = phoneNow?.battery
     return when {
       g != null && p != null -> app.getString(R.string.voice_battery_both, g, p)
@@ -1301,6 +2143,7 @@ class ToolHub(
     controls.detach()
     bus?.release()
     voice.stop()
+    phoneCamera.release()
     speaker.shutdown()
     earcons.release()
     tones.release()
@@ -1308,12 +2151,14 @@ class ToolHub(
 
   class Factory(
       private val application: Application,
+      /** The glasses camera (CameraViewModel). */
       private val camera: PageCamera,
+      private val registered: Boolean = true,
   ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
       if (modelClass.isAssignableFrom(ToolHub::class.java)) {
         @Suppress("UNCHECKED_CAST")
-        return ToolHub(application, camera) as T
+        return ToolHub(application, camera, registered) as T
       }
       throw IllegalArgumentException("Unknown ViewModel class")
     }

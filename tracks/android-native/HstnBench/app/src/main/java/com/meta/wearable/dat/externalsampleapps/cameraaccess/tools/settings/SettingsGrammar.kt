@@ -165,7 +165,7 @@ object SettingsGrammar {
           // Keep, undo, setup, reset, lock.
           Rule("keep (?:that|it|this|those|these|them)(?: settings?| change)?|save (?:that|those|these|my) (?:settings?|changes?)|save that|remember (?:that|this)|make (?:that|this|it) (?:the |my )?default") { SettingsCommand.Keep },
           Rule("undo(?: that| it)?|put it back(?: how it was)?|change it back|go back to how it was|that'?s worse|undo (?:the )?last change") { SettingsCommand.Undo },
-          Rule("what'?s my setup|what is my setup|what are my settings|my settings|what have i changed|what did i change|how am i set up|what'?s different|read (?:me )?my settings|tell me my setup") { SettingsCommand.WhatsMySetup },
+          Rule("what'?s my setup|what is my setup|what have i changed|what did i change|how am i set up|what'?s different|tell me my setup") { SettingsCommand.WhatsMySetup },
           Rule("reset (?:all|everything|all (?:my |the )?settings|my setup|the whole setup)|factory reset|reset (?:all|everything) to (?:the )?defaults?") { SettingsCommand.Reset(null) },
           Rule("reset (?:the |my )?(speech|voice|talking|sounds?|beeps|earcons|ears|balance|words|shortcuts|routines|controls|buttons|glasses controls|tips|reminders|descriptions)(?: settings)?(?: to (?:the )?defaults?)?") { m ->
             SettingsCommand.Reset(
@@ -288,7 +288,7 @@ object SettingsGrammar {
 
           // Sharing and the screen.
           Rule("(?:share|export|send) (?:my |this )?(?:setup|settings)") { SettingsCommand.ShareSetup },
-          Rule("(?:open|show)(?: me)? (?:my |the )?settings(?: screen)?|settings(?: screen)?|customi[sz]e|make it (?:my|your) own") { SettingsCommand.OpenSettings },
+          Rule("(?:open|show)(?: me)? (?:my |the )?(?:settings screen|customi[sz]e screen)|settings screen|customi[sz]e|make it (?:my|your) own|open make it my own") { SettingsCommand.OpenSettings },
       )
 
   private val SHORTCUT = Regex("^(?:when|if|whenever) i say (.+)$")

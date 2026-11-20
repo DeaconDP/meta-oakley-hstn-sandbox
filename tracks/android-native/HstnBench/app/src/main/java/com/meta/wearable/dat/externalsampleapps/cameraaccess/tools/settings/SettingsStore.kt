@@ -45,6 +45,8 @@ data class OldPrefs(
     val autoTurn: Boolean? = null,
     /** tools / watch_tick_seconds. */
     val watchTickSeconds: Int? = null,
+    /** mode / verbosity (hands-free "short answers"): SHORT, NORMAL or DETAILED. */
+    val verbosity: String? = null,
 ) {
   /** The same values in the new shape: main rate + book override. */
   fun toSetup(): Setup {
@@ -54,6 +56,7 @@ data class OldPrefs(
     if (book != null && book != main) speech = speech.withTool("book") { it.copy(rate = book) }
     if (pageNumbers == true) speech = speech.withTool("book") { it.copy(pageNumbers = true) }
     if (autoTurn == false) speech = speech.withTool("book") { it.copy(autoTurn = false) }
+    verbosity?.let { v -> Verbosity.entries.firstOrNull { it.name == v }?.let { speech = speech.copy(verbosity = it) } }
     val sounds = Sounds(watchTickSeconds = watchTickSeconds?.coerceIn(0, 600) ?: Sounds.DEFAULT_WATCH_TICK_S)
     return Setup(speech = speech, sounds = sounds)
   }

@@ -44,8 +44,13 @@ enum TextRecognizer {
   static let alternatives = 3
   static let minimumTextHeight: Float = 1.0 / 64
 
-  /// Blocking; call off the main actor.
-  static func recognize(_ image: UIImage) throws -> RecognizedFrame {
+  /// Blocking; call off the main actor. `minimumTextHeight` is lower for imported pages and
+  /// screenshots (ImportedPages), where body text is a small share of the picture. `fast` uses
+  /// Vision's fast recognizer without language correction: only for FramingAssist, which wants
+  /// where the text is, not its words.
+  static func recognize(
+    _ image: UIImage, minimumTextHeight: Float = TextRecognizer.minimumTextHeight, fast: Bool = false
+  ) throws -> RecognizedFrame {
     guard let cgImage = image.cgImage else { throw TextRecognizerError.noImage }
     let orientation = CGImagePropertyOrientation(image.imageOrientation)
     let rotated = [.left, .right, .leftMirrored, .rightMirrored].contains(orientation)
@@ -54,8 +59,8 @@ enum TextRecognizer {
       : CGSize(width: cgImage.width, height: cgImage.height)
 
     let request = VNRecognizeTextRequest()
-    request.recognitionLevel = .accurate
-    request.usesLanguageCorrection = true
+    request.recognitionLevel = fast ? .fast : .accurate
+    request.usesLanguageCorrection = !fast
     request.recognitionLanguages = ["en-US"]
     request.minimumTextHeight = minimumTextHeight
 

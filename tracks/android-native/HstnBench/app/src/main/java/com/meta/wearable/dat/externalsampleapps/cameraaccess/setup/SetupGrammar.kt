@@ -1,7 +1,8 @@
 // SetupGrammar - what a user can say on the setup screen (app not yet connected to Meta AI)
 //
 // The setup screen is the first thing a blind user meets, before any tool or ToolHub exists, so it
-// has its own tiny grammar: connect, help, repeat, open settings, quit, and "no / not now". It works
+// has its own tiny grammar: use my phone, connect, help, repeat, open settings, quit, and "no / not
+// now". It works
 // on the same normalised text as every other grammar (tools/core/Phrases). Negation is checked
 // before the command words so "don't connect" never opens Meta AI, and the connect words only
 // count in short utterances so room chatter ("I'll start dinner in a minute") doesn't either.
@@ -12,6 +13,8 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess.setup
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.Phrases
 
 enum class SetupCommand {
+  /** "Use my phone": skip Meta AI and use the phone's camera (notes/phone-camera.md). */
+  USE_PHONE,
   /** Start registration: speak the handoff, then open Meta AI. */
   CONNECT,
   HELP,
@@ -46,6 +49,11 @@ object SetupGrammar {
   private val TRY_AGAIN = Regex("\\b(?:try (?:it |that )?again|retry|one more time)\\b")
   private val SETTINGS =Regex("\\b(?:settings|permissions?)\\b")
   private val CONNECT = Regex("\\b$CONNECT_WORDS\\b")
+  private const val PHONE_WORDS =
+      "(?:(?:use|with|try|choose|pick|just)(?: the| my| this)? phone(?:'s)?(?: camera)?|(?:the |my )?phone(?:'s)?(?: camera)?|" +
+          "(?:i )?(?:don't|dont|do not) have (?:any )?(?:meta )?glasses|no glasses|without (?:the |my |any )?glasses)"
+  private val PHONE = Regex("^(?:$PHONE_WORDS)(?: (?:instead|only|please))?$|\\b(?:use|with)(?: the| my) phone(?:'s)?(?: camera)?\\b")
+  private val NEGATED_PHONE = Regex("(?:^| )(?:don't|dont|do not|not|never)(?: \\S+){0,2} (?:use )?(?:the |my )?phone\\b")
   private val YES = Regex("^(?:yes|yeah|yep|yup|sure|go ahead|let's go|lets go|do it)\\b")
   private val HELP =
       Regex(
@@ -58,6 +66,9 @@ object SetupGrammar {
     val t = Phrases.normalize(transcript)
     if (t.isEmpty()) return null
     val words = Phrases.wordCount(t)
+    // "Don't use the phone" is a no; "I don't have glasses" is the phone.
+    if (NEGATED_PHONE.containsMatchIn(t)) return SetupCommand.DECLINE
+    if (words <= MAX_COMMAND_WORDS && PHONE.containsMatchIn(t)) return SetupCommand.USE_PHONE
     // "Don't close", "no, don't connect": a negated command is a "no".
     if (NEGATED_CONNECT.containsMatchIn(t)) return SetupCommand.DECLINE
     if (NEGATED_QUIT.containsMatchIn(t)) return SetupCommand.DECLINE

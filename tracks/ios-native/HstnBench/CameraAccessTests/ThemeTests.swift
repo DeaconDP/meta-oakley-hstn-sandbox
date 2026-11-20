@@ -126,6 +126,17 @@ final class VoiceIndicatorModelTests: XCTestCase {
     XCTAssertTrue(model(.listening, speaking: false).detail?.contains("help") == true)
   }
 
+  func testAnEndedSessionOffersStartAgain() {
+    for status: VoiceControl.Status in [.paused, .off] {
+      let ended = VoiceIndicatorModel.make(
+        status: status, reason: VoicePauseReason.sessionEnded.text, listener: nil, micPermission: .granted,
+        speechPermission: .granted, isSpeaking: false, heard: nil, canPrompt: true, sessionEnded: true)
+      XCTAssertEqual(ended.title, "SpeakUp has stopped")
+      XCTAssertEqual(ended.fix, .startAgain)
+      XCTAssertEqual(ended.fix?.title, "Start again")
+    }
+  }
+
   func testAHeardCommandIsShownByItsPhrase() {
     XCTAssertTrue(model(.listening, heard: .read).title.contains("read"))
     XCTAssertEqual(model(.listening, heard: .read).mood, .happy)

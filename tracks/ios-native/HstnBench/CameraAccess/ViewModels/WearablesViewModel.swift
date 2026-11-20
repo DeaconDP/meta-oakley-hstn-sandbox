@@ -127,7 +127,8 @@ final class WearablesViewModel {
   @ObservationIgnored private var registrationTask: Task<Void, Never>?
   @ObservationIgnored private var deviceStreamTask: Task<Void, Never>?
   @ObservationIgnored private var setupDeviceStreamTask: Task<Void, Never>?
-  private let wearables: WearablesInterface
+  /// Internal so DATGlassesLink can make the camera screen's CameraViewModel from it.
+  let wearables: WearablesInterface
   private var deviceCompatibility: [DeviceIdentifier: Compatibility] = [:]
   private var compatibilityListenerTokens: [DeviceIdentifier: AnyListenerToken] = [:]
 
@@ -306,10 +307,14 @@ final class WearablesViewModel {
 
   private func receiveRegistrationRequest(_ request: RegistrationRequest) {
     pendingRegistrationRequest = PendingRegistrationRequest(request: request)
-    Announcer.shared.announce(SpokenMessage.metaAIRegistrationRequest, earcon: .attention)
+    // Answerable by voice as well as by the sheet's buttons; hands-free asks for yes or no.
+    VoiceControl.shared.ask(yes: { [weak self] in self?.continueRegistrationRequest() }, no: { [weak self] in self?.declineRegistrationRequest() })
+    let line = A11yPreferences.shared.handsFree ? SpokenMessage.metaAIRegistrationQuestion : SpokenMessage.metaAIRegistrationRequest
+    Announcer.shared.announce(line, earcon: .attention)
   }
 
   func continueRegistrationRequest() {
+    VoiceControl.shared.clearQuestion()
     guard let pending = pendingRegistrationRequest else { return }
     pendingRegistrationRequest = nil
     userDeclinedRequest = false
@@ -325,6 +330,7 @@ final class WearablesViewModel {
   }
 
   func declineRegistrationRequest() {
+    VoiceControl.shared.clearQuestion()
     guard let pending = pendingRegistrationRequest else { return }
     pendingRegistrationRequest = nil
     userDeclinedRequest = true
@@ -487,10 +493,16 @@ final class WearablesViewModel {
 
   /// Shows the alert and makes it heard. With VoiceOver running, VoiceOver reads the alert
   /// itself, so only the tone plays; speaking too would have two voices say the same sentence.
+  /// Hands-free has no dialogs: the sentence is always spoken and the alert isn't shown. "Connect"
+  /// and "try again" retry by voice.
   func present(_ problem: WearablesProblem) {
     errorTitle = problem.title
     errorMessage = problem.message
     errorAction = problem.action
+    if A11yPreferences.shared.handsFree {
+      Announcer.shared.announce(problem.message, earcon: problem.earcon)
+      return
+    }
     showError = true
     if UIAccessibility.isVoiceOverRunning {
       EarconPlayer.shared.play(problem.earcon)

@@ -11,8 +11,9 @@
 // Drives the camera screen by exercising the SDK's camera lifecycle as explicit steps: create and
 // start a DeviceSession, add and start a Stream, capture a photo or record video, stop the stream,
 // end the session. Owns the screen-scoped pieces — the DeviceSession, its Stream, the on-device
-// HEVC preview decoder, and the passthrough video recorder. It is also the tools' camera
-// (PageCamera): in-stream photos, frame sizes for page-turn detection, and frames for continuous
+// HEVC preview decoder, and the passthrough video recorder. It is also the tools' glasses camera
+// (PageCamera + GlassesLink): in-stream photos, a motion score from frame sizes for page-turn
+// detection, and frames for continuous
 // tools: copied off the preview Surface (PixelCopy) while it's on screen, else decoded by a second
 // decoder (FrameGrabber) only while collected. The UI binds to the SDK's own
 // DeviceSessionState / StreamState so the sample shows the real state machine.
@@ -50,6 +51,9 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.bench.BenchClock
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.bench.TtsReply
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.CameraLink
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.PageCamera
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.GlassesLink
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.FrameSizeMotion
+import kotlinx.coroutines.flow.flow
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.StreamFrameSize
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.FrameGrabber
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.AudioInputHandler
@@ -94,7 +98,7 @@ import kotlinx.coroutines.withContext
 class CameraViewModel(
     application: Application,
     private val wearablesViewModel: WearablesViewModel,
-) : AndroidViewModel(application), PageCamera {
+) : AndroidViewModel(application), PageCamera, GlassesLink {
 
   companion object {
     private const val TAG = "CameraAccess:CameraViewModel"
@@ -160,6 +164,11 @@ class CameraViewModel(
           onBufferOverflow = BufferOverflow.DROP_OLDEST,
       )
   override val frameSizes: SharedFlow<StreamFrameSize> = _frameSizes
+  /** PageCamera.motion: the frame-size score, with a fresh baseline per collector. */
+  override val motion: Flow<Float> = flow {
+    val m = FrameSizeMotion()
+    _frameSizes.collect { f -> m.onFrame(f.bytes, f.isCodecConfig)?.let { emit(it) } }
+  }
   private val awaitingPermission = MutableStateFlow(false)
   private val cameraDenied = MutableStateFlow(false)
   override val isStreaming: StateFlow<Boolean> =
@@ -284,7 +293,7 @@ class CameraViewModel(
    * stream-state collector observes (see [onStreamTerminated]) to stop recording and release stream
    * resources.
    */
-  fun endSession() {
+  override fun endSession() {
     val current = session ?: return
     _uiState.update { it.copy(sessionState = DeviceSessionState.STOPPING) }
     current.stop()
