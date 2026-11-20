@@ -10,8 +10,10 @@
 //
 // Shown until the app is connected to Meta AI. A hero with the SpeakUp mark, wordmark and tagline;
 // the voice ribbon and a status card showing that the screen is talking and listening (SetupVoice);
-// three short tips; and the big yellow "Connect my glasses" button, which does the same as saying
-// "connect".
+// three short tips; and two big buttons: "Use my phone's camera" (the same as saying "use my
+// phone": the tools open on the phone camera, no Meta AI, no Bluetooth; notes/phone-camera.md) and
+// "Connect my glasses", which does the same as saying "connect". The hands-free switch is here too (notes/hands-free-mode.md); with it off the screen
+// doesn't talk first, and the mic button listens for one command (SetupVoice.listenOnce).
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
@@ -35,12 +37,16 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.PhoneAndroid
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.setup.SetupVoice.Host
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.HandsFreeStore
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -123,6 +129,12 @@ fun HomeScreen(
         }
     VoiceRibbon(state = voiceState, height = 72.dp)
     SetupVoiceCard(voiceUi)
+    val modeStore = remember { HandsFreeStore.get(context) }
+    val modeSettings by modeStore.settings.collectAsStateWithLifecycle()
+    HandsFreeSwitch(on = modeSettings.handsFree, onChange = { setupVoice.setHandsFree(it) })
+    if (!modeSettings.handsFree) {
+      PushToTalkButton(listening = voiceUi.pushToTalk, onClick = { setupVoice.listenOnce() })
+    }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -148,6 +160,29 @@ fun HomeScreen(
     Spacer(modifier = Modifier.weight(1f))
 
     Text(
+        text = stringResource(R.string.setup_choice_message),
+        style = MaterialTheme.typography.bodyMedium,
+        color = SpeakUpColors.PaperMuted,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    // The phone first: it works now, with nothing else to install or pair.
+    val phoneDescription = stringResource(R.string.setup_use_phone_description)
+    SpeakUpButton(
+        label = stringResource(R.string.setup_use_phone_button),
+        icon = Icons.Filled.PhoneAndroid,
+        minHeight = SpeakUpDimens.HeroButtonHeight,
+        modifier =
+            Modifier.fillMaxWidth().testTag("setup_use_phone_button").semantics {
+              contentDescription = phoneDescription
+            },
+        onClick = {
+          setupVoice.usePhoneTapped()
+          (activity as? Host)?.usePhone()
+              ?: Toast.makeText(context, errorActivityUnavailable, Toast.LENGTH_SHORT).show()
+        },
+    )
+    Text(
         text = stringResource(R.string.home_redirect_message),
         style = MaterialTheme.typography.bodyMedium,
         color = SpeakUpColors.PaperMuted,
@@ -157,18 +192,23 @@ fun HomeScreen(
     val connectDescription = stringResource(R.string.setup_connect_description)
     SpeakUpButton(
         label = stringResource(R.string.register_button_title),
-        enabled = uiState.canStartRegistration,
+        // Nearby devices is asked for on the tap (MainActivity.startRegistration), not at launch.
+        enabled = !uiState.isRegistering,
         icon = Icons.Filled.Link,
+        kind = ButtonKind.SECONDARY,
         minHeight = SpeakUpDimens.HeroButtonHeight,
         modifier =
             Modifier.fillMaxWidth().testTag("setup_connect_button").semantics {
               contentDescription = connectDescription
             },
         onClick = {
-          activity?.let {
+          val host = activity as? Host
+          if (host != null) {
             setupVoice.connectTapped()
-            viewModel.startRegistration(it)
-          } ?: Toast.makeText(context, errorActivityUnavailable, Toast.LENGTH_SHORT).show()
+            host.startRegistration()
+          } else {
+            Toast.makeText(context, errorActivityUnavailable, Toast.LENGTH_SHORT).show()
+          }
         },
     )
   }

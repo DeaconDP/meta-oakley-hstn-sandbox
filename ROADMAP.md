@@ -17,13 +17,23 @@
 
 (notes/a11y-prior-art.md > 1b, > Implications.)
 
+**Strategy update (2026-11-18): from accessibility to everyday value.** Accessibility stays the quality bar, but SpeakUp now aims to be useful to as many people as possible, with or without glasses. Full reasoning: notes/value-strategy.md.
+
+- **Phones first, glasses as the upgrade.** About 9M Meta glasses exist; phones number in the billions. Meta hasn't opened publishing for glasses apps, and the App Store rejects iOS apps that link DAT (docs `build-integration-ios` > Prerequisites). A phone-only build ships to both stores now; the glasses build stays in Meta's Beta channel.
+- **Lead with jobs, not conditions:** "deal with your post", "no reading glasses needed", "hands full while cooking". The audiences behind them: presbyopia (~1.8bn), low literacy, second-language readers, older adults on many medicines, carers, ADHD, hearing loss, allergies, and blind and low-vision users as the core.
+- **Sell what nobody else does.** Scene description, one-off OCR and translation are free elsewhere. Our edge: every word read honestly, letters turned into "what do I do and by when", continuous "watch for", reminders that follow on, a log you can trust, hands-free voice, offline and private.
+- **Free core, sponsored and paid extras.** The reading and safety core stays free and offline. An optional Plus tier near cost (cloud reading, family sharing, multi-device). Sponsors with a duty to vulnerable customers (banks, energy firms, councils) for "understand your letter". Never take away something that was free.
+
 ## Ground rules (apply to every phase)
 
-- **Voice-first, both ways, from launch.** (Decided 2026-11-03.) A blind user can't find buttons on a screen, so every feature is fully usable by voice alone. They open it by voice ("Hey Google, open Book Reader"; later "Hey Meta, start …"), it connects with no taps or dialogs and narrates each step, and they control it conversationally with natural phrasing ("hang on", "say that again", "a bit faster", "where am I", "help"). Every response is spoken, and the user can talk over it at any time. The phone screen mirrors the state for sighted helpers, low-vision users and TalkBack users, but it is never the only way to do something. Understanding runs on-device (no cloud). Mic: the glasses' own speech recognition when available, otherwise the phone's on-device recogniser. The Bluetooth hands-free mic isn't used, because it would drop all output to mono. (notes/book-reader-android.md > Voice control)
+- **Hands-free mode (changed 2026-11-18).** By default SpeakUp is a touch toolbox for the SDK and our tools, with a push-to-talk mic. Voice-only use is an opt-in **hands-free mode**: switched on by toggle, by voice, by `speakup://handsfree` or a launcher shortcut / Siri shortcut, and on first run when TalkBack/VoiceOver is running. In hands-free mode the rule below applies in full, no screen is needed, and Ray-Ban Display glasses show an optional card that mirrors the speech. (notes/hands-free-mode.md)
+- **Voice-first, both ways, in hands-free mode.** (Decided 2026-11-03, scoped to hands-free 2026-11-18.) A blind user can't find buttons on a screen, so every feature is fully usable by voice alone. They open it by voice ("Hey Google, open Book Reader"; later "Hey Meta, start …"), it connects with no taps or dialogs and narrates each step, and they control it conversationally with natural phrasing ("hang on", "say that again", "a bit faster", "where am I", "help"). Every response is spoken, and the user can talk over it at any time. The phone screen mirrors the state for sighted helpers, low-vision users and TalkBack users, but it is never the only way to do something. Understanding runs on-device (no cloud). Mic: the glasses' own speech recognition when available, otherwise the phone's on-device recogniser. The Bluetooth hands-free mic isn't used, because it would drop all output to mono. (notes/book-reader-android.md > Voice control)
 - **Audio-first UX.** Every action plays an earcon within 100 ms. Silence is never how a failure is reported. Users can set verbosity (short / normal / detailed) and speech rate, and can cut speech off at any time. App audio has to work alongside TalkBack/VoiceOver; on Android it is tagged as accessibility audio. (notes/a11y-prior-art.md > 3, notes/a11y-perception-stack.md > TTS)
-- **Say how sure it is.** If the model isn't confident, it says "can't tell" and asks for a better frame instead of guessing. It refuses outright on medication doses and on money it can't verify.
+- **Say how sure it is.** If the model isn't confident, it says "can't tell" and asks for a better frame instead of guessing. It refuses outright on medication doses and on money it can't verify, and abstains on expiry dates and allergens it can't read in full. Medication reminders never state or change a dose.
 - **Privacy.** The cloud is called only on an explicit trigger, never continuously. Faces are blurred on the phone before upload, and no frames are stored. No face recognition and no identifying people (BIPA, GDPR Article 9, EU AI Act Article 5).
-- **Not a mobility aid.** Anything involving obstacles or direction is presented as orientation help, never as a replacement for a cane or guide dog.
+- **Awareness, not safety.** (Widened 2026-11-18 from "Not a mobility aid".) Navigation, alerts and anything about obstacles, traffic or sounds are presented as orientation and awareness help, never as a mobility aid, a safety device, or a replacement for a cane, guide dog or O&M training. We never say an area or crossing is safe, never give "all clear" messages, and never detect pedestrian signals or say when to cross. First use and "help" say once that silence doesn't mean there's no hazard.
+- **Alert budget.** Outdoors, callouts and alerts are short, rate-limited, interruptible, and dropped when stale (over 2 s old). One "attention" earcon is reserved for alerts. Speech the user asked for is never queued behind an ambient alert.
+- **Ephemeral listening.** Transcripts, sound detections and location history stay in memory on the phone for a few minutes at most, and are never uploaded or saved, unless the user saves a note or a marker.
 - **Companion phone UI meets WCAG 2.2 AA** and is fully usable with TalkBack and VoiceOver.
 - **Production path stays separate.** Ship-ready features use only GA APIs: the camera stream, in-stream photo, device state, and OS Bluetooth audio. Experimental APIs (inputs, voice invocation, Motion, in-stream mic) go behind a flag in dev/beta builds. **Exception: on-glasses speech** is used by default wherever the build channel allows it, because voice control is the default. Where it's unavailable (production builds, no permission, no recogniser), the app falls back to the GA path, Android's on-device recogniser on the phone mic, so voice works in every build.
 
@@ -69,7 +79,61 @@
    - Co-design sessions with BLV participants, paid and with accessible consent, recruited via ACB / NFB / Braille Institute / Carroll Center. Measure task success, number of turns, SUS, NASA-TLX and trust, and count wrong answers separately from declined ones. (notes/a11y-prior-art.md > 5)
 8. **Publish the showcase**: README demo section with audio/video captures, a write-up of results, and the ship-ready checklist before tagging a release.
 
+## Make it your own (cross-cutting, added 2026-11-18)
+
+Deep customisation, prompted by Meta's announcements of hearing enhancement, audio balance and mono audio, customisable controls, and detailed responses. Every setting can be changed by voice in the moment, and is announced, undoable and lockable. Full plan: notes/customisation-roadmap.md.
+
+- **C0 Foundation:** one settings schema for both platforms, one audio bus per platform, and a settings grammar ("slower", "keep that", "undo", "what's my setup").
+- **C1 Your voice:** speech presets, voice choice, per-tool verbosity, earcon options, and a settings screen on Android.
+- **C2 Your ears:** balance, which ear for which sound, mono-aware cues, the "Clear speech" preset (for our own voice only, never sold as hearing help), and a conversation mode.
+- **C3 Your words:** aliases, macros, home-menu order, wake word, and tip pacing.
+- **C4 Your buttons (Experimental):** glasses `Inputs` mapped to SpeakUp actions, and "Hey Meta, start SpeakUp mail". Tap and tap-and-hold on the temple belong to Meta and can't be remapped.
+- **C5 Your profiles:** Home, Out and about, and Reading. Switch by voice, with automatic triggers optional and announced.
+- **C6 Your descriptions:** a detail dial and description preferences. The "can't tell" answer and the refusals stay on.
+- **C7 Share and carry:** export and import a setup, and a helper view.
+
+## Everyday value (added 2026-11-18, comes before U2–U6)
+
+Plan: notes/value-strategy.md > 6.
+
+- **V0 Glasses optional:** every tool runs on the phone's own camera, mic, speaker and screen. Android: `PhoneCamera : PageCamera` with CameraX, chosen by a setting; bypass the registration gate, make Bluetooth optional, skip glasses health and reconnect narration; a motion signal for book page turns; re-tune for phone optics (about 1–2 weeks). iOS: `PhoneFrameSource : ReadFrameSource`, and a **store build without the DAT SDK**. Switch cameras by voice mid-task ("use the phone"). Big-text mirror of what's read. **Built 2026-11-19 on both platforms** (notes/phone-camera.md, notes/phone-camera-ios.md); not yet run on a real phone. The iOS store build without DAT is done (2026-11-20); Android's is still to do. **iOS phone UX built 2026-11-20:** framing haptics, the big-text mirror, and a dark warning with a torch offer (notes/phone-reading-ios.md).
+- **V1 Letters first:** grow the mail reader into "deal with this letter": who, what, how much, by when, scam signs, then a reminder before the deadline, "what's due this week", plain-English explain and "explain in my language", a letters log with export. **Built on iOS 2026-11-20:** the reminder offer, the letters log with export, explain on the phone or with AI, and more scam rules. "My letters" works from any screen. Not yet on a real iPhone (notes/letters-ios.md).
+- **V2 Daily triggers:** U1 reminders and medication log, food check (expiry against today, your allergens, cooking steps), "read me the next step" for recipes and manuals. **Built on iOS 2026-11-20:** Reminders is the seventh tool, with the medicine log (notes/reminders-ios.md). Food check is in Labels (notes/food-check-ios.md). "Next step" is in Read text (notes/phone-reading-ios.md). Not yet on a real iPhone.
+- **V3 Carer mode:** with the user's consent, share letter summaries and the medication log with a helper, asynchronously; "ask a helper" hand-off.
+- **V4 Reach:** one-tap and one-word entry (Quick Settings tile, widget, share sheet for photos, screenshots and PDFs; iOS Action Button, App Intents, Back Tap), more languages, store copy that leads with jobs.
+- **Built on iOS 2026-11-20 (V0, V4):** a tools home with six tools on the phone camera (seven once Reminders landed the same day), a store build without DAT, Siri and Shortcuts for every tool, and photos and PDFs from the share sheet, Files or the in-app button, read like a camera page. All unit and UI tests pass on the Simulator; not yet on a real iPhone (notes/tools-home-ios.md, notes/reach-ios.md).
+- **V5 Glasses as premium:** the same tools hands-free once Meta opens publishing; meanwhile a Beta with blind glasses owners from Meta's programmes (BVA, VA Blind Rehab, Vision Ireland, ACB).
+- **Business track:** apply for grants, pilot one UK letter sponsor (bank or energy firm), talk to Meta's accessibility team about the curated catalogue.
+
+## Voice from start to finish (iOS, added 2026-11-20)
+
+A blind user can run SpeakUp on iPhone by voice alone, from launch to the end of the session. Where iOS forces a tap (system permission alerts, pickers), the app says so and names the voice way round it. Full plan: notes/voice-journey-ios.md.
+
+- **J1 End the session by voice:** "goodbye", "end session", "close the app" say goodbye, then stop the mic, the glasses session and audio, and leave the app idle; "close" always goes up one level, as on Android. A short "listening" line on return. iOS has no way for an app to quit itself, so the user leaves with the lock button or Siri. **Built 2026-11-20** on the Simulator; not yet on a real iPhone.
+- **J2 Grammar gaps:** "switch to \<tool>", and "read a photo" / "read a file" to open Import. **Built 2026-11-20** on the Simulator; not yet on a real iPhone.
+- **J3 First run for everyone:** spoken welcome and a big "Use my voice" button without VoiceOver; a spoken pre-prompt before every system alert, naming Voice Control's "Tap Allow".
+- **J4 No touch-only dead ends:** Import by voice, error alerts always spoken, spoken handoff to and from Meta AI.
+- **J5 Every setting by voice, with undo:** voice choice, sounds, tips, "undo", "what's my setup". The iOS slice of C0 and C1.
+- **J6 Ways in without the icon:** a Control Center / Action button control, Back Tap help, "Hey Meta, start SpeakUp" (Beta).
+- **J7 Prove it:** one UI test for the whole walkthrough, and real-iPhone runs with VoiceOver, with Voice Control, and with neither.
+
+## Beyond reading: new use-cases (added 2026-11-18)
+
+Glasses are good for two things: **hands-free** (camera, mic and speakers at head height while the hands are busy) and **heads-up** (a glance at a lens, display glasses only). HSTN covers the first; Meta Ray-Ban Display adds the second. SpeakUp stays audio-first on both, and a display mirrors the audio. Full catalogue, prior art and what Meta already covers: notes/use-cases.md.
+
+- **U1 Reminders and memory (GA):** time reminders spoken on the glasses when worn, "what reminders do I have", notes and "what was I doing?", medication log ("did I take my evening pill?", never a dose), routine checklists ("leaving the house"). Ships with the static awareness checks: expiry dates and allergens in Labels, scam signs in Mail. **Built on iOS 2026-11-20:** time reminders, "what's due this week", the medication log and "what was I doing?", plus the expiry, allergen and scam checks (notes/reminders-ios.md). Still to do: spoken notes, routine checklists, and speaking on the glasses when worn.
+- **U2 Orientation (GA):** "where am I", markers and "take me back", "is this my bus?" (transit due time plus watch-for-text confirmation), rideshare plate check. Soundscape-style callouts afterwards; head-relative panning behind the Motion flag.
+- **U3 Listening help (GA on the phone mic, glasses mic Experimental):** "what did they say?" replay of the last 60 s, name-called alert, sound recognition (alarm, doorbell, siren, kettle) with YAMNet, transcript to a braille display for deaf-blind users.
+- **U4 Display mirror (Meta Ray-Ban Display, `mwdat-display` is GA, needs DAM):** glanceable status, large-print OCR text paced by the user, summary cards for labels, mail and reminders, a contrast-boosted still. First test whether the camera stream and display run in one session.
+- **U5 Everyday and sport:** kitchen coach ("is it browned?", step tracking), step-by-step coach from a manual, one-command hand-off to a human helper, spoken workout stats, posture cues, guided-run audio.
+- **U6 Research flags (Experimental, never production):** head-height obstacle demo measured on misses and false alarms, IMU form coaching, camera-based "where did I put my keys?".
+- **Not building:** live captions, translation, walking navigation and the viewfinder on Display (Meta ships them); crossing help, vehicle and kerb warnings (awareness rule, and not technically reliable); emotion coaching and person-triggered reminders (faces and identity).
+
 ## Deferred
+- 2026-11-18: Approaching-vehicle and step/kerb warnings. A 1.5 s pipeline at 10 m/s means 15 m travelled, the camera can't see sideways or behind, and it sees the ground poorly. Conflicts with "Awareness, not safety". `notes/use-cases.md` > Awareness alerts
+- 2026-11-18: Live captions, translation and walking navigation in the Display lens. Meta already ships them. Revisit only for something Meta lacks (braille output, phone-media captions). `notes/use-cases.md` > 2
+- 2026-11-18: Glasses web apps. They get no camera and no mic, and nothing documented links them to a DAT phone app. `notes/use-cases.md` > 1
+- 2026-11-18: Live sound amplification as a hearing-enhancement equivalent. The glasses→phone→A2DP round trip is likely over 300 ms against about 10–20 ms for hearing aids, and it falls under hearing-device regulation. `notes/customisation-roadmap.md`
 - 2026-10-21: Real-HSTN baseline run. The only phone available is a Galaxy S7 (API 26), and the sample's minSdk is 31. `TODO.md:6`
 - ~~2026-10-21: Didn't check whether `GlassesModel` has an Oakley HSTN entry.~~ Resolved 2026-10-22: `OAKLEY_META_HSTN` exists in both SDKs (notes/hstn-capabilities.md).
 - 2026-10-22: Real-HSTN android-native benchmark and A2DP route check. Blocked on the same Android 12+ phone. `TODO.md`

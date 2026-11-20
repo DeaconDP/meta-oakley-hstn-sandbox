@@ -1,8 +1,13 @@
 /*
  * OnboardingView - the one screen before the app (notes/a11y-onboarding.md, "One screen", 2026-11-17)
  *
- * The mascot says what SpeakUp does, one safety sentence, and what happens next. One big Connect
- * glasses button starts registration with Meta AI straight away. Not now goes to the app.
+ * The mascot says what SpeakUp does, one safety sentence, and what happens next. Two choices
+ * (V0 "Glasses optional"): Use my iPhone's camera goes straight to the main screen with no Meta AI
+ * and no registration; Connect glasses starts registration with Meta AI. "Not now" by voice is the
+ * phone choice. Glasses can be connected later from Settings or the camera switch.
+ *
+ * The App Store build (GlassesLink.supportsGlasses false, no DAT) has one button, Start reading,
+ * which goes straight to the phone camera. Its welcome line doesn't mention glasses.
  *
  * Coming back from Meta AI: WearablesViewModel says "Connected to …. Hold up a page and say read."
  * and this screen hands over to the main screen. If it didn't finish, the view model says why, the
@@ -15,14 +20,13 @@
  * sentence (VoiceControl.promptForPermissions), queued behind the welcome line.
  *
  * MainAppView shows it while A11yPreferences.onboardingCompleted is false, so "Replay setup" is
- * `A11yPreferences.shared.resetOnboarding()`. Reaching the main screen, or Not now, marks it done.
+ * `A11yPreferences.shared.resetOnboarding()`. Reaching the main screen either way marks it done.
  */
 
-import MWDATCore
 import SwiftUI
 
 struct OnboardingView: View {
-  var wearablesViewModel: WearablesViewModel
+  var link: any GlassesLink
 
   @AccessibilityFocusState private var titleFocused: Bool
 
@@ -32,10 +36,10 @@ struct OnboardingView: View {
   /// and finds itself registered, it goes straight on instead of offering to connect again.
   static let connectingMarker = "connecting"
 
-  private var isRegistered: Bool { wearablesViewModel.registrationState == .registered }
+  private var isRegistered: Bool { link.isRegistered }
 
   /// Why the last attempt didn't connect. Not shown once registered.
-  private var notice: String? { isRegistered ? nil : wearablesViewModel.connectionNotice }
+  private var notice: String? { isRegistered ? nil : link.connectionNotice }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -50,20 +54,20 @@ struct OnboardingView: View {
     .onAppear { appeared() }
     .onDisappear {
       // Leaving without connecting: a later connection shouldn't get setup's follow-up.
-      wearablesViewModel.connectedFollowUp = nil
+      link.connectedFollowUp = nil
       VoiceControl.shared.clearScreen { $0 == .welcome }
       VoiceCoach.shared.stopProviding(for: .welcome)
     }
-    .onChange(of: wearablesViewModel.registrationState) { _, state in
+    .onChange(of: link.isRegistered) { _, registered in
       // WearablesViewModel has said "Connected to …" with connectedFollowUp as one line.
-      if state == .registered { finishConnected(alreadySpoken: true) }
+      if registered { finishConnected(alreadySpoken: true) }
     }
-    .onChange(of: wearablesViewModel.connectionNotice) { _, newNotice in
+    .onChange(of: link.connectionNotice) { _, newNotice in
       // Queued behind the reason, which the view model has just said.
       if newNotice != nil, !isRegistered { speakKeyLine(SpokenMessage.welcomeRetry) }
     }
     // "Connecting…" otherwise only changes visually.
-    .a11yAnnounce(onChangeOf: wearablesViewModel.isConnecting) { connecting in
+    .a11yAnnounce(onChangeOf: link.isConnecting) { connecting in
       connecting ? "Connecting." : nil
     }
     // A container, so the identifier stays on the screen and doesn't land on what's inside it.
@@ -84,7 +88,7 @@ struct OnboardingView: View {
       .accessibilityAddTraits(.isHeader)
       .accessibilityFocused($titleFocused)
     MascotSays(mood: notice == nil ? .happy : .confused, mascotSize: 96) {
-      A11yNote(text: SpokenMessage.welcomeIntro)
+      A11yNote(text: introLine)
       A11yNote(text: nextStepLine)
     }
     if let notice {
@@ -97,44 +101,62 @@ struct OnboardingView: View {
 
   @ViewBuilder
   private var footer: some View {
-    if isRegistered {
+    if !link.supportsGlasses {
+      // The App Store build: no glasses, so one button straight to the phone camera.
+      Button("Start reading", action: usePhone)
+        .buttonStyle(.a11yPrimary)
+        .sayHint(.continueOn)
+        .accessibilityHint("Goes to the main screen. Reads with this iPhone's camera.")
+        .accessibilityIdentifier("onboarding_use_phone_button")
+    } else if isRegistered {
       Button("Start reading", action: startReading)
         .buttonStyle(.a11yPrimary)
         .sayHint(.continueOn)
         .accessibilityHint("Goes to the main screen.")
         .accessibilityIdentifier("onboarding_start_button")
     } else {
+      Button("Use my iPhone's camera", action: usePhone)
+        .buttonStyle(.a11yPrimary)
+        .sayHint(.usePhone)
+        .accessibilityHint("Starts reading with this iPhone's camera. No glasses or Meta AI needed.")
+        .accessibilityIdentifier("onboarding_use_phone_button")
       // Identifier shared with the home screen's button, so tests find either the same way.
       Button(connectTitle, action: connect)
-        .buttonStyle(.a11yPrimary)
-        .sayHint(notice == nil ? .connect : .tryAgain)
-        .disabled(wearablesViewModel.isConnecting)
-        .accessibilityHint(
-          wearablesViewModel.isConnecting ? "" : "Opens the Meta AI app. Choose Connect there, then come back.")
-        .accessibilityIdentifier("connect_glasses_button")
-      Button("Not now", action: notNow)
         .buttonStyle(.a11ySecondary)
-        .sayHint(.no)
-        .accessibilityHint("Goes to the app without connecting. You can connect from there.")
-        .accessibilityIdentifier("onboarding_not_now_button")
+        .sayHint(notice == nil ? .connect : .tryAgain)
+        .disabled(link.isConnecting)
+        .accessibilityHint(
+          link.isConnecting ? "" : "Opens the Meta AI app. Choose Connect there, then come back.")
+        .accessibilityIdentifier("connect_glasses_button")
     }
   }
 
   private var connectTitle: String {
-    if wearablesViewModel.isConnecting { return "Connecting…" }
+    if link.isConnecting { return "Connecting…" }
     return notice == nil ? "Connect glasses" : "Try again"
+  }
+
+  /// The first half of the bubble: what SpeakUp is. The App Store build doesn't mention glasses.
+  private var introLine: String {
+    link.supportsGlasses ? SpokenMessage.welcomeIntro : SpokenMessage.welcomeIntroPhoneOnly
   }
 
   /// The second half of the bubble: what to do now.
   private var nextStepLine: String {
+    if !link.supportsGlasses { return SpokenMessage.welcomeStartPhoneOnly }
     if isRegistered { return SpokenMessage.welcomeAlreadyConnected }
     return notice == nil ? SpokenMessage.welcomeConnect : SpokenMessage.welcomeRetry
   }
 
+  /// The next step as said on appearing and by "where am I".
+  private var startLine: String {
+    if !link.supportsGlasses { return SpokenMessage.welcomeStartPhoneOnly }
+    return isRegistered ? SpokenMessage.welcomeAlreadyConnected : SpokenMessage.welcomeConnect
+  }
+
   /// Everything the screen says when it appears, safety sentence included.
   private var welcomeLine: String {
-    let next = isRegistered ? SpokenMessage.welcomeAlreadyConnected : SpokenMessage.welcomeConnect
-    return "\(SpokenMessage.welcomeIntro) \(SpokenMessage.safetyNote) \(next)"
+    "\(introLine) \(SpokenMessage.safetyNote) \(startLine)"
   }
 
   // MARK: Actions
@@ -145,25 +167,37 @@ struct OnboardingView: View {
       finishConnected(alreadySpoken: false)
       return
     }
-    wearablesViewModel.connectedFollowUp = SpokenMessage.connectedNext
+    link.connectedFollowUp = SpokenMessage.connectedNext
     focusTitle()
     // Before setScreen: if voice control still needs permission, its one-sentence explanation and
     // the system dialogs queue behind this line instead of cutting it off.
     speakKeyLine(welcomeLine)
-    VoiceControl.shared.setScreen(.welcome, handler: handleVoice)
-    VoiceCoach.shared.provide(for: .welcome) { [wearablesViewModel] in
+    VoiceControl.shared.setScreen(.welcome, describe: { [link] in
+      if !link.supportsGlasses { return SpokenMessage.welcomeStartPhoneOnly }
+      return link.isRegistered ? SpokenMessage.welcomeAlreadyConnected : SpokenMessage.welcomeConnect
+    }, handler: handleVoice)
+    if link.supportsGlasses {
+      HandsFreeSurface.shared.publish(screen: .welcome, state: "Phone or glasses", hints: [.usePhone, .connect, .help])
+    } else {
+      HandsFreeSurface.shared.publish(screen: .welcome, state: "Welcome", hints: [.continueOn, .help])
+    }
+    VoiceCoach.shared.provide(for: .welcome) { [link] in
+      // The welcome tips name the glasses; the App Store build has one button and says so already.
+      if !link.supportsGlasses { return nil }
       // Nothing to suggest while Meta AI is being opened or waited for.
-      if wearablesViewModel.isConnecting { return nil }
-      if wearablesViewModel.registrationState == .registered { return .welcomeConnected }
-      return wearablesViewModel.connectionNotice == nil ? .welcome : .welcomeRetry
+      if link.isConnecting { return nil }
+      if link.isRegistered { return .welcomeConnected }
+      return link.connectionNotice == nil ? .welcome : .welcomeRetry
     }
   }
 
   private func connect() {
     // The failure alert, if it is still up, would sit over Meta AI's return.
-    wearablesViewModel.dismissError()
+    link.dismissError()
     preferences.onboardingStep = Self.connectingMarker
-    wearablesViewModel.connectGlasses()
+    // Once linked, auto reads with the glasses (and falls back to the phone without them).
+    if preferences.cameraSource == .phone { preferences.cameraSource = .auto }
+    link.connectGlasses()
   }
 
   /// Replay setup with the glasses already connected.
@@ -171,9 +205,11 @@ struct OnboardingView: View {
     finishConnected(alreadySpoken: false)
   }
 
-  private func notNow() {
-    wearablesViewModel.dismissError()
-    Announcer.shared.say(SpokenMessage.setupNotNow)
+  /// The iPhone's camera: no Meta AI, no registration. Straight to the main screen, Read enabled.
+  private func usePhone() {
+    link.dismissError()
+    preferences.cameraSource = .phone
+    Announcer.shared.announce(SpokenMessage.setupUsePhone, earcon: .ready)
     complete()
   }
 
@@ -200,11 +236,22 @@ struct OnboardingView: View {
   /// The same calls the buttons make. VoiceCommandParser only lets through what's valid here;
   /// help, stop, faster and slower are VoiceControl's own.
   private func handleVoice(_ command: VoiceCommand) -> Bool {
+    // The App Store build: anything that moves on starts with the phone; asking for glasses says
+    // they need the Beta app.
+    if !link.supportsGlasses {
+      switch command {
+      case .continueOn, .yes, .usePhone, .no: usePhone()
+      case .connect, .tryAgain, .useGlasses: link.connectGlasses()
+      case .repeatLast: Announcer.shared.say(welcomeLine)
+      default: return false
+      }
+      return true
+    }
     switch command {
-    case .connect, .tryAgain, .yes, .continueOn:
+    case .connect, .tryAgain, .yes, .continueOn, .useGlasses:
       if isRegistered { startReading() } else { connect() }
-    case .no:
-      notNow()
+    case .usePhone, .no:
+      usePhone()
     case .repeatLast:
       // Repeat this screen's words, even with VoiceOver: the user asked out loud.
       let line = notice.map { "\($0) \(SpokenMessage.welcomeRetry)" } ?? welcomeLine
@@ -224,11 +271,12 @@ struct OnboardingView: View {
     }
   }
 
-  /// Speaks a line of this screen, queued, only without VoiceOver. With VoiceOver, focus moves to
-  /// the title and VoiceOver reads the screen in the user's own voice; speaking as well would be
-  /// cut off by, or talk over, VoiceOver.
+  /// Speaks a line of this screen, queued, only in hands-free and without VoiceOver. The toolbox has
+  /// no start-up narration (notes/hands-free-mode.md). With VoiceOver, focus moves to the title and
+  /// VoiceOver reads the screen in the user's own voice; speaking as well would be cut off by, or
+  /// talk over, VoiceOver.
   private func speakKeyLine(_ text: String) {
-    guard !UIAccessibility.isVoiceOverRunning else { return }
+    guard preferences.handsFree, !UIAccessibility.isVoiceOverRunning else { return }
     Announcer.shared.say(text, interrupt: false)
   }
 }

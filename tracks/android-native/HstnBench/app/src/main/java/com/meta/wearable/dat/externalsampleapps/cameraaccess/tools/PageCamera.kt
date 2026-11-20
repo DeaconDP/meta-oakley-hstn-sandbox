@@ -1,18 +1,16 @@
-// PageCamera - what the tools need from the glasses camera
+// PageCamera - what the tools need from a camera (the glasses or the phone)
 //
-// CameraViewModel owns the DAT session and stream; a tool only needs a still for OCR, a cheap
-// per-frame signal for page-turn detection, decoded stream frames for tools that look continuously
-// (watch for text, light and colour), the session (to attach on-glasses speech recognition), and a
-// way to bring the stream up with no taps when the app is launched straight into a tool. Keeping it
-// to this interface leaves the tools independent of the camera screen's lifecycle code. (It started
-// as the book reader's seam, hence the name.)
+// A tool only needs a still for OCR, a cheap motion score for page-turn detection, decoded frames
+// for tools that look continuously (watch for text, light and colour), and whether the camera is
+// streaming. Two cameras implement it: CameraViewModel (the glasses, over DAT) and PhoneCamera
+// (CameraX). Tools see CameraSourceSelector, which forwards to whichever is in use and can switch
+// at runtime (notes/phone-camera.md). This interface has no DAT types: the glasses-only parts (the
+// DeviceSession for on-glasses speech, connecting with a Meta AI permission callback) are in
+// GlassesLink. (It started as the book reader's seam, hence the name.)
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools
 
 import android.graphics.Bitmap
-import com.meta.wearable.dat.core.session.DeviceSession
-import com.meta.wearable.dat.core.types.Permission
-import com.meta.wearable.dat.core.types.PermissionStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -40,45 +38,44 @@ enum class CameraLink {
 }
 
 interface PageCamera {
-  /** True while the glasses stream is live (capture is only possible then). */
+  /** True while the camera is streaming (capture is only possible then). */
   val isStreaming: StateFlow<Boolean>
 
-  /** Where the link is, for narration. */
+  /** Where the link is, for narration. The phone goes DISCONNECTED -> CONNECTING -> STREAMING. */
   val link: StateFlow<CameraLink>
 
-  /** Every compressed frame's size while streaming. Hot; frames are dropped if not collected. */
-  val frameSizes: Flow<StreamFrameSize>
-
-  /** The running DAT session, or null. The reader attaches speech recognition to it. */
-  val deviceSession: DeviceSession?
+  /**
+   * A 0..1 change score per frame while streaming (0 = same as the last frame), for page-turn
+   * detection. The glasses derive it from compressed frame sizes (FrameSizeMotion), the phone from
+   * small luma grids (FrameDifferenceMotion). Cold: each collector gets its own baseline.
+   */
+  val motion: Flow<Float>
 
   /**
-   * A still for OCR, using the GA in-stream `Stream.capturePhoto()` (960x1440 on the mock). Null if
-   * not streaming or the capture failed. Doesn't open the photo preview.
+   * A still for OCR. Glasses: the GA in-stream `Stream.capturePhoto()` (960x1440 on the mock).
+   * Phone: CameraX ImageCapture, about 1920 px on the long side or more. Null if not streaming or
+   * the capture failed. Doesn't open the photo preview.
    */
   suspend fun capturePage(): Bitmap?
 
   /**
-   * Stream frames, at most [maxFps] per second, for as long as the flow is collected. ARGB_8888 at
-   * the decoded picture's size (the mock streams its feed video's size: 540x960 for plant.mp4,
-   * 480x864 for MockVideo feeds). Normally copied off the preview Surface (PixelCopy: no extra
-   * decode); with no preview Surface (screen off, app in the background) a second, hardware HEVC
-   * decoder runs only while collected; if neither works, capturePage() at most once a second.
-   * Measured cost: notes/tools-layer.md > Frames. Emits nothing while not streaming. Each Bitmap is
-   * new; the receiver may keep it.
+   * Frames, at most [maxFps] per second, for as long as the flow is collected. ARGB_8888, upright.
+   * Glasses: the decoded picture's size (540x960 for plant.mp4), copied off the preview Surface
+   * (PixelCopy) or decoded by a second decoder (notes/tools-layer.md > Frames). Phone: about 960 px
+   * on the long side. Emits nothing while not streaming. Each Bitmap is new; the receiver may keep it.
    */
   fun frames(maxFps: Float = 2f): Flow<Bitmap>
 
   /**
-   * The newest decoded frame if one is under [maxAgeMs] old; otherwise decodes until one arrives
-   * (up to [timeoutMs]), and as a last resort captures a photo (capturePage). Null if not streaming.
+   * The newest frame if one is under [maxAgeMs] old; otherwise waits for one (up to [timeoutMs]),
+   * and as a last resort captures a photo (capturePage). Null if not streaming.
    */
   suspend fun latestFrame(maxAgeMs: Long = 1_000L, timeoutMs: Long = 2_500L): Bitmap?
 
   /**
-   * Starts the session if needed, then the stream, with no confirmation dialogs: a blind user
-   * launching straight into the reader can't see them. If camera access isn't granted yet,
-   * [requestPermission] is called (it opens the Meta AI app).
+   * Hold exposure and white balance still (the light and colour tool measures brightness, so the
+   * camera mustn't compensate). Optional: the glasses ignore it; the phone applies it once its
+   * auto exposure has settled. Every tool that locks must unlock when it leaves.
    */
-  fun connectAndStream(requestPermission: suspend (Permission) -> PermissionStatus)
+  fun lockExposure(locked: Boolean) = Unit
 }

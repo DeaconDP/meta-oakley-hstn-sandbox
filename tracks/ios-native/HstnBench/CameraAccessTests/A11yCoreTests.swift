@@ -34,7 +34,10 @@ final class A11yPreferencesTests: XCTestCase {
     XCTAssertEqual(preferences.verbosity, .normal)
     XCTAssertEqual(preferences.speechRate, AVSpeechUtteranceDefaultSpeechRate)
     XCTAssertFalse(preferences.useVoiceOverVoice)
-    XCTAssertTrue(preferences.voiceControlEnabled)
+    // The toolbox by default (notes/hands-free-mode.md); the glasses display on where there is one.
+    XCTAssertFalse(preferences.handsFree)
+    XCTAssertFalse(preferences.hasHandsFreeChoice)
+    XCTAssertTrue(preferences.glassesDisplayEnabled)
     XCTAssertFalse(preferences.voiceDownloadNoticeHeard)
     XCTAssertTrue(preferences.earconsEnabled)
     XCTAssertFalse(preferences.onboardingCompleted)
@@ -126,7 +129,14 @@ final class SpokenMessageTests: XCTestCase {
       SpokenMessage.welcomeRetry,
       SpokenMessage.connectedNext,
       SpokenMessage.setupConnected,
-      SpokenMessage.setupNotNow,
+      SpokenMessage.setupUsePhone,
+      SpokenMessage.phoneReady,
+      SpokenMessage.phoneCameraOn,
+      SpokenMessage.phoneCameraUnavailable,
+      SpokenMessage.phoneCameraSetupFailed,
+      SpokenMessage.phoneCameraStopped,
+      SpokenMessage.glassesFallbackToPhone,
+      SpokenMessage.glassesBackFromFallback,
       SpokenMessage.readyToRead,
       SpokenMessage.cameraOn,
       SpokenMessage.cameraEnded,
@@ -161,6 +171,9 @@ final class SpokenMessageTests: XCTestCase {
   func testWelcomeSaysWhatToSayAndTap() {
     XCTAssertTrue(SpokenMessage.welcomeConnect.contains("Say connect"))
     XCTAssertTrue(SpokenMessage.welcomeConnect.contains("tap Connect glasses"))
+    // The iPhone's camera is the other first-class choice (V0).
+    XCTAssertTrue(SpokenMessage.welcomeConnect.contains("say phone"))
+    XCTAssertTrue(SpokenMessage.welcomeConnect.contains("tap Use my iPhone's camera"))
     XCTAssertTrue(SpokenMessage.welcomeRetry.contains("Say try again"))
     XCTAssertTrue(SpokenMessage.welcomeAlreadyConnected.contains("Say continue"))
   }

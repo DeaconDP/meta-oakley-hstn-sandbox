@@ -5,6 +5,13 @@ See READINESS.md (2026-10-22).
 
 `HstnBench/` is the SpeakUp iOS app. It started as a copy of `sdks/meta-wearables-dat-ios/samples/CameraAccess` (mwdat 1.0.1).
 
+The project has two app targets, each with its own scheme:
+
+- **CameraAccess**: the Beta build with glasses. Links the DAT SDK. Unit and UI tests run against it.
+- **SpeakUp**: the App Store build. No DAT SDK (Meta's docs say linking it gets an app rejected), so it reads with the iPhone's camera only. Bundle ID `com.deaco.speakup`, compiled with `SPEAKUP_NO_DAT`, Info.plist in `Config/SpeakUp-Info.plist`. Details in `notes/phone-camera-ios.md` > "App Store build without the DAT SDK".
+
+Screens reach the glasses only through `A11y/Glasses/GlassesLink.swift`. Don't import `MWDAT*` in a shared file; build both schemes before merging.
+
 After setup there is one screen: what the glasses are doing, a big **Read text** button, the reading card while something is being read, and Settings (voice, Replay setup, Disconnect). There are no camera steps to take by hand. Read starts the session and the stream itself, and going to the background ends them. Magic Tap reads or stops reading, and voice commands, Siri ("Read", "Status", "Repeat") and VoiceOver actions do the same things. The sample's photo capture, video recording and session/preview controls were removed on 2026-11-16.
 
 The step-2 benchmark mirrors the android-native track:

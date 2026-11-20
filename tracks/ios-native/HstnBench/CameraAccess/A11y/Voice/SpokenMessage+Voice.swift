@@ -31,8 +31,6 @@ extension SpokenMessage {
 
   static let voiceControlOnWakeWord = "Voice control is on. Say reader, help at any time."
 
-  static let voiceControlTurnedOff = "Voice control off."
-
   /// Before the system's microphone and speech recognition dialogs, on the first screen that's up.
   static let voiceControlExplanation =
     "You can run this app by speaking. It needs the microphone to hear you, and speech recognition to understand you. Both stay on your phone, and nothing you say is stored. You'll be asked to allow them next."
@@ -47,7 +45,7 @@ extension SpokenMessage {
 
   static let voiceNotUnderstood = "Sorry, I didn't catch that. Say reader, help."
 
-  static let voiceHomeStatus = "Your glasses aren't connected to this app yet. Say connect."
+  static let voiceHomeStatus = "Your glasses aren't connected to this app yet. Say connect, or say use the phone."
 
   static let voiceGlassesMicNeedsMetaAI =
     "To listen through your glasses, you'll switch to the Meta AI app to allow their microphone, then come back here."

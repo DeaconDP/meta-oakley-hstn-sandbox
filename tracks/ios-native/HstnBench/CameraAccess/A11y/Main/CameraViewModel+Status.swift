@@ -11,32 +11,8 @@ import Foundation
 import MWDATCamera
 import MWDATCore
 
-/// The camera screen's state as a user thinks of it. Announcements fire on changes of this, so a
-/// session and its stream moving together (both pausing, say) are heard once.
-enum CameraPhase: Equatable, Sendable {
-  case noDevice
-  /// Glasses active, no session.
-  case idle
-  case sessionStarting
-  /// Session started, no stream.
-  case sessionReady
-  case previewStarting
-  case waitingForDevice
-  case streaming
-  case paused
-  case stopping
-
-  /// A wait the user should hear ticking.
-  var isWaiting: Bool {
-    switch self {
-    case .sessionStarting, .previewStarting, .waitingForDevice, .stopping: true
-    default: false
-    }
-  }
-}
-
-/// Battery at or below this is mentioned in the status line and announced once when crossed.
-let cameraBatteryWarningPercent = 20
+// CameraPhase and cameraBatteryWarningPercent are in A11y/Glasses/GlassesLink.swift, so the App
+// Store build (no DAT) has them too.
 
 extension CameraViewModel {
   var a11yPhase: CameraPhase {

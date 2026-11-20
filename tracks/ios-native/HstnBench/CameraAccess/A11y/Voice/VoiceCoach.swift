@@ -6,7 +6,8 @@
  * the coach names words ("Hold some text in front of you and say read"). Same idea as
  * the Android track's IdleNudge (notes/tools-layer.md > Silence reminders).
  *
- * When: only while voice control is listening (the tips are all "say ..."), the tips setting is on,
+ * When: only in hands-free mode (the toolbox has no idle reminders, notes/hands-free-mode.md), only
+ * while voice control is listening (the tips are all "say ..."), the tips setting is on,
  * and nothing is being said or read. Quiet means quiet on both sides: while the app speaks or
  * reads the gap restarts without using up a tip. The first tip comes 8 s into the quiet, then 30 s,
  * 1 min and 2 min later; the last one says it will stop, and then it stays quiet until the user
@@ -16,12 +17,11 @@
  *
  * Never: from outside the app, or over the user.
  *
- * Pure parts (VoiceCoachSchedule, VoiceCoachLines, CameraViewModel.coachSituation) are unit
+ * Pure parts (VoiceCoachSchedule, VoiceCoachLines, GlassesCamera.coachSituation) are unit
  * tested; the driver takes its world through Environment, so tests run it with a fake clock.
  */
 
 import Foundation
-import MWDATCore
 import UIKit
 
 /// What the screen is waiting for, as far as tips go. nil from a screen means "don't prompt now":
@@ -43,6 +43,10 @@ enum CoachSituation: Equatable, Sendable {
   /// A page has been read.
   case afterReading
   case paused
+  /// The phone camera reads (V0), nothing read yet.
+  case readyWithPhone
+  /// The phone camera can't be used (permission, no camera). The fix is in Settings, not a command.
+  case phoneCameraBlocked
 
   /// Stable key for counting how often a tip was heard.
   var key: String {
@@ -56,6 +60,8 @@ enum CoachSituation: Equatable, Sendable {
     case .ready: "ready"
     case .afterReading: "afterReading"
     case .paused: "paused"
+    case .readyWithPhone: "readyWithPhone"
+    case .phoneCameraBlocked: "phoneCameraBlocked"
     }
   }
 }
@@ -111,13 +117,14 @@ enum VoiceCoachLines {
   /// The whole line for one tip. Later tips start "I'm still listening."; the last one says it will
   /// stop. `wakeWord`: commands are given as "reader, read", since bare ones are ignored right now.
   static func line(
-    for situation: CoachSituation, tip: Int, isLast: Bool, wakeWord: Bool, verbosity: Verbosity
+    for situation: CoachSituation, tip: Int, isLast: Bool, wakeWord: Bool, verbosity: Verbosity,
+    glassesSupported: Bool = GlassesSupport.isBuiltIn
   ) -> String {
     let words = Words(wakeWord: wakeWord)
     let short = verbosity == .short
     var parts: [String] = []
     if tip > 0, !short { parts.append("I'm still listening.") }
-    parts.append(hint(for: situation, words, short: short))
+    parts.append(hint(for: situation, words, short: short, glassesSupported: glassesSupported))
     if isLast { parts.append("I'll stop reminding you now. \(words.sayFirst("help")) whenever you need me.") }
     return parts.joined(separator: " ")
   }
@@ -131,18 +138,22 @@ enum VoiceCoachLines {
     func sayFirst(_ command: String) -> String { wakeWord ? "Say reader, \(command)" : "Say \(command)" }
   }
 
-  static func hint(for situation: CoachSituation, _ w: Words, short: Bool) -> String {
+  /// `glassesSupported` false is the App Store build: it never offers connect or the glasses.
+  static func hint(
+    for situation: CoachSituation, _ w: Words, short: Bool, glassesSupported: Bool = GlassesSupport.isBuiltIn
+  ) -> String {
+    if !glassesSupported, let phoneOnly = phoneOnlyHint(for: situation, w, short: short) { return phoneOnly }
     switch situation {
     case .welcome:
       return short
-        ? "\(w.sayFirst("connect")), or \(w.say("not now"))."
-        : "To connect your glasses, \(w.say("connect")). I'll open the Meta AI app so you can approve it. "
-          + "Or \(w.say("not now"))."
+        ? "\(w.sayFirst("phone")), or \(w.say("connect"))."
+        : "To read with your iPhone's camera, \(w.say("phone")). To connect Meta glasses, \(w.say("connect")), "
+          + "and I'll open the Meta AI app so you can approve it."
     case .welcomeRetry:
       return short
-        ? "\(w.sayFirst("try again")), or \(w.say("not now"))."
+        ? "\(w.sayFirst("try again")), or \(w.say("phone"))."
         : "Your glasses aren't connected yet. \(w.sayFirst("try again")), and I'll open the Meta AI app again. "
-          + "Or \(w.say("not now"))."
+          + "Or \(w.say("phone")) to use your iPhone's camera."
     case .welcomeConnected:
       return short
         ? "\(w.sayFirst("continue")) to start."
@@ -150,7 +161,8 @@ enum VoiceCoachLines {
     case .notLinked:
       return short
         ? "\(w.sayFirst("connect")) to link your glasses."
-        : "Your glasses aren't linked to SpeakUp yet. \(w.sayFirst("connect")), and I'll open the Meta AI app so you can approve it."
+        : "Your glasses aren't linked to SpeakUp yet. \(w.sayFirst("connect")), and I'll open the Meta AI app so you can approve it. "
+          + "Or \(w.say("use the phone")) to read with your iPhone's camera."
     case .noGlasses:
       return short
         ? "Glasses not found. \(w.sayFirst("status")) to check again."
@@ -169,35 +181,57 @@ enum VoiceCoachLines {
           + "and \(w.say("repeat")) says one again."
     case .paused:
       return "Paused. Tap your glasses to carry on, or \(w.say("status"))."
+    case .readyWithPhone:
+      return short
+        ? "Hold the phone over some text and \(w.say("read"))."
+        : "Want me to read something? Hold the phone flat, about 30 centimetres above a page, a letter or a label, "
+          + "and \(w.say("read")). In a dark room, \(w.say("torch on"))."
+    case .phoneCameraBlocked:
+      return short
+        ? "The camera is off. \(w.sayFirst("status")) to hear how to fix it."
+        : "I can't use the phone camera yet. \(w.sayFirst("status")) to hear how to fix it."
+    }
+  }
+}
+
+extension VoiceCoachLines {
+  /// The App Store build's first-screen tips. The glasses' situations can't happen there.
+  static func phoneOnlyHint(for situation: CoachSituation, _ w: Words, short: Bool) -> String? {
+    switch situation {
+    case .welcome, .welcomeRetry, .welcomeConnected:
+      return short
+        ? "\(w.sayFirst("continue")) to start."
+        : "To start reading with your iPhone's camera, \(w.say("continue"))."
+    case .notLinked, .noGlasses, .glassesNotReady, .paused:
+      return short
+        ? "Hold the phone over some text and \(w.say("read"))."
+        : "Hold the phone flat, about 30 centimetres above a page, and \(w.say("read")). \(w.sayFirst("list tools")) to hear what else I can do."
+    default:
+      return nil
     }
   }
 }
 
 // MARK: - The main screen's situation
 
-extension CameraViewModel {
-  /// What a tip should be about on the main screen, or nil when nothing should be suggested.
-  func coachSituation(updateRequired: Bool, hasReadSentences: Bool) -> CoachSituation? {
-    // An alert owns the moment; the update has its own button and line.
-    if showError || showCameraPermissionRedirectConfirm || updateRequired {
-      return nil
-    }
-    if !hasActiveDevice { return .noGlasses }
-    if hingeState == .closed || (donState == .doffed && !hasSession) { return .glassesNotReady }
-    switch a11yPhase {
-    case .idle, .sessionReady, .streaming: return hasReadSentences ? .afterReading : .ready
-    case .paused: return .paused
-    case .noDevice: return .noGlasses
-    case .sessionStarting, .previewStarting, .waitingForDevice, .stopping: return nil
+extension CoachSituation {
+  /// The main screen with the phone as the camera. Interruptions pass by themselves, so no tip.
+  static func forPhone(problem: PhoneCameraProblem?, hasReadSentences: Bool) -> CoachSituation? {
+    switch problem {
+    case nil: return hasReadSentences ? .afterReading : .readyWithPhone
+    case .permissionDenied?, .permissionRestricted?, .noCamera?: return .phoneCameraBlocked
+    case .interrupted?, .stoppedWithError?, .setupFailed?: return nil
     }
   }
 }
+
+// The glasses' situation (GlassesCamera.coachSituation) is in A11y/Glasses/GlassesLink.swift.
 
 // MARK: - The driver
 
 @MainActor
 final class VoiceCoach {
-  static let shared = VoiceCoach(environment: .live)
+  static let shared: VoiceCoach = VoiceCoach(environment: .live)
 
   struct Environment {
     /// Tests and UI tests: never runs its own clock or speaks unless ticked.
@@ -300,11 +334,12 @@ final class VoiceCoach {
 }
 
 extension VoiceCoach.Environment {
-  static let live = VoiceCoach.Environment(
+  static let live: VoiceCoach.Environment = VoiceCoach.Environment(
     isInert: LaunchOptions.isAutomatedTest,
     now: { Date() },
-    tipsEnabled: { A11yPreferences.shared.voiceTipsEnabled },
-    isListening: { VoiceControl.shared.status == .listening },
+    tipsEnabled: { A11yPreferences.shared.voiceTipsEnabled && A11yPreferences.shared.handsFree },
+    // Push to talk listens too, but only for the one command the user is about to say.
+    isListening: { VoiceControl.shared.status == .listening && !VoiceControl.shared.isPushToTalkActive },
     isBusy: { Announcer.shared.isSpeaking || TextReader.shared.isActive },
     screen: { VoiceControl.shared.screen },
     lastCommandAt: { VoiceControl.shared.lastCommandAt },

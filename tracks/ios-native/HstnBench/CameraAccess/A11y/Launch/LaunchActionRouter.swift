@@ -21,6 +21,41 @@ enum LaunchAction: String, Sendable, CaseIterable {
   case status
   /// Repeat the last spoken line.
   case repeatLast
+  /// Open one of the everyday tools (SpeakUpTool). `.read` stays the one-step "read now".
+  case openMail
+  case openLabels
+  case openWatch
+  case openAsk
+  case openLight
+  case openReminders
+  /// Read pages that came in from outside (share sheet, Photos, Files): ImportedReading.
+  case readImported
+
+  /// The tool this action opens, if it opens one.
+  var tool: ToolID? {
+    switch self {
+    case .openMail: .mail
+    case .openLabels: .labels
+    case .openWatch: .watch
+    case .openAsk: .ask
+    case .openLight: .light
+    case .openReminders: .reminders
+    case .read, .status, .repeatLast, .readImported: nil
+    }
+  }
+
+  /// The action that opens `tool`. Read text maps to `.read`.
+  static func open(_ tool: ToolID) -> LaunchAction {
+    switch tool {
+    case .read: .read
+    case .mail: .openMail
+    case .labels: .openLabels
+    case .watch: .openWatch
+    case .ask: .openAsk
+    case .light: .openLight
+    case .reminders: .openReminders
+    }
+  }
 }
 
 @MainActor

@@ -38,6 +38,11 @@ struct RenderedSentence: Equatable, Sendable {
   var chunks: [SpokenChunk]
   var uncertainWords: Int
   var withheld: SensitiveKind?
+  /// Not page text: a line said among the sentences ("Page 2.", "No text on this page."). Kept
+  /// out of RecentText, so Ask never answers from it.
+  var isNotice = false
+  /// Played before it. Only for notices.
+  var earcon: Earcon? = nil
 }
 
 enum ReadSpeech {

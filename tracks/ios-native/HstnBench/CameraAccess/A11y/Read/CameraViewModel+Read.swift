@@ -8,6 +8,13 @@
  */
 
 extension CameraViewModel: ReadFrameSource {
+  var cameraKind: CameraKind { .glasses }
+
+  /// The phone camera took over (CameraSourceRouter): stop the stream, keep the session.
+  func stopReadingStream() {
+    stopStreaming()
+  }
+
   func prepareStreamForReading() -> ReadStreamReadiness {
     if isStreaming { return .ready }
     if showError || showCameraPermissionRedirectConfirm { return .blocked }

@@ -34,6 +34,11 @@ struct RegistrationView: View {
       // Handle callback URLs from the Meta mobile app
       // This is essential for completing DAT SDK registration and permission flows
       .onOpenURL { url in
+        // speakup://handsfree opens straight into hands-free mode. Everything else may be Meta AI's.
+        if HandsFreeMode.isHandsFreeURL(url) {
+          VoiceControl.shared.startHandsFreeFromLaunch()
+          return
+        }
         Task { await viewModel.handleCallbackURL(url) }
       }
       .onChange(of: scenePhase, initial: true) { _, phase in

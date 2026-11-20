@@ -83,11 +83,18 @@ dependencies {
   implementation(libs.mwdat.camera)
   // Book reader voice control: on-glasses speech recognition (Experimental in DAT 1.0).
   implementation(libs.mwdat.speech)
+  // Hands-free mode: a compact card on glasses with a display (Ray-Ban Display). GA in DAT 1.0.1.
+  implementation(libs.mwdat.display)
   implementation(libs.mwdat.mockdevice)
   // Book reader: on-device OCR, Latin script, model bundled in the APK (no Play Services download).
   implementation(libs.mlkit.text.recognition)
   // Label reader: on-device barcode scanning, model bundled in the APK.
   implementation(libs.mlkit.barcode.scanning)
+  // Glasses optional: the phone's back camera (tools/PhoneCamera, notes/phone-camera.md).
+  implementation(libs.androidx.camera.core)
+  implementation(libs.androidx.camera.camera2)
+  implementation(libs.androidx.camera.lifecycle)
+  implementation(libs.androidx.camera.view)
   testImplementation(libs.junit)
   androidTestImplementation(libs.androidx.ui.test.junit4)
   androidTestImplementation(libs.androidx.test.uiautomator)

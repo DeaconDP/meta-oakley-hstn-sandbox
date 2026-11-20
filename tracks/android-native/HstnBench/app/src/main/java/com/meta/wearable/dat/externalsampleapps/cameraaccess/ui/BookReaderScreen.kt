@@ -9,6 +9,7 @@
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolPushToTalk
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -190,6 +191,8 @@ private fun StatusLine(ui: BookReaderUiState) {
           modifier = Modifier.testTag("book_voice_heard"),
       )
     }
+    // The toolbox's mic button (hands-free off): one command, e.g. "read" or "next page".
+    ToolPushToTalk()
     if (!ui.speechAvailable) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(

@@ -65,7 +65,9 @@ final class VoiceCoachLinesTests: XCTestCase {
   func testWakeWordGoesOnEveryCommand() {
     let text = line(.welcome, wakeWord: true)
     XCTAssertEqual(
-      text, "To connect your glasses, say reader, connect. I'll open the Meta AI app so you can approve it. Or say reader, not now.")
+      text,
+      "To read with your iPhone's camera, say reader, phone. To connect Meta glasses, say reader, connect, "
+        + "and I'll open the Meta AI app so you can approve it.")
     XCTAssertTrue(line(.notLinked, isLast: true, wakeWord: true).hasSuffix("Say reader, help whenever you need me."))
   }
 
@@ -87,6 +89,8 @@ final class VoiceCoachLinesTests: XCTestCase {
       (.ready, VoiceContext(screen: .camera)),
       (.afterReading, VoiceContext(screen: .camera, hasReadSentences: true)),
       (.paused, VoiceContext(screen: .camera)),
+      (.readyWithPhone, VoiceContext(screen: .camera)),
+      (.phoneCameraBlocked, VoiceContext(screen: .camera)),
     ]
     for (situation, context) in cases {
       for verbosity in Verbosity.allCases {
@@ -259,12 +263,12 @@ final class VoiceCoachDriverTests: XCTestCase {
     world.screen = .welcome
     coach.tick()
     pass(8)
-    XCTAssertEqual(world.spoken, ["Say connect, or say not now."])
+    XCTAssertEqual(world.spoken, ["Say phone, or say connect."])
     // A connection that didn't finish is a new situation: the tips start over with "try again".
     situation = .welcomeRetry
     coach.tick()
     pass(8)
-    XCTAssertEqual(world.spoken.last, "Say try again, or say not now.")
+    XCTAssertEqual(world.spoken.last, "Say try again, or say phone.")
   }
 
   func testLearnedSituationsWaitLonger() {

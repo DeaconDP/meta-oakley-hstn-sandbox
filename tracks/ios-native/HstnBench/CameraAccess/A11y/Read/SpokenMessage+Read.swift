@@ -8,7 +8,10 @@
 extension SpokenMessage {
   // MARK: Read: framing guidance
 
-  static func readGuidance(_ verdict: FramingVerdict, verbosity: Verbosity) -> String? {
+  /// `camera`: the phone gets its own wording ("move the phone", "say torch on"); the glasses'
+  /// wording below is unchanged.
+  static func readGuidance(_ verdict: FramingVerdict, verbosity: Verbosity, camera: CameraKind = .glasses) -> String? {
+    if camera == .phone { return readGuidancePhone(verdict, verbosity: verbosity) }
     switch verdict {
     case .good:
       return nil
@@ -36,6 +39,59 @@ extension SpokenMessage {
       case .short: return "Text too small. Move closer."
       case .normal: return "The text is too small from here. Move a little closer, then read again."
       case .detailed: return "The text is too small from here, even in a photo. Move a little closer, about a forearm's length, then read again."
+      }
+    }
+  }
+
+  /// The phone's back camera, held over the page in portrait: image right is the user's right as
+  /// they look at the screen, so text cut off on the right means moving the phone right.
+  static func readGuidancePhone(_ verdict: FramingVerdict, verbosity: Verbosity) -> String? {
+    switch verdict {
+    case .good:
+      return nil
+    case .cutOff(let edges):
+      let horizontal = edges.contains(.left) && edges.contains(.right)
+      let vertical = edges.contains(.top) && edges.contains(.bottom)
+      if horizontal || vertical {
+        switch verbosity {
+        case .short: return "Cut off. Raise the phone."
+        case .normal, .detailed: return "Text runs off the edges. Raise the phone a little. Reading what I can see."
+        }
+      }
+      let moves = FramingEdge.allCases.filter(edges.contains).map { edge in
+        switch edge {
+        case .left: "left"
+        case .right: "right"
+        case .top: "up the page"
+        case .bottom: "down the page"
+        }
+      }
+      let move = moves.joined(separator: " and ")
+      switch verbosity {
+      case .short: return "Cut off. Move the phone \(move)."
+      case .normal, .detailed: return "Text is cut off. Move the phone a little \(move). Reading what I can see."
+      }
+    case .noText:
+      switch verbosity {
+      case .short: return "No text found."
+      case .normal: return "No text found. Hold the phone flat, about 30 centimetres above the page."
+      case .detailed:
+        return "No text found. Hold the phone flat, screen up, about 30 centimetres above the page, with the page in the middle."
+      }
+    case .tooDark:
+      switch verbosity {
+      case .short: return "Too dark. Say torch on."
+      case .normal, .detailed: return "Too dark to read. Say torch on, or move somewhere brighter, then read again."
+      }
+    case .tooBlurry:
+      switch verbosity {
+      case .short: return "Too blurry."
+      case .normal, .detailed: return "Too blurry to read. Hold the phone and the page still, then read again."
+      }
+    case .tooSmall:
+      switch verbosity {
+      case .short: return "Text too small. Move closer."
+      case .normal, .detailed: return "The text is too small from here. Bring the phone a little closer to the page, then read again."
       }
     }
   }
@@ -143,6 +199,67 @@ extension SpokenMessage {
     case .dose: "Check this dose with a pharmacist or another reader."
     case .money: "Check this amount another way."
     }
+  }
+
+  // MARK: Read: dark warning (DarkWatch)
+
+  static let readDarkWarning = "It's dark. Say torch on, or move somewhere brighter."
+
+  /// Asked once per run, after the warning, when the phone has a torch that is off.
+  static let readTorchOffer = "Shall I turn the torch on? Say yes, or tap Torch on."
+
+  static let readTorchDeclined = "OK. Say torch on any time."
+
+  // MARK: Read: haptics setting
+
+  static let readHapticsOn = "Framing haptics on."
+
+  static let readHapticsOff = "Framing haptics off."
+
+  // MARK: Read: big text
+
+  static let bigTextOn = "Big text."
+
+  static let bigTextOff = "Big text off."
+
+  static let bigTextNothing = "Nothing read yet. Read something first, then say big text."
+
+  /// "big text" with another tool open: big text follows pages read in Read text.
+  static let bigTextOnlyInReadText = "Big text is for pages in Read text. Say open reader, then big text."
+
+  // MARK: Read: steps
+
+  static let stepsNothingRead = "Nothing read yet. Read a recipe or a manual first, then say next step."
+
+  static let stepsNone = "I didn't find numbered steps on this page. Say next to hear the next sentence."
+
+  static func stepsCount(_ count: Int) -> String {
+    count == 1 ? "1 step." : "\(count) steps."
+  }
+
+  static func stepsLeft(_ count: Int) -> String {
+    switch count {
+    case 0: "No steps left. That was the last one."
+    case 1: "1 step left."
+    default: "\(count) steps left."
+    }
+  }
+
+  static func stepPosition(_ index: Int, of count: Int) -> String {
+    "You're on step \(index + 1) of \(count)."
+  }
+
+  static func stepsNotStarted(_ count: Int) -> String {
+    "You haven't started the steps. There \(count == 1 ? "is 1" : "are \(count)"). Say next step for step 1."
+  }
+
+  static let stepLast = "That was the last step. Say repeat step to hear it again."
+
+  static let stepFirst = "This is the first step."
+
+  /// Said before a step printed without a number (a bullet or a paragraph).
+  static func stepLabel(_ index: Int) -> String {
+    "Step \(index + 1)."
   }
 
   // MARK: Launch

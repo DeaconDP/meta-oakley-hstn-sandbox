@@ -14,6 +14,12 @@
 //     are released so the registered screen's own voice mode can take over cleanly.
 // The mic is stopped while this speaks (so it never hears itself) and while the app is in the
 // background.
+//
+// Hands-free mode (notes/hands-free-mode.md): the conversation (welcome, always listening,
+// reminders, speaking before permission dialogs) only runs in hands-free mode, or on a voice-first
+// launch into a tool. In the toolbox the screen waits for a tap: the Connect button, or the
+// push-to-talk mic ([listenOnce]), which hears one command with the same grammar. "Hands-free on"
+// and "hands-free off" work in both.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.setup
 
@@ -24,14 +30,19 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.HandsFreeStore
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.PhoneSpeechInput
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.ToolSpeaker
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.VoiceState
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlobalGrammar
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HandsFreeRules
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ModeChange
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -42,12 +53,18 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
   interface Host {
     fun startRegistration()
 
+    /** "Use my phone's camera": leave setup for the tools, no Meta AI (notes/phone-camera.md). */
+    fun usePhone()
+
     fun quitApp()
 
     fun openAppSettings()
 
-    /** Ask for the launch permissions again (the user said "connect" with Nearby devices off). */
-    fun askAppPermissions()
+    /**
+     * Ask for the launch permissions again: the mic (push to talk without it), or with
+     * [forGlasses] Nearby devices too (the user said "connect" with it off).
+     */
+    fun askAppPermissions(forGlasses: Boolean = false)
   }
 
   data class Ui(
@@ -56,6 +73,8 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
       val micGranted: Boolean = false,
       val heard: String? = null,
       val said: String? = null,
+      /** The push-to-talk mic is waiting for its one command. */
+      val pushToTalk: Boolean = false,
   )
 
   private val _ui = MutableStateFlow(Ui())
@@ -73,6 +92,14 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
   private var tickJob: Job? = null
   private var watchdog: Job? = null
   private var launchedTool: String? = null
+  private val mode = HandsFreeStore.get(application)
+  /** Launched voice-first (a tool's launcher entry, deep link or extra): talk even in the toolbox. */
+  private var voiceFirstVisit = false
+  private var oneShot: Job? = null
+
+  /** The conversation runs: hands-free, or a voice-first visit. */
+  private val conversing: Boolean
+    get() = HandsFreeRules.effective(mode.handsFree, voiceFirstVisit).setupConversation
 
   // Speech in progress: only the latest utterance's continuation runs.
   private var sequence = 0
@@ -123,7 +150,77 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
   /** Launched voice-first into a tool ("open Mail Reader") before setup: the welcome names it. */
   fun setLaunchedTool(name: String?) {
     launchedTool = name
+    if (name != null) voiceFirstVisit = true
   }
+
+  /** Launched through a hands-free entry point (speakup://handsfree, the shortcut, the extra). */
+  fun setVoiceFirstVisit(on: Boolean) {
+    voiceFirstVisit = voiceFirstVisit || on
+  }
+
+  /** True when this screen talks first (MainActivity speaks before Android's dialogs then). */
+  val talksFirst: Boolean
+    get() = conversing
+
+  /**
+   * The setup screen's hands-free switch (or "hands-free on/off" heard). On: says so, then the
+   * conversation starts. Off: says so, and the mic goes off until the next tap.
+   */
+  fun setHandsFree(on: Boolean) {
+    val change = HandsFreeRules.change(conversing, on)
+    mode.setHandsFree(on)
+    if (!on) voiceFirstVisit = false
+    Log.i(TAG, "hands-free $change")
+    if (on) {
+      val line = if (change == ModeChange.ALREADY_ON) R.string.hf_already_on else R.string.hf_turned_on
+      speak(app.getString(line)) {
+        if (!flow.greeted) run(flow.ready(now())) else startListening()
+        startTicking()
+      }
+    } else {
+      tickJob?.cancel()
+      stopListening()
+      val line = if (change == ModeChange.ALREADY_OFF) R.string.hf_already_off else R.string.hf_setup_off
+      speak(app.getString(line)) {}
+    }
+  }
+
+  /**
+   * Push to talk: listen for one command on the phone's mic (there's no glasses session before
+   * setup), then handle it as if heard in the conversation. A second tap cancels.
+   */
+  fun listenOnce() {
+    if (oneShot?.isActive == true) {
+      oneShot?.cancel()
+      return
+    }
+    if (flow.mic != PermState.GRANTED) {
+      host?.askAppPermissions()
+      return
+    }
+    stopSpeaking()
+    stopListening()
+    oneShot =
+        viewModelScope.launch {
+          _ui.update { it.copy(pushToTalk = true) }
+          val input = PhoneSpeechInput(app, viewModelScope)
+          try {
+            input.start()
+            _ui.update { it.copy(listening = input.state.value != VoiceState.UNAVAILABLE) }
+            val heard =
+                kotlinx.coroutines.withTimeoutOrNull(ONE_SHOT_MS) {
+                  input.utterances.first { it.isFinal && it.text.isNotBlank() }
+                }
+            input.stop()
+            _ui.update { it.copy(pushToTalk = false, listening = false) }
+            if (heard == null) speak(app.getString(R.string.hf_ptt_nothing)) {} else hear(heard.text)
+          } finally {
+            input.stop()
+            _ui.update { it.copy(pushToTalk = false, listening = false) }
+          }
+        }
+  }
+
 
   /** From MainActivity after each launch permission check. */
   fun onPermissions(bluetooth: PermState, mic: PermState) {
@@ -149,7 +246,17 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
     Log.i(TAG, "heard \"$text\"")
     _ui.update { it.copy(heard = text) }
     if (host == null) return
+    GlobalGrammar.parseMode(text)?.let {
+      setHandsFree(it.on)
+      return
+    }
     run(flow.heard(text, now()))
+  }
+
+  /** The "Use my phone's camera" button was pressed: stop talking, the tools open. */
+  fun usePhoneTapped() {
+    stopSpeaking()
+    stopListening()
   }
 
   /** The Connect button was pressed (TalkBack or sighted help): register now, no speech first. */
@@ -165,6 +272,8 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
    */
   fun announce(text: String) {
     if (text == app.getString(R.string.setup_bluetooth_denied)) return
+    // The toolbox shows errors; TalkBack reads them. Only hands-free speaks them.
+    if (!conversing) return
     if (host != null) run(flow.error(text))
     else speak(text) { if (host == null) releaseSpeaker() }
   }
@@ -175,7 +284,7 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
   // MARK: - Conversation
 
   private fun maybeGreet() {
-    if (host == null || !foreground || !permissionsKnown) return
+    if (host == null || !foreground || !permissionsKnown || !conversing) return
     if (flow.greeted && !cameBack) return
     if (greetJob?.isActive == true) return
     greetJob =
@@ -190,7 +299,7 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
   }
 
   private fun startTicking() {
-    if (host == null || !foreground || tickJob?.isActive == true) return
+    if (host == null || !foreground || tickJob?.isActive == true || !conversing) return
     tickJob =
         viewModelScope.launch {
           while (isActive) {
@@ -213,11 +322,12 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
     val h = host ?: return
     when (next) {
       Next.LISTEN -> startListening()
+      Next.USE_PHONE -> h.usePhone()
       Next.START_REGISTRATION -> {
         flow.registrationStarted(now())
         h.startRegistration()
       }
-      Next.ASK_PERMISSIONS -> h.askAppPermissions()
+      Next.ASK_PERMISSIONS -> h.askAppPermissions(forGlasses = true)
       Next.OPEN_SETTINGS -> h.openAppSettings()
       Next.QUIT -> h.quitApp()
     }
@@ -231,14 +341,17 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
         say.line == SetupLine.WELCOME ||
             say.line == SetupLine.WELCOME_NO_MIC ||
             say.line == SetupLine.WELCOME_NO_BLUETOOTH
-    return if (isWelcome && tool != null) app.getString(R.string.setup_tool_first, tool) + " " + text
-    else text
+    // First run with TalkBack: "Hands-free is on. Say hands-free off for touch only." once.
+    val first = if (isWelcome && mode.takeAnnouncement()) app.getString(R.string.hf_first_run) + " " else ""
+    return first +
+        if (isWelcome && tool != null) app.getString(R.string.setup_tool_first, tool) + " " + text else text
   }
 
   @StringRes
   private fun resFor(line: SetupLine): Int =
       when (line) {
         SetupLine.WELCOME -> R.string.setup_welcome
+        SetupLine.USING_PHONE -> R.string.setup_using_phone
         SetupLine.WELCOME_NO_MIC -> R.string.setup_welcome_no_mic
         SetupLine.WELCOME_NO_BLUETOOTH -> R.string.setup_welcome_no_bluetooth
         SetupLine.RESUMED -> R.string.setup_resumed
@@ -320,6 +433,8 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
 
   private fun startListening() {
     if (host == null || !foreground || flow.mic != PermState.GRANTED || currentTag != null) return
+    // The toolbox listens only on a tap (listenOnce).
+    if (!conversing) return
     val v = voice ?: PhoneSpeechInput(app, viewModelScope).also { created ->
       voice = created
       voiceJobs +=
@@ -357,5 +472,6 @@ class SetupVoice(application: Application) : AndroidViewModel(application), Tool
     const val MAX_SPOKEN = 50
     const val WATCHDOG_BASE_MS = 4_000L
     const val WATCHDOG_PER_CHAR_MS = 90L
+    const val ONE_SHOT_MS = 8_000L
   }
 }

@@ -12,19 +12,21 @@ enum SpokenMessage {
   // The one first-run screen (OnboardingView). Spoken together when it appears; the screen shows
   // the same words.
 
-  static let welcomeIntro = "Hi, I'm SpeakUp. I read printed pages out loud through your glasses."
+  static let welcomeIntro = "Hi, I'm SpeakUp. I read printed pages out loud, with your iPhone's camera or with Meta glasses."
 
   /// The core of `disclaimer`, short enough to say on the first screen.
   static let safetyNote = "I can make mistakes, so don't rely on me for medicine doses, money or finding your way."
 
+  /// Two first-class choices (V0 "Glasses optional"): the phone needs nothing else; the glasses go
+  /// through Meta AI.
   static let welcomeConnect =
-    "First, let's connect your glasses. I'll open the Meta AI app: choose Connect there, then come back. Say connect, or tap Connect glasses."
+    "Start now with your iPhone's camera: say phone, or tap Use my iPhone's camera. Have Meta glasses? Say connect, or tap Connect glasses, and choose Connect in Meta AI."
 
   /// Replay setup with the glasses already connected.
   static let welcomeAlreadyConnected = "Your glasses are already connected. Say continue, or tap Start reading."
 
   /// After the reason a connection didn't finish (WearablesViewModel says that part).
-  static let welcomeRetry = "Your glasses aren't connected yet. Say try again, or tap Try again."
+  static let welcomeRetry = "Your glasses aren't connected yet. Say try again, or say phone to use your iPhone's camera."
 
   /// Added to "Connected to …" when connecting finishes setup.
   static let connectedNext = "Hold up a page and say read."
@@ -32,7 +34,8 @@ enum SpokenMessage {
   /// Setup finished without a fresh "Connected to …" line (already connected).
   static let setupConnected = "You're connected. Hold up a page and say read."
 
-  static let setupNotNow = "OK. You can connect your glasses any time. Say connect when you're ready."
+  /// Setup finished with the iPhone's camera (the first screen's phone choice, or "not now").
+  static let setupUsePhone = "Using your iPhone's camera. Hold the phone over a page and say read."
 
   /// Detected after connecting, instead of a speaker test.
   static let soundOnPhoneSpeaker =

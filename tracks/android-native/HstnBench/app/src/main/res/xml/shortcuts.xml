@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcuts (long-press the SpeakUp icon). "Hands-free" opens straight into hands-free mode
+     and switches it on, through the same deep link as everything else: speakup://handsfree. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="handsfree"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/hf_shortcut_short"
+        android:shortcutLongLabel="@string/hf_shortcut_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="speakup://handsfree"
+            android:targetClass="com.meta.wearable.dat.externalsampleapps.cameraaccess.MainActivity"
+            android:targetPackage="com.deaco.hstnbench" />
+    </shortcut>
+</shortcuts>

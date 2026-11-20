@@ -86,7 +86,7 @@ final class ThemeTourUITests: XCTestCase {
     shot("03-waiting-for-glasses", settle: 0.8, scrolled: true)
 
     tap("settings_button", before: nil)
-    XCTAssertTrue(app.buttons["voice_control_toggle"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.switches["hands_free_toggle"].waitForExistence(timeout: 5))
     shot("04-settings", scrolled: true)
     scrollToTop()
     tap("settings_button", before: nil)

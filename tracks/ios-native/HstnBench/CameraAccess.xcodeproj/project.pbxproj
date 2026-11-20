@@ -16,6 +16,7 @@
 		8FD96B952E6F0F7D00F56AB2 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = 8FD96B942E6F0F7D00F56AB2 /* MWDATCamera */; };
 		8FD96B952E6F0F7D00F56AB3 /* MWDATMockDevice in Frameworks */ = {isa = PBXBuildFile; productRef = 8FD96B942E6F0F7D00F56AB3 /* MWDATMockDevice */; };
 		8FD96B952E6F0F7D00F56AB4 /* MWDATSpeech in Frameworks */ = {isa = PBXBuildFile; productRef = 8FD96B942E6F0F7D00F56AB4 /* MWDATSpeech */; };
+		8FD96B952E6F0F7D00F56AB5 /* MWDATDisplay in Frameworks */ = {isa = PBXBuildFile; productRef = 8FD96B942E6F0F7D00F56AB5 /* MWDATDisplay */; };
 		E66CC01D2F3E1A9300B07380 /* MWDATMockDeviceTestClient in Frameworks */ = {isa = PBXBuildFile; productRef = E66CC01E2F3E1A9300B07380 /* MWDATMockDeviceTestClient */; };
 		8FFD5FF52E8422580035E446 /* CircleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD5FF22E8422580035E446 /* CircleButton.swift */; };
 		8FFD5FF62E8422580035E446 /* CustomButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD5FF32E8422580035E446 /* CustomButton.swift */; };
@@ -35,6 +36,16 @@
 		D7A0000000000000000000A8 /* VideoFrameDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A0000000000000000000A7 /* VideoFrameDecoder.swift */; };
 		B3C4000000000000000000A2 /* BenchClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4000000000000000000A1 /* BenchClock.swift */; };
 		D7A0000000000000000000B2 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A0000000000000000000B1 /* CameraView.swift */; };
+		5B0A00000000000000000021 /* CameraAccessApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FD96B792E6F0A9800F56AB1 /* CameraAccessApp.swift */; };
+		5B0A00000000000000000022 /* HomeScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FD96B722E6F0A9800F56AB1 /* HomeScreenView.swift */; };
+		5B0A00000000000000000023 /* MainAppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD605F2E84A2F70035E446 /* MainAppView.swift */; };
+		5B0A00000000000000000024 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A0000000000000000000B1 /* CameraView.swift */; };
+		5B0A00000000000000000025 /* BenchClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4000000000000000000A1 /* BenchClock.swift */; };
+		5B0A00000000000000000026 /* CircleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD5FF22E8422580035E446 /* CircleButton.swift */; };
+		5B0A00000000000000000027 /* CustomButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD5FF32E8422580035E446 /* CustomButton.swift */; };
+		5B0A00000000000000000028 /* TipRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE0000000000000000FA01 /* TipRow.swift */; };
+		5B0A00000000000000000029 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8FD96B772E6F0A9800F56AB1 /* Assets.xcassets */; };
+		5E0A00000000000000000016 /* SpeakUpShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5E0A00000000000000000002 /* SpeakUpShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,6 +63,13 @@
 			remoteGlobalIDString = 8A8A8A8A8A8A8A8A8A8A8A8A;
 			remoteInfo = CameraAccess;
 		};
+		5E0A00000000000000000017 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CCCCCCCCCCCCCCCCCCCCCC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5E0A00000000000000000001;
+			remoteInfo = "SpeakUp Share";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -63,6 +81,17 @@
 			files = (
 			);
 			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E0A00000000000000000015 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5E0A00000000000000000016 /* SpeakUpShare.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -97,12 +126,37 @@
 		B3C4000000000000000000A1 /* BenchClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchClock.swift; sourceTree = "<group>"; };
 		D7A0000000000000000000B1 /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		C0F1C0F1C0F1C0F1C0F10001 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		5B0A00000000000000000002 /* SpeakUp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SpeakUp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B0A00000000000000000010 /* SpeakUp-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "SpeakUp-Info.plist"; sourceTree = "<group>"; };
+		5E0A00000000000000000002 /* SpeakUpShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SpeakUpShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E0A00000000000000000012 /* SpeakUp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SpeakUp.entitlements; sourceTree = "<group>"; };
+		5E0A00000000000000000013 /* SpeakUpShare-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "SpeakUpShare-Info.plist"; sourceTree = "<group>"; };
+		5E0A00000000000000000014 /* SpeakUpShare.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SpeakUpShare.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5B0A00000000000000000009 /* Exceptions for "A11y" folder in "SpeakUp" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Glasses/DATGlassesLink.swift,
+				HandsFree/DATGlassesDisplay.swift,
+				"Main/CameraViewModel+Status.swift",
+				Main/CameraProblem.swift,
+				"Read/CameraViewModel+Read.swift",
+				Read/Fixtures/read_page.mp4,
+				Read/Fixtures/read_page.png,
+				Voice/GlassesSpeechListener.swift,
+			);
+			target = 5B0A00000000000000000001 /* SpeakUp */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A11A0000000000000000000F /* A11y */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = A11y; sourceTree = "<group>"; };
+		A11A0000000000000000000F /* A11y */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (5B0A00000000000000000009 /* Exceptions for "A11y" folder in "SpeakUp" target */, ); explicitFileTypes = {}; explicitFolders = (); path = A11y; sourceTree = "<group>"; };
 		E66CC00E2F3E05D900B07379 /* CameraAccessUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CameraAccessUITests; sourceTree = "<group>"; };
 		E699CC962E8150670052C240 /* CameraAccessTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CameraAccessTests; sourceTree = "<group>"; };
+		5E0A00000000000000000010 /* SpeakUpShare */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = SpeakUpShare; sourceTree = "<group>"; };
+		5E0A00000000000000000011 /* SpeakUpShared */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = SpeakUpShared; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -114,6 +168,7 @@
 				8FD96B952E6F0F7D00F56AB2 /* MWDATCamera in Frameworks */,
 				8FD96B952E6F0F7D00F56AB3 /* MWDATMockDevice in Frameworks */,
 				8FD96B952E6F0F7D00F56AB4 /* MWDATSpeech in Frameworks */,
+				8FD96B952E6F0F7D00F56AB5 /* MWDATDisplay in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -122,6 +177,20 @@
 			buildActionMask = 2147483647;
 			files = (
 				E66CC01D2F3E1A9300B07380 /* MWDATMockDeviceTestClient in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B0A00000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E0A00000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -137,6 +206,8 @@
 				7A7A7A7A7A7A7A7A7A7A7A7A /* Products */,
 				E699CC962E8150670052C240 /* CameraAccessTests */,
 				C0F1C0F1C0F1C0F1C0F10002 /* Config */,
+				5E0A00000000000000000011 /* SpeakUpShared */,
+				5E0A00000000000000000010 /* SpeakUpShare */,
 			);
 			sourceTree = "<group>";
 		};
@@ -146,6 +217,8 @@
 				3A3A3A3A3A3A3A3A3A3A3A3A /* CameraAccess.app */,
 				E699CC952E8150670052C240 /* CameraAccessTests.xctest */,
 				E66CC00D2F3E05D900B07379 /* CameraAccessUITests.xctest */,
+				5B0A00000000000000000002 /* SpeakUp.app */,
+				5E0A00000000000000000002 /* SpeakUpShare.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -258,6 +331,10 @@
 			isa = PBXGroup;
 			children = (
 				C0F1C0F1C0F1C0F1C0F10001 /* Base.xcconfig */,
+				5B0A00000000000000000010 /* SpeakUp-Info.plist */,
+				5E0A00000000000000000012 /* SpeakUp.entitlements */,
+				5E0A00000000000000000013 /* SpeakUpShare-Info.plist */,
+				5E0A00000000000000000014 /* SpeakUpShare.entitlements */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -280,6 +357,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				A11A0000000000000000000F /* A11y */,
+				5E0A00000000000000000011 /* SpeakUpShared */,
 			);
 			name = CameraAccess;
 			productName = CameraAccess;
@@ -332,6 +410,54 @@
 			productReference = E699CC952E8150670052C240 /* CameraAccessTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		5B0A00000000000000000001 /* SpeakUp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5B0A00000000000000000006 /* Build configuration list for PBXNativeTarget "SpeakUp" */;
+			buildPhases = (
+				5B0A00000000000000000003 /* Sources */,
+				5B0A00000000000000000004 /* Frameworks */,
+				5B0A00000000000000000005 /* Resources */,
+				5E0A00000000000000000015 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5E0A00000000000000000018 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A11A0000000000000000000F /* A11y */,
+				5E0A00000000000000000011 /* SpeakUpShared */,
+			);
+			name = SpeakUp;
+			packageProductDependencies = (
+			);
+			productName = SpeakUp;
+			productReference = 5B0A00000000000000000002 /* SpeakUp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5E0A00000000000000000001 /* SpeakUp Share */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E0A00000000000000000006 /* Build configuration list for PBXNativeTarget "SpeakUp Share" */;
+			buildPhases = (
+				5E0A00000000000000000003 /* Sources */,
+				5E0A00000000000000000004 /* Frameworks */,
+				5E0A00000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5E0A00000000000000000010 /* SpeakUpShare */,
+				5E0A00000000000000000011 /* SpeakUpShared */,
+			);
+			name = "SpeakUp Share";
+			packageProductDependencies = (
+			);
+			productName = SpeakUpShare;
+			productReference = 5E0A00000000000000000002 /* SpeakUpShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -351,6 +477,12 @@
 					E699CC942E8150670052C240 = {
 						CreatedOnToolsVersion = 26.0;
 						TestTargetID = 8A8A8A8A8A8A8A8A8A8A8A8A;
+					};
+					5B0A00000000000000000001 = {
+						CreatedOnToolsVersion = 27.2;
+					};
+					5E0A00000000000000000001 = {
+						CreatedOnToolsVersion = 27.2;
 					};
 				};
 			};
@@ -373,6 +505,8 @@
 				8A8A8A8A8A8A8A8A8A8A8A8A /* CameraAccess */,
 				E699CC942E8150670052C240 /* CameraAccessTests */,
 				E66CC00C2F3E05D900B07379 /* CameraAccessUITests */,
+				5B0A00000000000000000001 /* SpeakUp */,
+				5E0A00000000000000000001 /* SpeakUp Share */,
 			);
 		};
 /* End PBXProject section */
@@ -396,6 +530,21 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		E699CC932E8150670052C240 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5B0A00000000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5B0A00000000000000000029 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E0A00000000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -446,6 +595,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5B0A00000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5B0A00000000000000000021 /* CameraAccessApp.swift in Sources */,
+				5B0A00000000000000000022 /* HomeScreenView.swift in Sources */,
+				5B0A00000000000000000023 /* MainAppView.swift in Sources */,
+				5B0A00000000000000000024 /* CameraView.swift in Sources */,
+				5B0A00000000000000000025 /* BenchClock.swift in Sources */,
+				5B0A00000000000000000026 /* CircleButton.swift in Sources */,
+				5B0A00000000000000000027 /* CustomButton.swift in Sources */,
+				5B0A00000000000000000028 /* TipRow.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E0A00000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -458,6 +629,11 @@
 			isa = PBXTargetDependency;
 			target = 8A8A8A8A8A8A8A8A8A8A8A8A /* CameraAccess */;
 			targetProxy = E699CC992E8150670052C240 /* PBXContainerItemProxy */;
+		};
+		5E0A00000000000000000018 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5E0A00000000000000000001 /* SpeakUp Share */;
+			targetProxy = 5E0A00000000000000000017 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -741,6 +917,114 @@
 			};
 			name = Release;
 		};
+		5B0A00000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0F1C0F1C0F1C0F1C0F10001 /* Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/SpeakUp.entitlements;
+				INFOPLIST_FILE = "Config/SpeakUp-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deaco.speakup;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "SPEAKUP_NO_DAT $(inherited)";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5B0A00000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0F1C0F1C0F1C0F1C0F10001 /* Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/SpeakUp.entitlements;
+				INFOPLIST_FILE = "Config/SpeakUp-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deaco.speakup;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "SPEAKUP_NO_DAT $(inherited)";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		5E0A00000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/SpeakUpShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Config/SpeakUpShare-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deaco.speakup.share;
+				PRODUCT_NAME = SpeakUpShare;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "SPEAKUP_SHARE_EXTENSION DEBUG $(inherited)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5E0A00000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/SpeakUpShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Config/SpeakUpShare-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.deaco.speakup.share;
+				PRODUCT_NAME = SpeakUpShare;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "SPEAKUP_SHARE_EXTENSION $(inherited)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -780,6 +1064,24 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		5B0A00000000000000000006 /* Build configuration list for PBXNativeTarget "SpeakUp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5B0A00000000000000000007 /* Debug */,
+				5B0A00000000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5E0A00000000000000000006 /* Build configuration list for PBXNativeTarget "SpeakUp Share" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E0A00000000000000000007 /* Debug */,
+				5E0A00000000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -813,6 +1115,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 95F7F3332DEF0D91006D1C1A /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
 			productName = MWDATSpeech;
+		};
+		8FD96B942E6F0F7D00F56AB5 /* MWDATDisplay */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 95F7F3332DEF0D91006D1C1A /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATDisplay;
 		};
 		E66CC01E2F3E1A9300B07380 /* MWDATMockDeviceTestClient */ = {
 			isa = XCSwiftPackageProductDependency;

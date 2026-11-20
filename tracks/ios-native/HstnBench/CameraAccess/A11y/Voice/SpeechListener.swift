@@ -60,11 +60,14 @@ enum VoicePermission: Equatable, Sendable {
 enum VoicePauseReason: String, Equatable, Sendable {
   case background
   case interrupted
+  /// "Goodbye": the user ended the session by voice (VoiceControl.endSession).
+  case sessionEnded
 
   var text: String {
     switch self {
     case .background: "Paused while the app is in the background."
     case .interrupted: "Paused by a call or another app."
+    case .sessionEnded: "SpeakUp has stopped. Tap Start again, or leave the app and come back."
     }
   }
 }
@@ -85,6 +88,8 @@ enum VoiceListenerPolicy {
     var enabled = true
     var inBackground = false
     var interrupted = false
+    /// The user said goodbye. Stays off until they come back or tap Start again.
+    var sessionEnded = false
     /// A device session is STARTED and Speech is allowed by the feature flag.
     var glassesAvailable = false
     /// The wearable MICROPHONE permission (a Meta AI grant, separate from the phone's).
@@ -99,6 +104,7 @@ enum VoiceListenerPolicy {
 
   static func decide(_ inputs: Inputs) -> VoiceListenerDecision {
     guard inputs.enabled else { return .off }
+    if inputs.sessionEnded { return .paused(.sessionEnded) }
     if inputs.inBackground { return .paused(.background) }
     if inputs.interrupted { return .paused(.interrupted) }
     if inputs.glassesAvailable, inputs.glassesMicGranted, !inputs.glassesCoolingOff { return .glasses }
