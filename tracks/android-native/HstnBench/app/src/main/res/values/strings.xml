@@ -27,6 +27,7 @@
     <string name="status_session" description="Session status chip label">Session</string>
     <string name="status_stream" description="Stream status chip label">Stream</string>
     <string name="unregister_button_title" description="Disconnect App">Disconnect</string>
+    <string name="customise_button" description="Button on the camera screen that opens the settings screen">Make it your own: settings</string>
 
     <!-- Placeholder states -->
     <string name="placeholder_put_on_glasses" description="Placeholder when no active device">Put on your glasses</string>

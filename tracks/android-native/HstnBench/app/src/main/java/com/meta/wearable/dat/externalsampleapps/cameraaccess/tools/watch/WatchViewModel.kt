@@ -83,8 +83,6 @@ class WatchViewModel(application: Application, hub: ToolHub) :
     const val DEFAULT_TICK_S = 10
     /** Tick choices the screen button cycles through (0 = off). */
     val TICK_CHOICES = listOf(10, 20, 30, 0)
-    private const val PREFS = "tools"
-    private const val KEY_TICK = "watch_tick_seconds"
     /** No processed frame for this long while streaming: say so. */
     private const val NO_FRAMES_MS = 10_000L
     /** Ticks only while frames are arriving. */
@@ -93,9 +91,9 @@ class WatchViewModel(application: Application, hub: ToolHub) :
     private const val MAX_ANSWER_WORDS = 4
   }
 
-  private val prefs = application.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-  private val _watch = MutableStateFlow(WatchUi(tickSeconds = prefs.getInt(KEY_TICK, DEFAULT_TICK_S)))
+  // The tick interval lives in the settings store (sounds.watchTickSeconds).
+  private val _watch = MutableStateFlow(WatchUi(tickSeconds = hub.settings.current.sounds.watchTickSeconds))
   val watch: StateFlow<WatchUi> = _watch.asStateFlow()
 
   private var target: WatchTarget? = null
@@ -328,7 +326,9 @@ class WatchViewModel(application: Application, hub: ToolHub) :
   }
 
   private fun setTicks(seconds: Int, spoken: Boolean) {
-    prefs.edit().putInt(KEY_TICK, seconds).apply()
+    hub.settings.change(if (seconds == 0) "watch ticks off" else "watch ticks every $seconds seconds", keep = true) {
+      it.copy(sounds = it.sounds.copy(watchTickSeconds = seconds))
+    }
     _watch.update { it.copy(tickSeconds = seconds) }
     if (spoken) hub.reply(if (seconds == 0) str(R.string.watch_ticks_off) else str(R.string.watch_ticks_every, seconds))
   }
@@ -446,6 +446,14 @@ class WatchViewModel(application: Application, hub: ToolHub) :
       when (event) {
         is WatchEvent.Appeared -> {
           hub.earcons.play(Earcon.FOUND)
+          // A direction cue: on its side in stereo, a pitch for "I use mono"; the words say it too.
+          hub.tones.cue(
+              when (Position.side(event.spot.x)) {
+                Side.LEFT -> -1f
+                Side.AHEAD -> 0f
+                Side.RIGHT -> 1f
+              },
+          )
           val line = str(R.string.watch_seen, t.display, placeOf(event.spot))
           hub.hush()
           say(line)

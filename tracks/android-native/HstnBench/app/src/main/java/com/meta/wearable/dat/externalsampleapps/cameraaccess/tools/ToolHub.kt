@@ -17,6 +17,11 @@
 //   switching  "read my mail" in any tool: the old tool's onLeaving (the book saves its bookmark),
 //              "Mail reader.", the new tool attaches. The DAT session, stream and mic stay up.
 //   ask        GlobalCommand.Ask -> AskAboutText with the tool's RecentText -> spoken answer.
+//   settings   "Make it your own" (notes/customisation-android.md): the SettingsStore drives the
+//              speaker, earcons, tones and reminders; SettingsGrammar runs after the tool's grammar
+//              (first, while trying voices or answering a question); shortcuts are rewritten
+//              before anything; conversation mode silences speech until "carry on"; glasses
+//              controls (Experimental) run mapped commands.
 //   home       the home voice menu: with home=true, voice runs for the whole camera screen, not just
 //              while a tool is open. With no tool open, transcripts go to GlobalGrammar.parseHome
 //              ("read my mail" opens it, "what can I say", "close the app" leaves). "Main menu" in
@@ -70,6 +75,17 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.PhoneSna
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.RecentText
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolId
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolRequest
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.AudioMath
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsCommand
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsEnv
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsPrefs
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsStore
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsVoice
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Setup
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SetupSpeech
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Shortcuts
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.VoiceChoice
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Words
 import java.util.Locale
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.GlassesCard
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.HandsFreePolicy
@@ -109,8 +125,7 @@ class ToolHub(
 
   companion object {
     private const val TAG = "ToolHub"
-    private const val PREFS = "tools"
-    private const val KEY_RATE = "speech_rate"
+    private const val MACRO_STEP_WAIT_MS = 8_000L
     private const val LINK_WAIT_MS = 20_000L
     /** The phone camera opens in well under a second; this covers a slow first bind. */
     private const val PHONE_WAIT_MS = 6_000L
@@ -141,7 +156,9 @@ class ToolHub(
     @Volatile @JvmStatic var homeMenuEnabled: Boolean = true
   }
 
-  private val prefs = application.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+  /** Every "Make it your own" setting (shared with the book reader and the settings screen). */
+  val settings: SettingsStore = SettingsPrefs.store(application)
+  private val settingsPrefs = SettingsPrefs.prefs(application)
 
   /** The saved mode and the settings hands-free can change by voice. */
   val mode: HandsFreeStore = HandsFreeStore.get(application)
@@ -200,7 +217,8 @@ class ToolHub(
 
   private val voice = VoiceControl(application, viewModelScope)
   private val echo = EchoGuard()
-  private val nudge = IdleNudge()
+  private var nudgeGaps = settings.current.tips.reminderGapsMs()
+  private var nudge = IdleNudge(nudgeGaps)
   private val watch = GlassesWatch(application)
   private val health = HealthMonitor()
 
@@ -247,9 +265,62 @@ class ToolHub(
   var streamLost = false
     private set
 
-  /** The shared tools speech rate (tools that don't keep their own; see ToolHost.speechRate). */
-  var sharedRate: Float = prefs.getFloat(KEY_RATE, 1f)
-    private set
+  /** The main speech rate (tools without an override of their own). */
+  val sharedRate: Float
+    get() = settings.current.rateFor(null)
+
+  /** Settings by voice: commands, replies, trying voices, conversation mode. */
+  val settingsVoice =
+      SettingsVoice(
+          settings,
+          object : SettingsEnv {
+            override fun voices(): List<VoiceChoice> = speaker.voices()
+
+            override fun languageName(): String = speaker.languageName()
+
+            override val controlsAvailable: Boolean
+              get() = true
+          },
+      )
+
+  private val _showSettings = MutableStateFlow(false)
+  /** "Open settings" by voice: the camera screen shows the settings screen. */
+  val showSettings: StateFlow<Boolean> = _showSettings.asStateFlow()
+
+  fun setShowSettings(show: Boolean) {
+    _showSettings.value = show
+  }
+
+  /** What the settings screen shows. */
+  data class SettingsView(
+      val setup: Setup,
+      val unkept: Boolean,
+      val locked: Boolean,
+      val profile: String,
+      val profiles: List<String>,
+      val canUndo: Boolean,
+      val lastChange: String?,
+  )
+
+  private fun settingsViewNow() =
+      SettingsView(
+          settings.current, settings.hasUnkept, settings.locked, settings.activeProfile,
+          settings.profiles.keys.toList(), settings.canUndo, settings.lastChange,
+      )
+
+  private val _settingsView = MutableStateFlow(settingsViewNow())
+  val settingsView: StateFlow<SettingsView> = _settingsView.asStateFlow()
+
+  /** Set by the camera screen: opens the share sheet with the setup ("share my setup"). */
+  var onShareSetup: ((json: String, code: String) -> Unit)? = null
+
+  /** The experimental audio bus, while switched on (SettingsPrefs.audioBus). */
+  private var bus: AudioBus? = null
+
+  /** Glasses buttons (Experimental), attached while streaming with controls on. */
+  private val controls = GlassesControls(viewModelScope) { key -> runControl(key) }
+  private var macroJob: Job? = null
+  private val settingsListener: (Setup) -> Unit = { applySettings() }
 
   private val _homeHeard = MutableStateFlow("")
   /** The last thing heard in the home menu (for the camera screen). */
@@ -310,9 +381,20 @@ class ToolHub(
 
   /** "Short/normal/detailed answers". Tools that can say more or less read this. */
   val verbosity: Verbosity
-    get() = mode.settings.value.verbosity
+    get() = Verbosity.valueOf(settings.current.verbosityFor(host?.toolId?.id).name)
 
   init {
+    settings.addListener(settingsListener)
+    earcons.speakInstead = { _, word ->
+      if (settingsVoice.conversation) false
+      else {
+        speaker.speak(word, "~earcon")
+        true
+      }
+    }
+    applySettings()
+    // Glasses controls follow the stream (they need a started session).
+    viewModelScope.launch { camera.isStreaming.collect { updateControls() } }
     // A fold or session end stops the stream; the open tool decides whether that matters. With no
     // tool open only hands-free mode reconnects by itself; "disconnect" means stay disconnected.
     viewModelScope.launch {
@@ -479,7 +561,12 @@ class ToolHub(
     if (cutOff) hush()
     _homeHeard.value = ""
     // The toolbox shows the menu; only hands-free says it (screen changes are narrated).
-    if (policy.narrateStartup) homeSay(str(R.string.home_back)) else _homeStatus.value = ""
+    if (policy.narrateStartup) {
+      _homeStatus.value = str(R.string.home_back)
+      sayFamiliar(str(R.string.home_back), Earcon.SWITCH)
+    } else {
+      _homeStatus.value = ""
+    }
   }
 
   /**
@@ -519,7 +606,7 @@ class ToolHub(
     host = tool
     hostRequest = request
     attached.value = tool
-    (tool.speechRate() ?: sharedRate).let { speaker.setRate(it) }
+    applySettings()
     engineAvailable?.let { tool.onEngineState(it) }
     tool.onAttached(request)
     // The phone camera is cheap to open: have it live behind any tool (the toolbox doesn't start
@@ -536,7 +623,7 @@ class ToolHub(
       } else if (policy.narrateStartup) {
         // A tool tapped open in the toolbox doesn't announce itself (its screen does); it still
         // speaks its results.
-        sayAside(tool.texts().welcome)
+        sayAside(brief(tool.texts().welcome))
       }
       tool.onOpened(request, reason)
     }
@@ -638,7 +725,7 @@ class ToolHub(
               ready = { (host ?: first).texts().ready },
           )
         } else {
-          sayAside(first.texts().welcome)
+          sayAside(brief(first.texts().welcome))
         }
         host?.let { h -> hostRequest?.let { h.onOpened(it, pendingReason) } }
       }
@@ -915,22 +1002,64 @@ class ToolHub(
    * speech are dropped; partials go to the tool (barge-in); a final transcript goes to the tool's
    * grammar, then the global one.
    */
-  fun onUtterance(text: String, isFinal: Boolean) {
+  fun onUtterance(text: String, isFinal: Boolean) = onUtterance(text, isFinal, fromShortcut = false)
+
+  private fun onUtterance(heard: String, isFinal: Boolean, fromShortcut: Boolean, checkEcho: Boolean = !fromShortcut) {
     val now = SystemClock.elapsedRealtime()
-    if (echo.isEcho(text, now)) {
-      if (isFinal) Log.i(TAG, "voice echo ignored: \"$text\"")
+    if (checkEcho && echo.isEcho(heard, now)) {
+      if (isFinal) Log.i(TAG, "voice echo ignored: \"$heard\"")
       return
     }
-    dispatch(text, isFinal, now)
+    // Conversation mode: someone is talking to the user. Only "carry on" counts.
+    if (settingsVoice.conversation) {
+      if (isFinal && settingsVoice.parse(heard) == SettingsCommand.ConversationEnd) {
+        nudge.userActed(now)
+        runSettings(SettingsCommand.ConversationEnd)
+      } else if (isFinal) {
+        Log.i(TAG, "conversation mode, ignored: \"$heard\"")
+      }
+      return
+    }
+    val text = withoutAddress(heard)
+    if (isFinal && !fromShortcut) {
+      when (val r = Shortcuts.rewrite(text, settings.current.words)) {
+        is Shortcuts.Rewrite.Alias -> {
+          Log.i(TAG, "shortcut \"${r.phrase}\" -> \"${r.command}\"")
+          if (isHome) _homeHeard.value = text else host?.onHeard(text)
+          onUtterance(r.command, true, fromShortcut = true)
+          return
+        }
+        is Shortcuts.Rewrite.Macro -> {
+          if (isHome) _homeHeard.value = text else host?.onHeard(text)
+          runMacro(r.name, r.steps)
+          return
+        }
+        null -> Unit
+      }
+    }
+    // A settings conversation (trying voices, a yes/no question) takes its short words first.
+    if (isFinal) {
+      val ctx = settingsVoice.context
+      if (ctx.tryingVoices || ctx.question) {
+        val cmd = settingsVoice.parse(text)
+        if (cmd != null) {
+          nudge.userActed(now)
+          if (isHome) _homeHeard.value = text else host?.onHeard(text)
+          runSettings(cmd)
+          return
+        }
+      }
+    }
+    dispatch(text, isFinal, now, fromShortcut)
   }
 
   /**
    * A command that didn't come from the open mic (push to talk, a glasses-display button): the same
-   * grammar and handling, without the echo check.
+   * grammar and handling (shortcuts, conversation mode, settings), without the echo check.
    */
-  fun runCommand(text: String) = dispatch(text, isFinal = true, now = SystemClock.elapsedRealtime())
+  fun runCommand(text: String) = onUtterance(text, true, fromShortcut = false, checkEcho = false)
 
-  private fun dispatch(text: String, isFinal: Boolean, now: Long) {
+  private fun dispatch(text: String, isFinal: Boolean, now: Long, fromShortcut: Boolean) {
     if (isFinal) {
       cardHeard = text
       updateCard()
@@ -946,8 +1075,14 @@ class ToolHub(
     }
     // Even speech that isn't a command means the user is there: no reminder needed yet.
     nudge.userActed(now)
-    h.onHeard(text)
+    if (!fromShortcut) h.onHeard(text)
     if (h.onCommand(text)) return
+    val settingsCommand = settingsVoice.parse(text)
+    if (settingsCommand != null) {
+      Log.i(TAG, "voice heard=\"$text\" tool=${h.toolId.id} settings=$settingsCommand")
+      runSettings(settingsCommand)
+      return
+    }
     val command = GlobalGrammar.parse(text)
     Log.i(TAG, "voice heard=\"$text\" tool=${h.toolId.id} global=$command")
     if (command == null) {
@@ -973,13 +1108,13 @@ class ToolHub(
       is GlobalCommand.Ask -> ask(command)
       GlobalCommand.Pause -> {
         hush()
-        sayAside(str(R.string.voice_paused))
+        sayFamiliar(str(R.string.voice_paused), Earcon.ACK)
       }
-      GlobalCommand.Resume -> reply(h.texts().welcome)
+      GlobalCommand.Resume -> reply(brief(h.texts().welcome))
       GlobalCommand.Repeat -> reply(lastSaid ?: h.texts().welcome)
-      is GlobalCommand.Faster -> changeSharedRate(sharedRate + command.step)
-      is GlobalCommand.Slower -> changeSharedRate(sharedRate - command.step)
-      is GlobalCommand.SetRate -> changeSharedRate(command.rate)
+      is GlobalCommand.Faster -> changeRate(h.toolId.id) { it + command.step }
+      is GlobalCommand.Slower -> changeRate(h.toolId.id) { it - command.step }
+      is GlobalCommand.SetRate -> changeRate(h.toolId.id) { command.rate }
       GlobalCommand.Help ->
           reply(if (hasHomeMenu) h.texts().help + " " + str(R.string.home_help_in_tool) else h.texts().help)
       GlobalCommand.Battery -> reply(batteryReport())
@@ -1004,8 +1139,15 @@ class ToolHub(
       GlobalCommand.Connect -> connectByVoice()
       GlobalCommand.Disconnect -> disconnectByVoice()
       is GlobalCommand.SetVerbosity -> {
-        mode.setVerbosity(command.verbosity)
-        reply(verbosityLine(command.verbosity))
+        // One verbosity: the settings store's (applySettings mirrors it into the mode store).
+        val r =
+            settingsVoice.handle(
+                SettingsCommand.SetVerbosity(
+                    com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Verbosity.valueOf(command.verbosity.name),
+                ),
+                host?.toolId?.id,
+            )
+        reply(if (settings.locked) r.text else verbosityLine(command.verbosity))
       }
       is GlobalCommand.GlassesDisplay -> setGlassesDisplay(command.on)
       is GlobalCommand.HandsFree -> setHandsFree(command.on)
@@ -1027,6 +1169,12 @@ class ToolHub(
     }
     nudge.userActed(now)
     _homeHeard.value = text
+    val settingsCommand = settingsVoice.parse(text)
+    if (settingsCommand != null) {
+      Log.i(TAG, "voice heard=\"$text\" tool=home settings=$settingsCommand")
+      runSettings(settingsCommand)
+      return
+    }
     val command = GlobalGrammar.parseHome(text)
     Log.i(TAG, "voice heard=\"$text\" tool=home global=$command")
     if (command != null && handleAnywhere(command)) return
@@ -1038,9 +1186,9 @@ class ToolHub(
       GlobalCommand.Pause -> hush()
       GlobalCommand.Resume, GlobalCommand.Home -> homeReply(homePrompt())
       GlobalCommand.Repeat -> homeReply(lastSaid ?: homePrompt())
-      is GlobalCommand.Faster -> changeSharedRate(sharedRate + command.step)
-      is GlobalCommand.Slower -> changeSharedRate(sharedRate - command.step)
-      is GlobalCommand.SetRate -> changeSharedRate(command.rate)
+      is GlobalCommand.Faster -> changeRate(null) { it + command.step }
+      is GlobalCommand.Slower -> changeRate(null) { it - command.step }
+      is GlobalCommand.SetRate -> changeRate(null) { command.rate }
       GlobalCommand.Help -> homeReply(str(if (policy.handsFree) R.string.home_help else R.string.hf_help_toolbox))
       GlobalCommand.Battery -> homeReply(batteryReport())
       // Nothing above the menu: "back" says so; "close", "goodbye", "quit" leave the app.
@@ -1050,13 +1198,30 @@ class ToolHub(
     }
   }
 
-  /** "Main menu. Say read my book, ..." ("Main menu." with short answers). */
+  /** "Main menu. Say read my book, ..." ("Main menu." with short answers; the user's own menu if changed). */
   private fun homePrompt(): String =
-      str(if (verbosity == Verbosity.SHORT) R.string.home_back else R.string.home_prompt)
+      if (verbosity == Verbosity.SHORT) str(R.string.home_back)
+      else menuOptions()?.let { getApplication<Application>().getString(R.string.home_prompt_custom, it) } ?: str(R.string.home_prompt)
 
-  /** "SpeakUp is ready. Say read my book, ..." */
+  /** "SpeakUp is ready. Say read my book, ..." (the user's own menu, if they changed it). */
   private fun homeWelcome(): String =
-      str(if (verbosity == Verbosity.SHORT) R.string.hf_welcome_short else R.string.home_welcome)
+      if (verbosity == Verbosity.SHORT) str(R.string.hf_welcome_short)
+      else menuOptions()?.let { getApplication<Application>().getString(R.string.home_welcome_custom, it) } ?: str(R.string.home_welcome)
+
+  /** "read my mail, labels, light" when the menu was reordered or tools hidden; null for the default. */
+  private fun menuOptions(): String? {
+    val w = settings.current.words
+    if (w.normalisedOrder() == Words.DEFAULT_MENU && w.menuHidden.isEmpty()) return null
+    val said =
+        mapOf(
+            "book" to R.string.home_option_book,
+            "mail" to R.string.home_option_mail,
+            "labels" to R.string.home_option_labels,
+            "watch" to R.string.home_option_watch,
+            "light" to R.string.home_option_light,
+        )
+    return (w.visibleMenu().mapNotNull { id -> said[id]?.let { str(it) } } + str(R.string.home_option_help)).joinToString(", ")
+  }
 
   /** The menu's spoken line, also shown on the camera screen. */
   private fun homeSay(text: String) {
@@ -1073,7 +1238,8 @@ class ToolHub(
 
   /** Silence reminders in the menu: the options again, then quiet. */
   private fun homeReminder(last: Boolean): String =
-      if (last) str(R.string.home_reminder_last) else homePrompt()
+      if (last) menuOptions()?.let { getApplication<Application>().getString(R.string.home_reminder_last_custom, it) } ?: str(R.string.home_reminder_last)
+      else homePrompt()
 
   /** "Sorry, I didn't get that", but not while [busy] (reading: probably the room), not for long
    * speech, and at most every 8 s. */
@@ -1442,16 +1608,48 @@ class ToolHub(
 
   /** Short spoken note (status, hint, reply). The tool's ToolHost.onAsideDone runs after it. */
   fun sayAside(text: String) {
-    asidesPending++
     remember(text)
+    if (settingsVoice.conversation) {
+      // Conversation mode: no speech. The tool is paused; nothing waits on this note.
+      Log.i(TAG, "conversation mode, not said: \"$text\"")
+      return
+    }
+    asidesPending++
     speaker.speak(text, "aside")
+  }
+
+  /**
+   * A familiar short line ("Paused.", "Main menu."): with "sounds instead of short replies" on,
+   * only [earcon] plays.
+   */
+  fun sayFamiliar(text: String, earcon: Earcon) {
+    val s = settings.current.sounds
+    if (s.earconsOnly && s.earcons) {
+      remember(text)
+      earcons.play(earcon)
+      return
+    }
+    sayAside(text)
   }
 
   /** Tool content (a sentence of a page). ToolHost.onSpoken([tag]) runs when it finishes. */
   fun speak(text: String, tag: String) {
     require(tag != "aside") { "\"aside\" is reserved for sayAside" }
     remember(text)
+    if (settingsVoice.conversation) {
+      Log.i(TAG, "conversation mode, not read: \"$text\"")
+      return
+    }
     speaker.speak(text, tag)
+  }
+
+  /** How much the open tool (or the menu) should say: short, normal or detailed. */
+  fun verbosity(tool: ToolId? = host?.toolId): com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Verbosity =
+      settings.current.verbosityFor(tool?.id)
+
+  /** [text] cut to its first sentence when the user asked for short replies. */
+  fun brief(text: String, tool: ToolId? = host?.toolId): String {
+    return if (verbosity(tool) == com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Verbosity.SHORT) SetupSpeech.firstSentence(text) else text
   }
 
   private fun remember(text: String) {
@@ -1506,19 +1704,166 @@ class ToolHub(
     speaker.setRate(rate)
   }
 
+  // MARK: - Make it your own
+
+  /** Pushes the current settings into the speaker, earcons, tones, reminders and controls. */
+  fun applySettings() {
+    val s = settings.current
+    val wantBus = settingsPrefs.audioBus
+    if (wantBus && bus == null) bus = AudioBus().takeIf { it.available }
+    if (!wantBus && bus != null) {
+      bus?.release()
+      bus = null
+    }
+    val b = bus
+    speaker.setRate(host?.speechRate() ?: s.rateFor(host?.toolId?.id))
+    speaker.configure(
+        ToolSpeaker.Config(
+            pitch = s.speech.pitch,
+            pauseMs = s.speech.pauseMs,
+            voice = s.speech.voice,
+            locale = s.speech.locale,
+            pan = AudioMath.pan(AudioMath.Kind.SPEECH, s.ears),
+            clearSpeech = s.ears.clearSpeech,
+            bus = b,
+        ),
+    )
+    b?.setClearSpeech(s.ears.clearSpeech)
+    val earconGains = AudioMath.gains(AudioMath.Kind.EARCON, s.ears)
+    earcons.configure(
+        Earcons.Config(
+            enabled = s.sounds.earcons,
+            volume = s.sounds.volume,
+            gains = earconGains,
+            speakInstead = s.sounds.speakEarcons,
+            bus = b,
+        ),
+    )
+    tones.gains = earconGains
+    tones.ears = s.ears
+    tones.bus = b
+    val gaps = s.tips.reminderGapsMs()
+    if (gaps != nudgeGaps) {
+      nudgeGaps = gaps
+      nudge = IdleNudge(gaps)
+      nudge.userActed(SystemClock.elapsedRealtime())
+    }
+    updateControls()
+    // Hands-free's "short answers" and the settings store share one value.
+    val v = Verbosity.valueOf(s.speech.verbosity.name)
+    if (mode.settings.value.verbosity != v) mode.setVerbosity(v)
+    _settingsView.value = settingsViewNow()
+  }
+
+  /** Installed voices for the speech language (settings screen). */
+  fun voices(): List<VoiceChoice> = speaker.voices()
+
+  /** The experimental audio bus on or off (settings screen). */
+  fun setAudioBus(on: Boolean) {
+    settingsPrefs.audioBus = on
+    applySettings()
+  }
+
+  val audioBusOn: Boolean
+    get() = settingsPrefs.audioBus
+
+  /** Faster/slower/"1.5 times": the tool's own speed if it has one, else the main speed. */
+  fun changeRate(tool: String?, requested: (Float) -> Float) {
+    val r = settingsVoice.changeRate(tool, requested = requested)
+    if (isHome) homeReply(r.text) else reply(r.text)
+  }
+
+  /** A settings command heard: change, then say the new value (or run the effect). */
+  fun runSettings(cmd: SettingsCommand) {
+    val r = settingsVoice.handle(cmd, host?.toolId?.id)
+    when (r.effect) {
+      SettingsVoice.Effect.CONVERSATION_START -> {
+        // Pause whatever the tool is doing, say the one line, then go quiet.
+        val h = host
+        if (h == null || !h.onGlobal(GlobalCommand.Pause)) hush()
+        hush()
+        earcons.play(Earcon.ACK)
+        speaker.speak(r.text, "~conversation")
+        return
+      }
+      SettingsVoice.Effect.CONVERSATION_END -> {
+        reply(r.text)
+        host?.onGlobal(GlobalCommand.Resume)
+        return
+      }
+      SettingsVoice.Effect.SHARE_SETUP -> onShareSetup?.invoke(settings.exportJson(), settings.exportCode())
+      SettingsVoice.Effect.OPEN_SETTINGS -> _showSettings.value = true
+      null -> Unit
+    }
+    if (isHome) homeReply(r.text) else reply(r.text)
+  }
+
+  /** A change made on the settings screen: saved, and said out loud for the user (helper view). */
+  fun changeFromScreen(spoken: String, f: (Setup) -> Setup) {
+    val r = settingsVoice.fromScreen(spoken, f)
+    sayFromScreen(r.text)
+  }
+
+  /** Says [text] for the settings screen (undo, keep, import results), if voice is running. */
+  fun sayFromScreen(text: String) {
+    if (isVoiceOpen && text.isNotBlank()) {
+      hush()
+      sayAside(text)
+    }
+  }
+
+  /** "Sam, read my mail": the user's own address word is dropped like the built-in ones. */
+  private fun withoutAddress(text: String): String {
+    val word = settings.current.words.address ?: return text
+    val m = Regex("^\\W*(?:hey |ok |okay )?${Regex.escape(word)}\\b[\\s,.!]*", RegexOption.IGNORE_CASE).find(text) ?: return text
+    val rest = text.substring(m.range.last + 1)
+    return rest.ifBlank { text }
+  }
+
+  /** A routine: each command in turn, as if said, once the one before has settled. */
+  private fun runMacro(name: String, steps: List<String>) {
+    macroJob?.cancel()
+    Log.i(TAG, "routine \"$name\": $steps")
+    earcons.play(Earcon.ACK)
+    macroJob =
+        viewModelScope.launch {
+          for ((i, step) in steps.withIndex()) {
+            if (i > 0) {
+              // Let a tool switch attach and its first line finish before the next command.
+              delay(300)
+              withTimeoutOrNull(MACRO_STEP_WAIT_MS) {
+                while (isSpeakingAside || (_activeTool.value != null && attached.value?.toolId != _activeTool.value?.tool)) delay(100)
+              }
+            }
+            Log.i(TAG, "routine step ${i + 1}: \"$step\"")
+            onUtterance(step, true, fromShortcut = true)
+          }
+        }
+  }
+
+  /** A glasses button or swipe (Experimental): its mapped command, as if said. */
+  fun runControl(key: String) {
+    val c = settings.current.controls
+    if (!c.enabled || !isVoiceOpen) return
+    val action = c.actionFor(key) ?: return
+    nudge.userActed(SystemClock.elapsedRealtime())
+    when (val r = Shortcuts.rewrite(action, settings.current.words)) {
+      is Shortcuts.Rewrite.Macro -> runMacro(r.name, r.steps)
+      is Shortcuts.Rewrite.Alias -> onUtterance(r.command, true, fromShortcut = true)
+      null -> onUtterance(action, true, fromShortcut = true)
+    }
+  }
+
+  private fun updateControls() {
+    val session = sources.deviceSession
+    if (settings.current.controls.enabled && camera.isStreaming.value && session != null) controls.attach(session)
+    else if (!settings.current.controls.enabled) controls.detach()
+  }
+
   /** A button press or command: acknowledge it, and start silence reminders over. */
   fun userActed() {
     earcons.play(Earcon.ACK)
     nudge.userActed(SystemClock.elapsedRealtime())
-  }
-
-  private fun changeSharedRate(requested: Float) {
-    val before = sharedRate
-    val r = (Math.round(requested * 10f) / 10f).coerceIn(MIN_RATE, MAX_RATE)
-    sharedRate = r
-    prefs.edit().putFloat(KEY_RATE, r).apply()
-    speaker.setRate(r)
-    reply(rateReply(before, requested, r))
   }
 
   /** "1.5 times speed.", or "already the fastest/slowest". */
@@ -1539,6 +1884,8 @@ class ToolHub(
 
   override fun onSpoken(tag: String) {
     echo.finished(SystemClock.elapsedRealtime())
+    // ToolHub's own lines that no tool waits for (conversation mode, earcons said as words).
+    if (tag.startsWith("~")) return
     if (tag == "aside") {
       asidesPending = (asidesPending - 1).coerceAtLeast(0)
       host?.onAsideDone()
@@ -1573,7 +1920,8 @@ class ToolHub(
           (if (home) homeReminder(nudge.isLast(reminder))
           else h?.reminder(reminder, nudge.isLast(reminder))) ?: continue
       Log.i(TAG, "nudge reminder=$reminder text=$text")
-      sayAside(text)
+      if (settingsVoice.conversation) continue
+      sayAside(brief(text))
     }
   }
 
@@ -1791,6 +2139,9 @@ class ToolHub(
 
   override fun onCleared() {
     super.onCleared()
+    settings.removeListener(settingsListener)
+    controls.detach()
+    bus?.release()
     voice.stop()
     phoneCamera.release()
     speaker.shutdown()

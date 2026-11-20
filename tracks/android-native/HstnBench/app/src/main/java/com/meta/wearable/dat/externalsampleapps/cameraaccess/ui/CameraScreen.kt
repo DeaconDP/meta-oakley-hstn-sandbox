@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -87,6 +88,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -187,6 +189,12 @@ fun CameraScreen(
     }
   }
   val activeTool by hub.activeTool.collectAsStateWithLifecycle()
+  val showCustomise by hub.showSettings.collectAsStateWithLifecycle()
+  val shareContext = LocalContext.current
+  DisposableEffect(hub) {
+    hub.onShareSetup = { json, code -> shareSetup(shareContext, json, code) }
+    onDispose { hub.onShareSetup = null }
+  }
   val modeSettings by hub.mode.settings.collectAsStateWithLifecycle()
   val pushToTalk by hub.pushToTalkActive.collectAsStateWithLifecycle()
   // Hands-free (saved, or a voice-first visit into a tool) vs the toolbox.
@@ -280,6 +288,7 @@ fun CameraScreen(
             activity?.let { wearablesViewModel.startUnregistration(it) }
             showSettingsMenu = false
           },
+          onCustomise = { hub.setShowSettings(true) },
           settings =
               if (homeVoice) {
                 {
@@ -404,6 +413,9 @@ fun CameraScreen(
         }
       }
     }
+
+    // Make it your own: over everything, including an open tool.
+    if (showCustomise) CustomiseScreen(hub, onClose = { hub.setShowSettings(false) })
 
     // The toolbox and the touch bench keep the prompt; hands-free replaces it with speech.
     if (ui.showCameraPermissionRedirectConfirm && !(homeVoice && handsFree)) {
@@ -879,6 +891,7 @@ private fun TopBar(
     showSettingsMenu: Boolean,
     onToggleSettings: () -> Unit,
     onDisconnect: () -> Unit,
+    onCustomise: () -> Unit,
     settings: (@Composable () -> Unit)? = null,
 ) {
   Row(
@@ -918,6 +931,27 @@ private fun TopBar(
             present = ui.hasStream,
         )
       }
+    }
+
+    Spacer(modifier = Modifier.width(12.dp))
+
+    // "Make it your own": the settings screen (also "open settings" by voice).
+    Box(
+        modifier =
+            Modifier.size(SpeakUpDimens.MinTouchTarget)
+                .clip(CircleShape)
+                .background(SpeakUpColors.Dusk)
+                .border(2.dp, SpeakUpColors.DuskLine, CircleShape)
+                .clickable(onClick = onCustomise)
+                .testTag("customise_button"),
+        contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+          imageVector = Icons.Filled.Tune,
+          contentDescription = stringResource(R.string.customise_button),
+          tint = SpeakUpColors.Paper,
+          modifier = Modifier.size(28.dp),
+      )
     }
 
     Spacer(modifier = Modifier.width(12.dp))

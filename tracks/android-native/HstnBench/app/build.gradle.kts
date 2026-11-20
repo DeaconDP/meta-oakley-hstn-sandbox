@@ -85,6 +85,8 @@ dependencies {
   implementation(libs.mwdat.speech)
   // Hands-free mode: a compact card on glasses with a display (Ray-Ban Display). GA in DAT 1.0.1.
   implementation(libs.mwdat.display)
+  // Glasses controls (Make it your own, C4): capture button, touchpad and swipes (Experimental).
+  implementation(libs.mwdat.inputs)
   implementation(libs.mwdat.mockdevice)
   // Book reader: on-device OCR, Latin script, model bundled in the APK (no Play Services download).
   implementation(libs.mlkit.text.recognition)

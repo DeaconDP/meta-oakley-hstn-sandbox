@@ -54,30 +54,41 @@
 ## Make it your own (notes/customisation-roadmap.md)
 - [ ] C0: one settings schema shared by both platforms (rate on one 0.5–3× scale, per-tool overrides); migrate the existing Android prefs and the iOS `A11yPreferences` keys; merge the book rate into "main rate + book override"
   - [x] iOS (2026-11-20, notes/customisation-ios-core.md): SettingsStore over the SettingsArea contract, rate on the 0.5–3× scale with `a11y.speechRate` migrated losslessly, per-tool verbosity overrides, versioned setup JSON. Android and the book rate still to do
+  - [x] Android (2026-11-20, notes/customisation-android.md): one settings document (schema 1) in `speakup_settings`, old tools/book prefs and the hands-free verbosity migrated, the book rate merged into "main rate + book override"; JVM tests in the note
 - [ ] C0: one audio bus per platform (Android single AudioTrack mixer; iOS `AVSpeechSynthesizer.write` into the shared engine); check earcons still play within 100 ms
+  - [ ] Android: `AudioBus` (TTS via synthesizeToFile streaming into one AudioTrack mixer) built behind an Experimental switch, off by default until earcon latency (`bus_earcon_ms`) and first-word delay are measured on the A26 + HSTN
 - [ ] C0: settings grammar: slower/faster, shorter/more detail, "keep that", "undo", "what's my setup", "reset speech", "lock settings"
   - [x] iOS (2026-11-20): all of these, plus reset <area>, reset everything (yes/no, undoable), profiles and share codes by voice; one hook in `VoiceControl.inject`
+  - [x] Android (2026-11-20): all of these plus "reset <area>"/"reset everything" (undoable), "put it back", "unlock settings"; voice tweaks last the session until "keep that"
 - [x] Fix the gap in notes/a11y-onboarding.md:69: iOS detail level and rate aren't in Settings; earcons can't be reached (2026-11-20: Settings > Make it your own)
 - [ ] C1: speech presets (Brisk/Normal/Gentle), voice choice by voice with samples, per-tool verbosity, earcon on/off/volume/earcons-only, Android settings screen
   - [x] iOS (2026-11-20): presets Brisk/Normal/Gentle/Clear speech rate, pitch, pauses, voice choice by ear, per-tool verbosity, earcons on/off on screen. Earcon volume and earcons-only are the sounds area's; the OpenAI voice isn't choosable yet
+  - [x] Android (2026-11-20): presets, pitch, pauses, voice choice by voice with samples (device locale, US fallback), per-tool verbosity (welcomes and reminders only so far), earcon on/off/volume/earcons-only/speak-instead, settings screen (`ui/CustomiseScreen.kt`)
 - [ ] C2: balance, which ear for which sound, mono-aware cues (iOS `isMonoAudioEnabled`), Clear speech preset (DynamicsProcessing / AVAudioUnitEQ), conversation mode
   - [x] C0 iOS audio bus (2026-11-20, notes/customisation-ios-ears.md): `AVSpeechSynthesizer.write` into the earcon engine through `AudioBus`, used when pan or Clear speech need it (`ears.speechBus` kill switch, falls back to `speak()` on failure); natural voice shaped by the same chain on its own engine. Sim: earcon trigger to sound ~10 ms warm / ~28 ms cold; bus first word ~4 ms warm, ~600 ms cold, so it is pre-warmed
   - [x] C1 iOS Sounds (2026-11-20): `SoundsArea` with earcons on/off (still `a11y.earconsEnabled`), earcon and voice volume, earcons only, say it instead of beeping; voice phrases; on-screen section
   - [x] C2 iOS Your ears (2026-11-20): `EarsArea` with balance, ear per kind of sound, iOS mono + "I use mono", Watch for text pan/pitch side cue, Clear speech (dynamics + EQ + slower) with the A/B listening check, conversation mode; voice phrases; on-screen section
   - [ ] C2 iOS on real hardware: per-temple stereo on HSTN, OS mono/balance over A2DP, Clear speech EQ on the glasses' speakers, bus latency on an iPhone
   - [x] Settings core: `SettingsVoice` runs before the tools and the command parse in `VoiceControl.inject`, so "carry on", "again" and "stop" reach conversation mode and the clarity check (2026-11-20, checked at merge)
+  - [x] C2 Android (2026-11-20): balance, ear per kind of sound, manual "I use mono" with Watch for text side cue falling back to pitch plus words, Clear speech (DynamicsProcessing on the TTS session), conversation mode
 - [ ] C3: aliases + macros by voice with conflict check, home-menu show/hide/reorder, wake word choice, tip pacing Fewer/Normal/Off
   - [x] iOS tip pacing Fewer/Normal/Off (2026-11-20)
-  - [x] C3 iOS (2026-11-20, notes/customisation-ios-words.md): aliases, macros built by voice with read-back and run in order, conflict check, tools menu show/hide/reorder by voice and on screen, address word choice. Tip pacing not done. Not tried on a real iPhone
+  - [x] C3 iOS (2026-11-20, notes/customisation-ios-words.md): aliases, macros built by voice with read-back and run in order, conflict check, tools menu show/hide/reorder by voice and on screen, address word choice. Not tried on a real iPhone
+  - [x] C3 Android (2026-11-20): aliases and routines by voice with read-back and conflict check, home-menu show/hide/reorder, address word, tip pacing Fewer/Normal/Off
 - [ ] C4 (Experimental): glasses controls map for `Capture`/`Select`/`Nav`, "what do my buttons do?", `LaunchApp` into a tool; find out whether Meta's press-and-hold shortcut can launch a DAT app
   - [x] C4 iOS (2026-11-20, notes/customisation-ios-words.md): glasses controls map wired to MWDATInputs 1.0.1 (Beta build only), "what do my buttons do?" with the Meta warning, favourite tool, Shortcuts intents to run a macro or open the favourite. Not done: `LaunchApp`, the press-and-hold question
   - [ ] C4 iOS on real glasses: which Inputs events HSTN sends, swipe directions, the double-press timing, inputs after re-wear
+  - [ ] C4 Android: glasses controls wired to DAT Inputs (`mwdat-inputs` 1.0.1) with "what do my buttons do?"; not yet run on the mock or hardware, needs Developer Center approval
 - [ ] C5: profiles (Home / Out and about / Reading), switch by voice, optional announced triggers, learned suggestions
   - [x] iOS (2026-11-20): starters, save/switch/list/delete by voice and on screen, learned suggestions after three tweaks. No automatic triggers yet
+  - [x] Android (2026-11-20): starters, switch/save by voice and on screen, learned suggestions after three tweaks (asked, never applied). No automatic triggers yet
 - [ ] C6: detail dial + description preferences passed to the model
   - [ ] iOS: the area is stored and settable (2026-11-20) but unused: iOS has no Look closer yet
+  - [ ] Android: stored, exported and on the screen, but no tool uses it yet
 - [ ] C7: export/import setup code, helper view, backup with the bookmarks
   - [x] iOS export/import as JSON and a `SPEAKUP1.` code, share sheet, paste, by voice; undoable (2026-11-20). Helper view and backup still to do
+  - [x] Android export/import as JSON and an `SU1.` code, share sheet, copy and paste, "share my setup" (2026-11-20). Note: the iOS code prefix differs; align on one
+- [ ] Android: run the instrumented suite and a CustomiseTest on the A26; TalkBack pass over the settings screen
 - [ ] Real HSTN: per-temple stereo, OS mono/balance over A2DP, capture-button events, `KEY_PARAM_PAN` support
 
 - [ ] iOS hands-free: `DATGlassesDisplayMockTests.testTheCardRendersOnTheMockDisplay` fails every run ("The display didn't start", 50–73 s) on a fresh iOS 27 simulator (2026-11-18; the other 228 unit tests pass)
