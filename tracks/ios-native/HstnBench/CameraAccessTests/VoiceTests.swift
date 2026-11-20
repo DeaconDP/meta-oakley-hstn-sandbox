@@ -308,6 +308,15 @@ final class VoiceListenerRuleTests: XCTestCase {
     XCTAssertEqual(VoiceListenerPolicy.decide(inputs), .off)
   }
 
+  func testAnEndedSessionDoesNotListen() {
+    var inputs = allowed
+    inputs.sessionEnded = true
+    XCTAssertEqual(VoiceListenerPolicy.decide(inputs), .paused(.sessionEnded))
+    inputs.glassesAvailable = true
+    inputs.glassesMicGranted = true
+    XCTAssertEqual(VoiceListenerPolicy.decide(inputs), .paused(.sessionEnded), "not the glasses mic either")
+  }
+
   func testPermissionsAndRecognizer() {
     XCTAssertEqual(VoiceListenerPolicy.decide(.init()), .needsPermission)
     XCTAssertEqual(VoiceListenerPolicy.decide(.init(phoneMic: .granted, speechRecognition: .notDetermined)), .needsPermission)
@@ -606,6 +615,53 @@ final class VoiceControlTests: XCTestCase {
     XCTAssertEqual(control.status, .starting)
   }
 
+  func testGoodbyeStopsTheMicBeforeSayingSo() {
+    let listener = beginListening()
+    var stopsWhenSpoken = -1
+    var tornDown = false
+    harness.finishLines = true
+    control.endSession { tornDown = true; stopsWhenSpoken = listener.stops }
+    XCTAssertEqual(listener.stops, 1)
+    XCTAssertEqual(stopsWhenSpoken, 1, "the mic was off before the goodbye finished")
+    XCTAssertTrue(tornDown)
+    XCTAssertEqual(harness.lines.last, SpokenMessage.sessionEnded)
+    XCTAssertEqual(harness.earcons.last, .disconnected)
+    XCTAssertEqual(control.status, .paused)
+    XCTAssertEqual(control.reason, VoicePauseReason.sessionEnded.text)
+    XCTAssertFalse(harness.idleTimerDisabled, "the screen can lock")
+  }
+
+  func testTeardownRunsEvenWhenTheGoodbyeIsCutOff() {
+    _ = beginListening()
+    harness.finishLines = false
+    var tornDown = false
+    control.endSession { tornDown = true }
+    XCTAssertTrue(tornDown)
+  }
+
+  func testComingBackAfterGoodbyeListensAgain() {
+    _ = beginListening()
+    control.inject(transcript: "goodbye")
+    XCTAssertTrue(control.isSessionEnded)
+    let count = harness.phoneListeners.count
+    control.noteBackground(true)
+    control.noteBackground(false)
+    XCTAssertFalse(control.isSessionEnded)
+    XCTAssertEqual(harness.lines.last, SpokenMessage.sessionResumed)
+    XCTAssertEqual(harness.phoneListeners.count, count + 1)
+    harness.phoneListeners.last!.onEvent?(.started)
+    XCTAssertEqual(control.status, .listening)
+    XCTAssertEqual(harness.earcons.last, .listening, "the listening cue plays again")
+  }
+
+  func testStartAgainAsksForTheWakeWordWhenTheMicHearsVoiceOver() {
+    _ = beginListening()
+    control.inject(transcript: "end session")
+    harness.micHearsVoiceOver = true
+    control.resumeSession()
+    XCTAssertEqual(harness.lines.last, SpokenMessage.sessionResumedWakeWord)
+  }
+
   func testBackgroundStopsTheMic() {
     let listener = beginListening()
     control.noteBackground(true)
@@ -845,6 +901,22 @@ final class HandsFreeVoiceControlTests: XCTestCase {
     XCTAssertEqual(listener.stops, 1)
   }
 
+  func testMicButtonStartsAgainAfterGoodbye() {
+    control.begin()
+    control.setScreen(.camera) { _ in false }
+    control.pushToTalk()
+    harness.phoneListeners.last!.onEvent?(.started)
+    harness.phoneListeners.last!.onEvent?(.transcript("goodbye"))
+    XCTAssertTrue(control.isSessionEnded)
+    XCTAssertEqual(harness.lines.last, SpokenMessage.sessionEnded)
+    XCTAssertEqual(control.status, .off)
+
+    control.pushToTalk()
+    XCTAssertFalse(control.isSessionEnded)
+    XCTAssertTrue(control.isPushToTalkActive)
+    XCTAssertEqual(harness.lines.last, SpokenMessage.sessionEnded, "the toolbox doesn't add a line, it just listens")
+  }
+
   func testPushToTalkStopsTheAppTalking() {
     control.begin()
     control.setScreen(.camera) { _ in true }
@@ -934,9 +1006,10 @@ final class HandsFreeVoiceControlTests: XCTestCase {
     control.inject(transcript: "what tools are there")
     XCTAssertEqual(harness.lines.last, SpokenMessage.toolsListNotConnected)
     control.inject(transcript: "close the app")
-    XCTAssertEqual(harness.lines.last, SpokenMessage.closeAppNeedsATouch)
+    XCTAssertEqual(harness.lines.last, SpokenMessage.sessionEnded)
+    XCTAssertTrue(control.isSessionEnded)
     control.inject(transcript: "main menu")
-    XCTAssertEqual(harness.lines.last, SpokenMessage.mainMenuHome)
+    XCTAssertEqual(harness.lines.last, SpokenMessage.sessionEnded, "nothing is heard after goodbye")
   }
 
   func testQuestionsAreAnsweredByVoiceBeforeTheScreen() {

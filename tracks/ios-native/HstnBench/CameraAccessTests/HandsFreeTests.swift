@@ -24,7 +24,8 @@ final class HandsFreeGrammarTests: XCTestCase {
       ("main menu", .mainMenu), ("go home", .mainMenu),
       ("what tools are there", .listTools), ("list tools", .listTools), ("list features", .listTools),
       ("where am I", .whereAmI), ("what screen is this", .whereAmI),
-      ("close the app", .closeApp), ("quit", .closeApp),
+      ("close the app", .closeApp), ("quit", .closeApp), ("goodbye", .closeApp), ("bye", .closeApp),
+      ("end session", .closeApp), ("end the session", .closeApp), ("exit the app", .closeApp), ("quit speak up", .closeApp),
       ("short answers", .shortAnswers), ("normal answers", .normalAnswers), ("detailed answers", .detailedAnswers),
       ("glasses display on", .glassesDisplayOn), ("glasses display off", .glassesDisplayOff),
       ("hands-free on", .handsFreeOn), ("start hands free", .handsFreeOn), ("voice mode", .handsFreeOn),
@@ -35,6 +36,12 @@ final class HandsFreeGrammarTests: XCTestCase {
         XCTAssertEqual(parse(text, VoiceContext(screen: screen)), .command(command), "\(text) on \(screen)")
       }
     }
+  }
+
+  /// Bare "exit" stays free: Watch looks for it ("what should I watch for?" "exit").
+  func testBareExitDoesNotEndTheSession() {
+    XCTAssertNotEqual(parse("exit"), .command(.closeApp))
+    XCTAssertNotEqual(parse("watch for exit"), .command(.closeApp))
   }
 
   func testScreenPhrases() {

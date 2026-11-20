@@ -45,7 +45,7 @@ enum VoiceCommand: String, CaseIterable, Sendable {
   /// Close settings, or go back to the main menu.
   case close
   case whereAmI
-  /// iOS doesn't let an app close itself, so this says how.
+  /// "Goodbye": ends the session (VoiceControl.endSession). iOS doesn't let an app close itself.
   case closeApp
   case disconnect
   // Settings by voice
@@ -227,7 +227,12 @@ enum VoiceCommandParser {
     .openSettings: ["settings", "open settings", "open the settings", "show settings"],
     .close: ["close", "close this", "close settings", "close the settings", "done"],
     .whereAmI: ["where am i", "what screen is this", "what screen am i on", "where are we"],
-    .closeApp: ["close the app", "close app", "quit", "quit the app", "exit the app", "close speakup", "quit speakup"],
+    // Not bare "exit": Watch takes it as a word to look for ("watch for exit").
+    .closeApp: [
+      "close the app", "close app", "quit", "quit the app", "exit the app", "exit app", "close speakup", "quit speakup",
+      "exit speakup", "close speak up", "quit speak up", "exit speak up", "goodbye", "good bye", "bye", "bye bye",
+      "goodbye speakup", "goodbye speak up", "end session", "end the session", "end my session", "stop the app",
+    ],
     .disconnect: ["disconnect", "disconnect glasses", "disconnect my glasses", "disconnect the glasses"],
     .shortAnswers: ["short answers", "shorter answers", "be brief", "brief answers"],
     .normalAnswers: ["normal answers", "medium answers"],

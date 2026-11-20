@@ -18,9 +18,11 @@ struct VoiceIndicatorModel: Equatable {
     case turnOn
     case askPermission
     case openSettings
+    case startAgain
 
     var title: String {
       switch self {
+      case .startAgain: "Start again"
       case .turnOn: "Hands-free on"
       case .askPermission: "Allow"
       case .openSettings: "Open Settings"
@@ -29,6 +31,7 @@ struct VoiceIndicatorModel: Equatable {
 
     var hint: String {
       switch self {
+      case .startAgain: "Starts listening again, and uses the camera when you read."
       case .turnOn: "Turns hands-free on, so the app is always listening."
       case .askPermission: "Asks to use the microphone and speech recognition."
       case .openSettings: "Opens Settings for this app."
@@ -69,8 +72,14 @@ struct VoiceIndicatorModel: Equatable {
     speechPermission: VoicePermission,
     isSpeaking: Bool,
     heard: VoiceCommand?,
-    canPrompt: Bool
+    canPrompt: Bool,
+    sessionEnded: Bool = false
   ) -> VoiceIndicatorModel {
+    if sessionEnded {
+      return VoiceIndicatorModel(
+        title: "SpeakUp has stopped", detail: "Tap Start again, or leave the app and come back.", mood: .idle,
+        fix: .startAgain)
+    }
     switch status {
     case .listening:
       if let heard {
@@ -121,7 +130,8 @@ struct VoiceIndicatorView: View {
       speechPermission: voice.speechPermission,
       isSpeaking: Announcer.shared.isSpeaking,
       heard: heard,
-      canPrompt: !LaunchOptions.isAutomatedTest)
+      canPrompt: !LaunchOptions.isAutomatedTest,
+      sessionEnded: voice.isSessionEnded)
   }
 
   var body: some View {
@@ -182,6 +192,8 @@ struct VoiceIndicatorView: View {
 
   private func perform(_ fix: VoiceIndicatorModel.Fix) {
     switch fix {
+    case .startAgain:
+      voice.resumeSession()
     case .turnOn:
       voice.setHandsFree(true)
     case .askPermission:

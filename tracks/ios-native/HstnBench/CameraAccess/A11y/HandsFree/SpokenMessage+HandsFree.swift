@@ -38,8 +38,16 @@ extension SpokenMessage {
 
   static let mainMenuWelcome = "This is setup. Say phone, or connect."
 
-  static let closeAppNeedsATouch =
-    "Apps can't close themselves on iPhone. Swipe up from the bottom of the screen, or just lock the phone."
+  /// "Goodbye". iOS has no way for an app to quit itself (Apple QA1561), so the app stops listening
+  /// and lets go of the cameras, and says how to leave.
+  static let sessionEnded =
+    "Goodbye. I've stopped listening, and the camera is off. Lock the phone or swipe up to leave. Open SpeakUp again to carry on."
+
+  /// Back after "goodbye", hands-free.
+  static let sessionResumed = "Hello again. I'm listening. Say help at any time."
+
+  /// The same, when bare commands aren't safe (see VoiceCommand).
+  static let sessionResumedWakeWord = "Hello again. I'm listening. Say reader, help at any time."
 
   static let settingsOpened =
     "Settings. You can say faster, slower, short answers, detailed answers, glasses display off, or hands-free off. Say close when you're done."

@@ -96,6 +96,10 @@ final class VoiceControl {
   /// Push to talk is listening for its one command.
   private(set) var isPushToTalkActive = false
 
+  /// The user said goodbye (endSession). Nothing listens until they come back to the app, tap
+  /// Start again, or tap the mic. Not saved: a fresh launch always starts a session.
+  private(set) var isSessionEnded = false
+
   /// A yes-or-no question is waiting for a spoken answer.
   var isAwaitingAnswer: Bool { question != nil }
 
@@ -202,6 +206,40 @@ final class VoiceControl {
       interrupted = false
       cachedPhoneLocale = nil
       refreshPermissions()
+      // Coming back after "goodbye" starts a new session.
+      if isSessionEnded {
+        resumeSession()
+        return
+      }
+    }
+    reconcile()
+  }
+
+  // MARK: Ending the session
+
+  /// "Goodbye". iOS has no API for an app to quit itself, and exit() looks like a crash (Apple
+  /// QA1561), so this is the nearest thing: the mic stops first, so it can't hear the goodbye, then
+  /// the goodbye is said, then `teardown` runs (the screen lets go of the cameras and the glasses
+  /// session) once it has finished or been cut off. The user leaves by locking the phone or
+  /// swiping up; coming back, Start again or the mic starts a new session.
+  func endSession(teardown: (@MainActor () -> Void)? = nil) {
+    question = nil
+    pushToTalkTimeout?.cancel()
+    pushToTalkTimeout = nil
+    isPushToTalkActive = false
+    isSessionEnded = true
+    reconcile()
+    environment.say(SpokenMessage.sessionEnded, .disconnected, true) { _ in teardown?() }
+  }
+
+  /// After "goodbye": listen again. Hands-free says so; the toolbox only cues when the mic is tapped.
+  func resumeSession() {
+    guard isSessionEnded else { return }
+    isSessionEnded = false
+    cueDue = true
+    if preferences.handsFree {
+      let line = environment.micHearsVoiceOver(activeListener) ? SpokenMessage.sessionResumedWakeWord : SpokenMessage.sessionResumed
+      environment.say(line, nil, true, nil)
     }
     reconcile()
   }
@@ -253,6 +291,11 @@ final class VoiceControl {
   /// The toolbox's mic button: stops the app talking, listens for one command, then stops. A second
   /// press while listening cancels. In hands-free mode the mic is already open, so it only cues.
   func pushToTalk() {
+    // After "goodbye", the mic button starts again. Hands-free then listens by itself.
+    if isSessionEnded {
+      resumeSession()
+      if preferences.handsFree { return }
+    }
     if preferences.handsFree {
       environment.stopSpeech()
       environment.playEarcon(.listening)
@@ -362,7 +405,8 @@ final class VoiceControl {
   /// for "watch for 42" from anywhere, but leave the app's always-on commands (stop, close, main
   /// menu, help, another tool) alone; then the screen's commands; then the common ones.
   func inject(transcript: String) {
-    guard let screen else { return }
+    // After "goodbye", a recogniser that was still finishing can deliver one last utterance.
+    guard let screen, !isSessionEnded else { return }
     let pushToTalk = isPushToTalkActive
     let context = context(on: screen)
     let parsed = VoiceCommandParser.parse(transcript, context: context)
@@ -472,7 +516,7 @@ final class VoiceControl {
     case .disconnect:
       say(SpokenMessage.notConnectedNothingToDisconnect)
     case .closeApp:
-      say(SpokenMessage.closeAppNeedsATouch)
+      endSession()
     case .shortAnswers:
       setVerbosity(.short)
     case .normalAnswers:
@@ -581,6 +625,7 @@ final class VoiceControl {
   private var policyInputs: VoiceListenerPolicy.Inputs {
     VoiceListenerPolicy.Inputs(
       enabled: preferences.handsFree || isPushToTalkActive, inBackground: inBackground, interrupted: interrupted,
+      sessionEnded: isSessionEnded,
       glassesAvailable: makeGlassesListener != nil, glassesMicGranted: glassesMicGranted,
       glassesCoolingOff: glassesCoolOffUntil.map { environment.now() < $0 } ?? false,
       phoneMic: phoneMicPermission, speechRecognition: speechPermission, onDeviceRecognizerAvailable: phoneLocale != nil)

@@ -68,7 +68,8 @@
 - [ ] iOS hands-free: `DATGlassesDisplayMockTests.testTheCardRendersOnTheMockDisplay` fails every run ("The display didn't start", 50–73 s) on a fresh iOS 27 simulator (2026-11-18; the other 228 unit tests pass)
 
 ## Voice from start to finish (notes/voice-journey-ios.md)
-- [ ] J1 iOS: end the session by voice ("goodbye", "end session", "close the app"): goodbye, stop the listener, `endSession()`, ticks off, non-saved "ended" flag, "listening" line on return; "close" goes up one level as on Android; update `testListToolsAndCloseTheApp`
+- [x] J1 iOS: end the session by voice ("goodbye", "end session", "close the app"): mic off first, goodbye, tool, reader, camera and ticks off, glasses session ended after the goodbye; Start again button, mic button or coming back starts again with a spoken line (2026-11-20, notes/voice-journey-ios.md > J1; unit tests 533 run, 2 failed and both fixed or rerun green; not tried on a real iPhone)
+- [ ] J1 follow-up: Android's "close in the menu ends the session" rule on iOS, or decide against it; real-iPhone and glasses check of the goodbye
 - [ ] J2 iOS: "switch to <tool>" phrases; "read a photo" / "read a file" open Import
 - [ ] J3 iOS: check notes/a11y-onboarding.md:72 against the code; spoken welcome and "Use my voice" button without VoiceOver; spoken pre-prompt before mic, speech and camera alerts; camera asked at setup when "phone" is chosen
 - [ ] J4 iOS: Import by voice; spoken "tap the mic to answer" in toolbox mode; error alerts always spoken; spoken Meta AI handoff and return; find out about "read my latest photo" with PhotoKit

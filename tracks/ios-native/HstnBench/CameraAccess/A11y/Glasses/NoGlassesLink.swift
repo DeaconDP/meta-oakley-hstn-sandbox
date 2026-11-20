@@ -63,6 +63,7 @@ final class NoGlassesCamera: GlassesCamera, ReadFrameSource {
     showCameraPermissionRedirectConfirm = false
   }
   func hostDisplaySessionIfNeeded() {}
+  func endSession() {}
   func waitForDeviceReport(timeout: Duration) async {}
   func statusLine(updateRequired: Bool) -> String { SpokenMessage.glassesNeedBetaBuild }
   func speakStatus(updateRequired: Bool, interrupt: Bool) {

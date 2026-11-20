@@ -146,6 +146,8 @@ protocol GlassesCamera: AnyObject {
   func confirmCameraPermissionRedirect(then: (@MainActor () -> Void)?) async
   /// Hands-free on glasses with a display: a session so the card can show.
   func hostDisplaySessionIfNeeded()
+  /// Ends the device session, if there is one ("goodbye"). The next read starts a new one.
+  func endSession()
   /// Waits until the device stream has reported (or `timeout`).
   func waitForDeviceReport(timeout: Duration) async
   /// The spoken status line: the first blocker with its fix, otherwise what is ready.

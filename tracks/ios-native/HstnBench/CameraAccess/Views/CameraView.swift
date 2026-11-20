@@ -404,6 +404,15 @@ struct CameraView: View {
     case .torchOff: router.setTorch(false)
     case .disconnect:
       link.disconnectGlasses()
+    case .closeApp:
+      // "Goodbye": everything stops now except the glasses session, which ends after the goodbye
+      // so the audio route doesn't move mid-sentence.
+      setSettingsMenu(open: false)
+      if reader.isActive { reader.stop() }
+      hub.close(announce: false)
+      router.stopReadingStream()
+      EarconPlayer.shared.stopAllWorkingTicks()
+      VoiceControl.shared.endSession { [viewModel] in viewModel.endSession() }
     default: return false
     }
     return true

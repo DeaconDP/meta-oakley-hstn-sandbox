@@ -32,7 +32,49 @@ The walkthrough below assumes VoiceOver is on and the phone camera is used.
 
 Order: J1 and J2 first (small, visible), then J3 and J4 (the real dead ends), then J5 and J6, then J7 to prove it.
 
-### J1 End the session by voice (M)
+### J1 End the session by voice (M) — built 2026-11-20
+
+**What was built:**
+- **Phrases:** "goodbye", "bye", "end session", "end the session", "close the app", "quit", "exit the app" and "quit speakup" all mean `.closeApp` (`VoiceCommand.swift`). Bare "exit" doesn't, because Watch looks for it as a word.
+- **`VoiceControl.endSession(teardown:)`:**
+  1. Clears any waiting question and push to talk.
+  2. Sets `isSessionEnded`. This flag isn't saved, and the listener rules turn it into `.paused(.sessionEnded)`, so the mic stops before anything is said.
+  3. Says "Goodbye. I've stopped listening, and the camera is off. Lock the phone or swipe up to leave. Open SpeakUp again to carry on." with the `.disconnected` earcon.
+  4. Runs `teardown` once the line has finished or been cut off.
+- **Late phrases are dropped:** while the session is ended, `inject` ignores transcripts, in case a recognizer that was still stopping delivers one last phrase.
+- **On the main screen** (`CameraView.handleVoice`), the session ending:
+  - closes settings and the open tool;
+  - stops the reader;
+  - stops the camera stream (`router.stopReadingStream()`);
+  - stops the working ticks;
+  - ends the glasses session after the goodbye, so the audio route doesn't switch mid-sentence. `endSession()` was added to `GlassesCamera`; `NoGlassesCamera` does nothing.
+- **On setup and the home screen**, the session ending is handled in `performCommon`: the mic stops and the goodbye is said.
+- **Starting again:** coming back to the app (`noteBackground(false)`), the indicator's new **Start again** button, or the mic button in touch mode all call `resumeSession()`. Hands-free then says "Hello again. I'm listening. Say help at any time." (with "reader," when the mic can hear VoiceOver), and the listening cue plays when the mic opens.
+- **The voice indicator** shows "SpeakUp has stopped", "Tap Start again, or leave the app and come back.", and a Start again button.
+
+**Not done:**
+- Android's rule that "close" in the menu ends the session. On iOS, "close" still only goes up one level.
+- Turning the audio session off explicitly. It goes idle by itself once nothing is speaking (`A11yAudioSession`).
+
+**Tests** (Mac, Xcode 27.2, iOS 27.0 Simulator "SpeakUp J1 iPhone 17", `-parallel-testing-enabled NO`). Unit tests, skipping the known display mock test: 533 run. 531 passed. The two failures were:
+- `testListToolsAndCloseTheApp`: it injected a phrase after the goodbye, which is what led to the late-phrase guard above;
+- `ViewModelIntegrationTests.testVideoStreamingFlow`, a 10 s timeout on a heavily loaded Mac.
+
+Rerun of the voice, grammar, ToolHub and integration suites: 68 run, 0 failed. UI tests `ToolsHomeUITests` and `VoiceControlUITests`: 11 run, 0 failed. The SpeakUp (store) scheme builds.
+
+New tests:
+- `testAnEndedSessionDoesNotListen`
+- `testGoodbyeStopsTheMicBeforeSayingSo`
+- `testTeardownRunsEvenWhenTheGoodbyeIsCutOff`
+- `testComingBackAfterGoodbyeListensAgain`
+- `testStartAgainAsksForTheWakeWordWhenTheMicHearsVoiceOver`
+- `testMicButtonStartsAgainAfterGoodbye`
+- `testBareExitDoesNotEndTheSession`
+- `testAnEndedSessionOffersStartAgain`
+
+**Not tried on a real iPhone:** the goodbye over the glasses' speakers, ending the glasses session after it, and whether the main screen says anything about the glasses when their session stops.
+
+**Plan as written:**
 Match Android's rule (notes/tools-layer.md:144-150): "close" always goes up one level, and "close the app", "goodbye", "end session", "quit", "exit the app" always end the session.
 - Phrases: `VoiceCommand.swift:230`. Test bare "exit" against `.close` (":228").
 - Replace `VoiceControl.swift:474-475`. Route through `CameraView.handleVoice` (`CameraView.swift:332`) so the glasses link is reachable. Steps:
