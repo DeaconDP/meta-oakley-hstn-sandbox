@@ -56,7 +56,7 @@ object ToolTestKit {
           .uiAutomation
           .executeShellCommand("pm grant ${context.packageName} android.permission.$it")
     }
-    for (prefs in listOf("book_reader", "tools")) {
+    for (prefs in listOf("book_reader", "tools", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsPrefs.FILE)) {
       context.getSharedPreferences(prefs, Context.MODE_PRIVATE).edit().clear().commit()
     }
     // These tests drive the app by voice: hands-free on (the default is the touch toolbox).
@@ -64,6 +64,7 @@ object ToolTestKit {
     // The camera choice back to the default: AUTO (glasses once registered), setup not skipped.
     HandsFreeStore.get(context).setCameraSource(CameraSourceSetting.AUTO)
     HandsFreeStore.get(context).setPhoneChosen(false)
+    com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsPrefs.resetForTests()
   }
 
   /** Call in @After. */

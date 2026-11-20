@@ -189,13 +189,28 @@ final class AppVoice {
   /// the main thread at the same time deadlocked inside TextToSpeech on the iOS 27 Simulator
   /// (both waited in axUnsafeForcedSync; notes/tools-home-ios.md).
   var voice: AVSpeechSynthesisVoice? {
+    if let chosen = chosenVoice { return chosen }
     if !isLoaded, !isLoading { apply(Self.installedVoices()) }
     return cachedVoice ?? AVSpeechSynthesisVoice(language: "en-GB")
   }
 
+  /// The voice the user picked (A11yPreferences.appVoiceIdentifier), if it is still installed.
+  /// Cached by identifier, so the lookup runs once per choice.
+  private var chosenVoice: AVSpeechSynthesisVoice? {
+    guard let identifier = preferences.trialVoiceIdentifier ?? preferences.appVoiceIdentifier else { return nil }
+    if chosenCache?.identifier != identifier { chosenCache = AVSpeechSynthesisVoice(identifier: identifier) }
+    return chosenCache
+  }
+
+  @ObservationIgnored private var chosenCache: AVSpeechSynthesisVoice?
+
   /// For settings: "Voice: Serena, British".
   var displayString: String {
     if preferences.useVoiceOverVoice, UIAccessibility.isVoiceOverRunning { return "Voice: VoiceOver's voice" }
+    if let chosen = chosenVoice {
+      return "Voice: \(chosen.name.split(separator: " ").first.map(String.init) ?? chosen.name), "
+        + VoiceSelection.accentName(language: chosen.language)
+    }
     guard let choice else { return "Voice: system default" }
     return VoiceSelection.displayString(for: choice.voice)
   }
@@ -219,7 +234,7 @@ final class AppVoice {
     apply(voices)
   }
 
-  nonisolated private static func installedVoices() -> [VoiceDescriptor] {
+  nonisolated static func installedVoices() -> [VoiceDescriptor] {
     AVSpeechSynthesisVoice.speechVoices().map { voice in
       let gender: VoiceDescriptor.Gender =
         switch voice.gender {
@@ -262,7 +277,7 @@ final class AppVoice {
   /// `speak: false` (the toolbox, which has no start-up narration) only shows the banner; it counts
   /// as heard once dismissed.
   func offerDownloadIfNeeded(speak: Bool = true) {
-    guard !LaunchOptions.isAutomatedTest else { return }
+    guard !LaunchOptions.isAutomatedTest, preferences.appVoiceIdentifier == nil else { return }
     _ = voice  // make sure the lookup has happened
     let followsVoiceOver = preferences.useVoiceOverVoice && UIAccessibility.isVoiceOverRunning
     guard

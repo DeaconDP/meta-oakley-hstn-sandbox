@@ -44,7 +44,8 @@ struct ToolsHome: View {
         .foregroundStyle(Theme.ink)
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("tools_home_title")
-      ForEach(ToolID.allCases) { tool in
+      // In the user's order, without hidden tools ("put labels first", Customise/Words).
+      ForEach(WordsArea.shared.visibleTools) { tool in
         row(tool)
       }
     }

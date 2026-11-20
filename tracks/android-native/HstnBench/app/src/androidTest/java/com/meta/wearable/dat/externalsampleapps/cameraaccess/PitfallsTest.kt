@@ -57,6 +57,8 @@ class PitfallsTest {
           .executeShellCommand("pm grant ${ctx.packageName} android.permission.$it")
     }
     ctx.getSharedPreferences("book_reader", Context.MODE_PRIVATE).edit().clear().commit()
+    ctx.getSharedPreferences(com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsPrefs.FILE, Context.MODE_PRIVATE).edit().clear().commit()
+    com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsPrefs.resetForTests()
   }
 
   @After

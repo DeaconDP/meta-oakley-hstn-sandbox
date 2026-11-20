@@ -28,9 +28,18 @@
     <string name="home_welcome" description="Spoken when the main menu is ready after connecting to the glasses">SpeakUp is ready. Say read my book, read my mail, labels, watch for text, light, or what can I say.</string>
     <string name="home_back" description="Spoken when going back to the main menu from a tool">Main menu.</string>
     <string name="home_prompt" description="Spoken when the user asks for the main menu again or says start">Main menu. Say read my book, read my mail, labels, watch for text, light, or what can I say.</string>
-    <string name="home_help" description="Spoken for help in the main menu (hands-free), in short groups">This is the main menu. Tools: read my book, read my mail, labels, watch for, then what to look for, light, or what colour is this. Say what tools are there for the list. Camera: use the phone, use the glasses, which camera, torch on, connect, disconnect, status, or battery. Settings: faster, slower, short answers, glasses display off, or hands-free off. Say where am I at any time, or close the app to leave. In any tool, say main menu to come back here.</string>
+    <string name="home_help" description="Spoken for help in the main menu (hands-free), in short groups">This is the main menu. Tools: read my book, read my mail, labels, watch for, then what to look for, light, or what colour is this. Say what tools are there for the list. Camera: use the phone, use the glasses, which camera, torch on, connect, disconnect, status, or battery. Settings: faster, slower, short answers, glasses display off, or hands-free off. To make it your own, say slower, shorter, try another voice, or what\'s my setup. Say where am I at any time, or close the app to leave. In any tool, say main menu to come back here.</string>
     <string name="home_help_in_tool" description="Added to a tool's help when there is a main menu">Say main menu for other tools, or where am I.</string>
     <string name="home_reminder_last" description="Last silence reminder in the main menu">Say read my book, read my mail, labels, watch for text, light, or what can I say. I\'ll stay quiet now.</string>
+    <string name="home_prompt_custom" description="Main menu prompt when the user reordered or hid tools; %1$s is the list, e.g. read my mail, labels, or what can I say">Main menu. Say <xliff:g id="options">%1$s</xliff:g>.</string>
+    <string name="home_welcome_custom" description="Main menu welcome when the user reordered or hid tools; %1$s is the list">SpeakUp is ready. Say <xliff:g id="options">%1$s</xliff:g>.</string>
+    <string name="home_reminder_last_custom" description="Last silence reminder with the user own menu; %1$s is the list">Say <xliff:g id="options">%1$s</xliff:g>. I\'ll stay quiet now.</string>
+    <string name="home_option_book" description="Menu option as spoken">read my book</string>
+    <string name="home_option_mail" description="Menu option as spoken">read my mail</string>
+    <string name="home_option_labels" description="Menu option as spoken">labels</string>
+    <string name="home_option_watch" description="Menu option as spoken">watch for text</string>
+    <string name="home_option_light" description="Menu option as spoken">light</string>
+    <string name="home_option_help" description="Last menu option as spoken">or what can I say</string>
     <string name="home_heading" description="Screen: heading for the voice menu on the camera screen">Voice menu</string>
     <!-- Screen -->
     <string name="tool_close" description="Close button on a tool screen; %1$s is the tool name">Close <xliff:g id="tool">%1$s</xliff:g></string>

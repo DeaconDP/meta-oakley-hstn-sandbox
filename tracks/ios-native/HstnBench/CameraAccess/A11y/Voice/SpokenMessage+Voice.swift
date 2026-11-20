@@ -29,7 +29,7 @@ extension SpokenMessage {
 
   static let voiceControlOn = "Voice control is on. Say help at any time."
 
-  static let voiceControlOnWakeWord = "Voice control is on. Say reader, help at any time."
+  static var voiceControlOnWakeWord: String { "Voice control is on. Say \(AddressWord.current), help at any time." }
 
   /// Before the system's microphone and speech recognition dialogs, on the first screen that's up.
   static let voiceControlExplanation =
@@ -43,7 +43,7 @@ extension SpokenMessage {
 
   static let voiceControlTroubled = "Voice control has stopped hearing you. I'll keep trying. Every button still works."
 
-  static let voiceNotUnderstood = "Sorry, I didn't catch that. Say reader, help."
+  static var voiceNotUnderstood: String { "Sorry, I didn't catch that. Say \(AddressWord.current), help." }
 
   static let voiceHomeStatus = "Your glasses aren't connected to this app yet. Say connect, or say use the phone."
 

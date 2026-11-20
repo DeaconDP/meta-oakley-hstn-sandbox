@@ -78,6 +78,8 @@ struct CameraAccessApp: App {
     if LaunchOptions.isUITesting, LaunchOptions.forcesOnboarding {
       A11yPreferences.shared.resetOnboarding()
     }
+    // Your words and Your buttons: their settings areas, grammars and the hook before parsing.
+    MakeItYourOwnWords.install()
     // Render the earcons now, so the first tone doesn't wait on engine setup.
     EarconPlayer.shared.prepare()
     // And look up the voice, so the first word doesn't wait on that.
@@ -85,6 +87,10 @@ struct CameraAccessApp: App {
     // Reminders (A11y/Reminders): the on-phone store, and reminders spoken while the app is in front.
     Reminders.shared = ReminderStore.live()
     ReminderAlerts.shared.install()
+    // Make it your own: settings areas, undo and keep, profiles, and settings by voice.
+    MakeItYourOwn.start()
+    // Your ears and Sounds (Make it your own): areas, voice grammars, and the audio shape.
+    AudioCustomisation.install()
 
     #if !SPEAKUP_NO_DAT
     self._wearablesViewModel = State(wrappedValue: WearablesViewModel(wearables: Wearables.shared))

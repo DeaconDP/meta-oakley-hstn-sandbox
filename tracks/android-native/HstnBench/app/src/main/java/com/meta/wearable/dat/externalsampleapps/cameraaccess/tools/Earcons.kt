@@ -4,12 +4,20 @@
 // failure. ToneGenerator plays immediately with no asset loading. It's on the accessibility stream
 // to sit with the TTS (USAGE_ASSISTANCE_ACCESSIBILITY). Placeholder tones; a designed earcon set is
 // part of ROADMAP step 4.
+//
+// Make it your own (sounds and ears settings, via [configure]):
+//   - off: nothing plays (every problem is still spoken, so silence still never reports a failure);
+//   - volume: the ToneGenerator is rebuilt at the new level;
+//   - panned (balance, or earcons in one ear): ToneGenerator can't pan, so the same earcon is played
+//     from PCM (AudioMath.EARCON_NOTES) on a small static stereo AudioTrack, or on the audio bus;
+//   - speak instead: [speakInstead] says the earcon's meaning ("found", "problem") while learning.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.tools
 
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.util.Log
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.AudioMath
 
 enum class Earcon(val tone: Int, val durationMs: Int) {
   /** A control was pressed. */
@@ -37,23 +45,61 @@ enum class Earcon(val tone: Int, val durationMs: Int) {
 }
 
 class Earcons {
-  private val generator: ToneGenerator? =
+
+  /** How earcons should play now (from the sounds and ears settings). */
+  data class Config(
+      val enabled: Boolean = true,
+      val volume: Float = 0.8f,
+      val gains: AudioMath.Gains = AudioMath.CENTRE,
+      val speakInstead: Boolean = false,
+      val bus: AudioBus? = null,
+  )
+
+  private var config = Config()
+  private var generator: ToneGenerator? = makeGenerator(config.volume)
+  private val pcm = PcmPlayer()
+
+  /** Set by ToolHub: says an earcon's meaning instead of playing it. Returns false if it can't. */
+  var speakInstead: ((Earcon, String) -> Boolean)? = null
+
+  fun configure(next: Config) {
+    val old = config
+    config = next
+    if (next.volume != old.volume) {
+      generator?.release()
+      generator = makeGenerator(next.volume)
+    }
+  }
+
+  fun play(earcon: Earcon) {
+    val c = config
+    Log.i(TAG, "earcon=${earcon.name.lowercase()}" + if (!c.enabled) " (off)" else "")
+    if (!c.enabled) return
+    if (c.speakInstead) {
+      val word = AudioMath.EARCON_WORDS[earcon.name]
+      if (word != null && speakInstead?.invoke(earcon, word) == true) return
+    }
+    val notes = AudioMath.EARCON_NOTES[earcon.name]
+    when {
+      c.bus != null && notes != null -> c.bus.play(AudioMath.tones(notes, c.bus.sampleRate), c.gains, c.volume)
+      c.gains != AudioMath.CENTRE && notes != null -> pcm.play(AudioMath.tones(notes, PcmPlayer.RATE), c.gains, c.volume)
+      else -> generator?.startTone(earcon.tone, earcon.durationMs)
+    }
+  }
+
+  fun release() {
+    generator?.release()
+    pcm.release()
+  }
+
+  private fun makeGenerator(volume: Float): ToneGenerator? =
       try {
-        ToneGenerator(AudioManager.STREAM_ACCESSIBILITY, 80)
+        ToneGenerator(AudioManager.STREAM_ACCESSIBILITY, (volume * 100).toInt().coerceIn(0, 100))
       } catch (e: RuntimeException) {
         // No audio device (e.g. a headless emulator); earcons are skipped, speech still reports.
         Log.w(TAG, "ToneGenerator unavailable", e)
         null
       }
-
-  fun play(earcon: Earcon) {
-    Log.i(TAG, "earcon=${earcon.name.lowercase()}")
-    generator?.startTone(earcon.tone, earcon.durationMs)
-  }
-
-  fun release() {
-    generator?.release()
-  }
 
   companion object {
     const val TAG = "BookReader"
