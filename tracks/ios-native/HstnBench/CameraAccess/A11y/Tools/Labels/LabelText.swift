@@ -19,6 +19,28 @@ struct LabelLine: Equatable, Sendable {
   var text: String
   var height: Double = 0
   var confidence: Float? = nil
+  /// The line runs into an edge of the photo, so words may be missing (FramingAdvisor.cutEdges).
+  var touchesEdge = false
+}
+
+/// A section's lines as found, and why it ended, so food check can tell a whole list from a cut one.
+struct LabelSectionLines: Equatable, Sendable {
+  enum End: Equatable, Sendable {
+    /// Another heading started.
+    case heading
+    /// The side ran out of lines: the list may go on past the photo.
+    case endOfText
+    /// The line limit was reached.
+    case limit
+  }
+
+  /// The text, heading taken off (kept for cooking), one entry per line.
+  var texts: [String]
+  /// The OCR lines it came from, heading line included.
+  var lines: [LabelLine]
+  var end: End
+
+  var text: String { LabelsString.trimmed(texts.filter { !LabelsString.trimmed($0).isEmpty }.joined(separator: " ")) }
 }
 
 enum LabelSection: Sendable {
@@ -54,29 +76,48 @@ enum LabelText {
   }
 
   /// At most this many lines are taken for one section.
-  private static let maxSectionLines = 14
+  static let maxSectionLines = 14
 
   /// The text of `section` in `lines`, without its heading, or nil if there's no heading. The
   /// cooking section keeps sub-headings (oven, microwave), since they're part of the instructions.
   static func section(_ lines: [LabelLine], _ section: LabelSection) -> String? {
+    guard let found = sectionLines(lines, section) else { return nil }
+    let joined = found.text
+    return joined.isEmpty ? nil : joined
+  }
+
+  /// `section` with the lines it came from and how it ended. `requireHeading`: only a real heading
+  /// ("Ingredients:"), never a mention ("see ingredients in bold"). `maxLines` caps the lines taken.
+  static func sectionLines(
+    _ lines: [LabelLine], _ section: LabelSection, requireHeading: Bool = false, maxLines: Int = maxSectionLines
+  ) -> LabelSectionLines? {
     let regex = heading(section)
     // A real heading first ("Ingredients:"); a mention ("see ingredients in bold") only if none.
     guard
-      let start = lines.firstIndex(where: { isHeading($0.text, regex) }) ?? lines.firstIndex(where: { regex.contains($0.text) })
+      let start = lines.firstIndex(where: { isHeading($0.text, regex) })
+        ?? (requireHeading ? nil : lines.firstIndex(where: { regex.contains($0.text) }))
     else { return nil }
     let first = lines[start].text
     guard let match = regex.first(in: first) else { return nil }
     let keepHeading = section == .cooking && match.start > 0
     let rest = section == .cooking ? LabelsString.trimmed(first) : LabelsString.trimmed(LabelsString.substring(first, from: match.end))
     var out: [String] = []
+    var used = [lines[start]]
     if !rest.isEmpty || keepHeading { out.append(rest) }
+    var end = LabelSectionLines.End.endOfText
     for line in lines[(start + 1)...] {
-      if out.count >= maxSectionLines { break }
-      if startsOtherSection(line.text, section) { break }
+      if out.count >= maxLines {
+        end = .limit
+        break
+      }
+      if startsOtherSection(line.text, section) {
+        end = .heading
+        break
+      }
       out.append(LabelsString.trimmed(line.text))
+      used.append(line)
     }
-    let joined = LabelsString.trimmed(out.filter { !LabelsString.trimmed($0).isEmpty }.joined(separator: " "))
-    return joined.isEmpty ? nil : joined
+    return LabelSectionLines(texts: out, lines: used, end: end)
   }
 
   private static func startsOtherSection(_ text: String, _ current: LabelSection) -> Bool {

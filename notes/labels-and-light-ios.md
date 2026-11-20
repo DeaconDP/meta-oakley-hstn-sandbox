@@ -10,6 +10,8 @@ Tests:
 - `CameraAccessTests/LabelsToolTests.swift`
 - `CameraAccessTests/LightToolTests.swift`
 
+Update 2026-11-20: food check (your allergens, dates against today, cooking steps) was added to the Labels tool. See `notes/food-check-ios.md`.
+
 **Nothing here has been tried on a real iPhone.** It builds, and the pure logic passes its unit tests in the Simulator. The Simulator has no camera, so the barcode search, OCR on real labels, the probe tone and the exposure lock have not run end to end.
 
 ## What was built

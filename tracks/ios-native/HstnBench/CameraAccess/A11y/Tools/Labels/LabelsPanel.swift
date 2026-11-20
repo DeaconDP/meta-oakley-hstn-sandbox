@@ -64,6 +64,14 @@ struct LabelsPanel: View {
 
       buttons
 
+      if let index = tool.stepIndex, tool.cookingSteps.indices.contains(index), !tool.isMedicine {
+        stepCard(index)
+      }
+
+      if !tool.isMedicine {
+        FoodCheckCard(tool: tool, allergens: tool.myAllergens)
+      }
+
       if let text = tool.labelText, !tool.isMedicine {
         VStack(alignment: .leading, spacing: 8) {
           Text("Label text")
@@ -123,6 +131,46 @@ struct LabelsPanel: View {
     }
   }
 
+  /// The cooking step being read, as printed, with Previous, Repeat and Next.
+  private func stepCard(_ index: Int) -> some View {
+    let step = tool.cookingSteps[index]
+    return VStack(alignment: .leading, spacing: 12) {
+      Text("Step \(index + 1) of \(tool.cookingSteps.count)\(step.method.map { ", \($0)" } ?? "")")
+        .font(.rounded(.headline, weight: .heavy))
+        .foregroundStyle(Theme.inkSoft)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("labels_step_title")
+      Text(step.text)
+        .font(.rounded(.title2, weight: .bold))
+        .foregroundStyle(Theme.ink)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("labels_step_text")
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 12) { stepButtons(index) }
+        VStack(spacing: 12) { stepButtons(index) }
+      }
+    }
+    .themeCard()
+  }
+
+  @ViewBuilder
+  private func stepButtons(_ index: Int) -> some View {
+    Button("Previous") { tool.perform(.previousStep) }
+      .buttonStyle(.a11ySecondary)
+      .disabled(index == 0)
+      .accessibilityLabel("Previous step")
+      .accessibilityIdentifier("labels_step_previous")
+    Button("Repeat") { tool.perform(.repeatStep) }
+      .buttonStyle(.a11ySecondary)
+      .accessibilityLabel("Repeat step")
+      .accessibilityIdentifier("labels_step_repeat")
+    Button("Next") { tool.perform(.nextStep) }
+      .buttonStyle(.a11ySecondary)
+      .disabled(index + 1 >= tool.cookingSteps.count)
+      .accessibilityLabel("Next step")
+      .accessibilityIdentifier("labels_step_next")
+  }
+
   @ViewBuilder
   private var quickJumps: some View {
     Button("Date") { tool.perform(.expiry) }
@@ -135,5 +183,66 @@ struct LabelsPanel: View {
     Button("Allergens") { tool.perform(.allergens(nil)) }
       .buttonStyle(.a11ySecondary)
       .accessibilityIdentifier("labels_allergens")
+  }
+}
+
+/// Food check: my allergens (with a switch for each of the 14), "Is this OK for me?", cooking steps,
+/// and the reminder when a reminders feature is there. Every button does what its voice command does.
+struct FoodCheckCard: View {
+  let tool: LabelsTool
+  let allergens: MyAllergens
+  @State private var editing = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Food check")
+        .font(.rounded(.title2, weight: .heavy))
+        .foregroundStyle(Theme.ink)
+        .accessibilityAddTraits(.isHeader)
+
+      Text(allergens.isEmpty ? "My allergens: none set yet." : "My allergens: \(FoodAllergens.spokenList(allergens.allergens)).")
+        .font(.rounded(.title3, weight: .semibold))
+        .foregroundStyle(Theme.ink)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("labels_my_allergens")
+
+      Button("Is this OK for me?") { tool.perform(.foodCheck) }
+        .buttonStyle(.a11ySecondary)
+        .accessibilityHint("Checks the ingredients and allergy advice against your allergens. Nothing goes online.")
+        .accessibilityIdentifier("labels_food_check")
+
+      Button("Cooking steps") { tool.perform(.cooking) }
+        .buttonStyle(.a11ySecondary)
+        .accessibilityHint("Reads the cooking instructions one step at a time.")
+        .accessibilityIdentifier("labels_cooking_steps")
+
+      if tool.foodDate != nil, tool.canRemind {
+        Button("Remind me before it goes off") { tool.perform(.remind) }
+          .buttonStyle(.a11ySecondary)
+          .accessibilityIdentifier("labels_remind")
+      }
+
+      Button(editing ? "Done changing allergens" : "Change my allergens") { editing.toggle() }
+        .buttonStyle(.a11ySecondary)
+        .accessibilityIdentifier("labels_edit_allergens")
+
+      if editing {
+        VStack(alignment: .leading, spacing: 4) {
+          ForEach(FoodAllergens.all) { allergen in
+            Toggle(
+              isOn: Binding(get: { allergens.contains(allergen) }, set: { tool.setAllergen(allergen, on: $0) })
+            ) {
+              Text(allergen.title)
+                .font(.rounded(.title3, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(minHeight: 52)
+            .accessibilityIdentifier("labels_allergen_\(allergen.id)")
+          }
+        }
+      }
+    }
+    .themeCard()
   }
 }
