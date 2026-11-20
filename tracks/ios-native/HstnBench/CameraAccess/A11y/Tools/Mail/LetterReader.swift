@@ -51,7 +51,7 @@ struct DueDate: Equatable, Sendable {
   var sure: Bool
 }
 
-struct Reference: Equatable, Sendable {
+struct Reference: Equatable, Sendable, Codable {
   var label: String
   var value: String
 
@@ -262,7 +262,7 @@ enum LetterReader {
       pages: pages, isEnvelope: isEnvelope, kind: isEnvelope ? .unknown : kind, sender: sender, recipient: recipient,
       recipientAddress: recipientAddress, salutation: salutation, date: date, subject: subject, opening: opening,
       amount: amount, due: due, references: references, amountsMentioned: amountsMentioned, unsureMoney: unsureMoney,
-      scamSigns: ScamSigns.find(text))
+      scamSigns: ScamSigns.find(text, sender: sender, kind: kind))
   }
 
   /// The second-picture check, iOS only. `other` is the same page read from another picture.

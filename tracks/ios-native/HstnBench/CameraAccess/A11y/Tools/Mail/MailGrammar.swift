@@ -127,6 +127,19 @@ enum MailGrammar {
   ]
   private static let trailingFiller: [[String]] = [["thank", "you"], ["for", "me"], ["please"], ["now"], ["thanks"]]
 
+  /// The transcript normalised, then again after each piece of filler peeled off: what a rule may
+  /// match, longest first. LetterGrammar matches the same way.
+  static func phrases(_ transcript: String) -> [String] {
+    var tokens = VoiceCommandParser.normalize(transcript)
+    var out: [String] = []
+    while !tokens.isEmpty {
+      out.append(tokens.joined(separator: " "))
+      guard let shorter = stripOneFiller(tokens) else { break }
+      tokens = shorter
+    }
+    return out
+  }
+
   /// A command inside the tool, or nil.
   static func parse(_ transcript: String) -> MailCommand? {
     var tokens = VoiceCommandParser.normalize(transcript)
