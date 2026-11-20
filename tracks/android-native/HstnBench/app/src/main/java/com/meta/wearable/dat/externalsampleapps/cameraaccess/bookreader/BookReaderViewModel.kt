@@ -61,6 +61,7 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.ImageCheck
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.book.ImageIssue
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolId
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.core.ToolRequest
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.Setup
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -129,9 +130,6 @@ class BookReaderViewModel(
     private const val TAG = "BookReader"
     private const val PREFS = "book_reader"
     private const val KEY_BOOKMARK = "bookmark"
-    private const val KEY_RATE = "speech_rate"
-    private const val KEY_FURNITURE = "read_furniture"
-    private const val KEY_AUTO = "auto_turn"
     private const val MAX_HINTS = 3
     private const val HINT_RETRY_MS = 2500L
     private const val TICK_MS = 2_500L
@@ -147,12 +145,20 @@ class BookReaderViewModel(
   private val _uiState =
       MutableStateFlow(
           BookReaderUiState(
-              speechRate = prefs.getFloat(KEY_RATE, 1f),
-              readFurniture = prefs.getBoolean(KEY_FURNITURE, false),
-              autoTurn = prefs.getBoolean(KEY_AUTO, true),
+              // Speed, page numbers and auto-turn live in the settings store (speech.tools.book).
+              speechRate = hub.settings.current.rateFor(ToolId.BOOK.id),
+              readFurniture = hub.settings.current.bookPageNumbers,
+              autoTurn = hub.settings.current.bookAutoTurn,
           ),
       )
   val uiState: StateFlow<BookReaderUiState> = _uiState.asStateFlow()
+
+  /** Keeps the screen (and the detector) in step with settings changed by voice or elsewhere. */
+  private val settingsListener: (Setup) -> Unit = { s ->
+    val auto = s.bookAutoTurn
+    if (auto != _uiState.value.autoTurn) synchronized(detector) { detector.reset() }
+    _uiState.update { it.copy(speechRate = s.rateFor(ToolId.BOOK.id), readFurniture = s.bookPageNumbers, autoTurn = auto) }
+  }
 
   private val processor = PageProcessor()
   private val detector = PageTurnDetector()
@@ -176,6 +182,7 @@ class BookReaderViewModel(
     get() = hub.isSpeakingAside
 
   init {
+    hub.settings.addListener(settingsListener)
     // Page-turn detection from the stream. Cheap per frame; events hop to main.
     viewModelScope.launch(Dispatchers.Default) {
       camera.frameSizes.collect { frame ->
@@ -274,22 +281,21 @@ class BookReaderViewModel(
   /** A button press or command: acknowledge it, and start silence reminders over. */
   private fun userActed() = hub.userActed()
 
+  /** The rate buttons on the screen: the book's speed (its override if it has one), kept. */
   fun setSpeechRate(rate: Float) {
-    val r = (Math.round(rate * 10f) / 10f).coerceIn(MIN_RATE, MAX_RATE)
-    hub.setRate(r)
-    prefs.edit().putFloat(KEY_RATE, r).apply()
-    _uiState.update { it.copy(speechRate = r) }
+    hub.settingsVoice.changeRate(ToolId.BOOK.id, keep = true) { rate }
   }
 
   fun setReadFurniture(enabled: Boolean) {
-    prefs.edit().putBoolean(KEY_FURNITURE, enabled).apply()
-    _uiState.update { it.copy(readFurniture = enabled) }
+    hub.settings.change(if (enabled) "page numbers read out" else "page numbers skipped", keep = true) {
+      it.copy(speech = it.speech.withTool(ToolId.BOOK.id) { t -> t.copy(pageNumbers = enabled.takeIf { e -> e }) })
+    }
   }
 
   fun setAutoTurn(enabled: Boolean) {
-    prefs.edit().putBoolean(KEY_AUTO, enabled).apply()
-    synchronized(detector) { detector.reset() }
-    _uiState.update { it.copy(autoTurn = enabled) }
+    hub.settings.change(if (enabled) "automatic page turns on" else "automatic page turns off", keep = true) {
+      it.copy(speech = it.speech.withTool(ToolId.BOOK.id) { t -> t.copy(autoTurn = if (enabled) null else false) })
+    }
   }
 
   /** Leaves the reader: stop speaking, keep the bookmark. */
@@ -585,7 +591,7 @@ class BookReaderViewModel(
           goodbye = str(R.string.voice_goodbye),
       )
 
-  override fun speechRate(): Float = _uiState.value.speechRate
+  override fun speechRate(): Float = hub.settings.current.rateFor(ToolId.BOOK.id)
 
   override fun onAttached(request: ToolRequest) {
     _uiState.update { it.copy(closeRequested = false) }
@@ -753,9 +759,9 @@ class BookReaderViewModel(
             page.chunks.indexOfFirst { it.paragraph == p }.coerceAtLeast(0)
           }
       VoiceCommand.FromTop -> jump { _, _ -> 0 }
-      is VoiceCommand.Faster -> changeRate(_uiState.value.speechRate + command.step)
-      is VoiceCommand.Slower -> changeRate(_uiState.value.speechRate - command.step)
-      is VoiceCommand.SetRate -> changeRate(command.rate)
+      is VoiceCommand.Faster -> changeRate { it + command.step }
+      is VoiceCommand.Slower -> changeRate { it - command.step }
+      is VoiceCommand.SetRate -> changeRate { command.rate }
       VoiceCommand.WhereAmI -> reply(whereAmI())
       VoiceCommand.Battery -> reply(hub.batteryReport())
       VoiceCommand.Help ->
@@ -827,11 +833,9 @@ class BookReaderViewModel(
     return page.chunks.indexOfFirst { it.sentence == sentence }.coerceAtLeast(0)
   }
 
-  private fun changeRate(requested: Float) {
-    val before = _uiState.value.speechRate
-    setSpeechRate(requested)
-    val after = _uiState.value.speechRate
-    reply(hub.rateReply(before, requested, after))
+  /** By voice: this session only until "keep that" (the settings store says so the first time). */
+  private fun changeRate(requested: (Float) -> Float) {
+    reply(hub.settingsVoice.changeRate(ToolId.BOOK.id, requested = requested).text)
   }
 
   private fun whereAmI(): String {
@@ -889,6 +893,7 @@ class BookReaderViewModel(
 
   override fun onCleared() {
     super.onCleared()
+    hub.settings.removeListener(settingsListener)
     saveBookmark()
     ocr.close()
   }

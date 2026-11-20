@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -73,6 +74,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -144,6 +146,12 @@ fun CameraScreen(
   val application = (LocalActivity.current as ComponentActivity).application
   val hub: ToolHub = viewModel(factory = ToolHub.Factory(application, cameraViewModel))
   val activeTool by hub.activeTool.collectAsStateWithLifecycle()
+  val showCustomise by hub.showSettings.collectAsStateWithLifecycle()
+  val shareContext = LocalContext.current
+  DisposableEffect(hub) {
+    hub.onShareSetup = { json, code -> shareSetup(shareContext, json, code) }
+    onDispose { hub.onShareSetup = null }
+  }
   // The home voice menu: voice runs for this whole screen, not only while a tool is open, so a
   // blind user never needs the buttons (notes/tools-layer.md > Home voice menu). Off for the
   // touch-driven bench tests and with `--ez home_voice false`.
@@ -223,6 +231,7 @@ fun CameraScreen(
             activity?.let { wearablesViewModel.startUnregistration(it) }
             showSettingsMenu = false
           },
+          onCustomise = { hub.setShowSettings(true) },
       )
 
       if (homeVoice && activeTool == null) HomeVoicePanel(hub)
@@ -291,6 +300,9 @@ fun CameraScreen(
             )
       }
     }
+
+    // Make it your own: over everything, including an open tool.
+    if (showCustomise) CustomiseScreen(hub, onClose = { hub.setShowSettings(false) })
 
     // Touch-only mode keeps the bench's prompt; with the home menu the voice path replaces it.
     if (ui.showCameraPermissionRedirectConfirm && !homeVoice) {
@@ -537,6 +549,7 @@ private fun TopBar(
     showSettingsMenu: Boolean,
     onToggleSettings: () -> Unit,
     onDisconnect: () -> Unit,
+    onCustomise: () -> Unit,
 ) {
   Row(
       modifier =
@@ -565,6 +578,27 @@ private fun TopBar(
           value = ui.streamStateText,
           active = ui.isStreaming,
           present = ui.hasStream,
+      )
+    }
+
+    Spacer(modifier = Modifier.width(12.dp))
+
+    // "Make it your own": the settings screen (also "open settings" by voice).
+    Box(
+        modifier =
+            Modifier.size(SpeakUpDimens.MinTouchTarget)
+                .clip(CircleShape)
+                .background(SpeakUpColors.Dusk)
+                .border(2.dp, SpeakUpColors.DuskLine, CircleShape)
+                .clickable(onClick = onCustomise)
+                .testTag("customise_button"),
+        contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+          imageVector = Icons.Filled.Tune,
+          contentDescription = stringResource(R.string.customise_button),
+          tint = SpeakUpColors.Paper,
+          modifier = Modifier.size(28.dp),
       )
     }
 

@@ -83,6 +83,8 @@ dependencies {
   implementation(libs.mwdat.camera)
   // Book reader voice control: on-glasses speech recognition (Experimental in DAT 1.0).
   implementation(libs.mwdat.speech)
+  // Glasses controls (Make it your own, C4): capture button, touchpad and swipes (Experimental).
+  implementation(libs.mwdat.inputs)
   implementation(libs.mwdat.mockdevice)
   // Book reader: on-device OCR, Latin script, model bundled in the APK (no Play Services download).
   implementation(libs.mlkit.text.recognition)

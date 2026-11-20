@@ -54,9 +54,10 @@ object ToolTestKit {
           .uiAutomation
           .executeShellCommand("pm grant ${context.packageName} android.permission.$it")
     }
-    for (prefs in listOf("book_reader", "tools")) {
+    for (prefs in listOf("book_reader", "tools", com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsPrefs.FILE)) {
       context.getSharedPreferences(prefs, Context.MODE_PRIVATE).edit().clear().commit()
     }
+    com.meta.wearable.dat.externalsampleapps.cameraaccess.tools.settings.SettingsPrefs.resetForTests()
   }
 
   /** Call in @After. */
