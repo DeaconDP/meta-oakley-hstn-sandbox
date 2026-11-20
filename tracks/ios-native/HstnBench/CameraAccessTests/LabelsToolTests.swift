@@ -322,10 +322,17 @@ final class LabelsToolMedicineTests: XCTestCase {
 
   func testFoodDatesAreSaidPlainly() {
     let t = tool()
-    t.addViewForTesting([LabelLine(text: "OAT CRUNCH", height: 60), LabelLine(text: "Best before: 12/03/2027", height: 18, confidence: 0.4)])
+    t.addViewForTesting([LabelLine(text: "OAT CRUNCH", height: 60), LabelLine(text: "Best before: 12/03/2027", height: 18, confidence: 0.9)])
     XCTAssertFalse(t.isMedicine)
-    XCTAssertEqual(t.expiryAnswer(), "Best before 12 March 2027.")
+    XCTAssertEqual(t.expiryAnswer(), "Best before 12 March 2027: that's in about 4 months. Best before is about quality, not safety.")
     XCTAssertNotNil(t.labelText)
+  }
+
+  func testAnUnclearFoodDateIsNotSaid() {
+    // Food check (FoodDates): a date line read with low confidence abstains, as medicine does.
+    let t = tool()
+    t.addViewForTesting([LabelLine(text: "OAT CRUNCH", height: 60), LabelLine(text: "Best before: 12/03/2027", height: 18, confidence: 0.4)])
+    XCTAssertFalse(t.expiryAnswer().contains("12 March"))
   }
 
   func testDoseQuestionsAreHandledByTheTool() {

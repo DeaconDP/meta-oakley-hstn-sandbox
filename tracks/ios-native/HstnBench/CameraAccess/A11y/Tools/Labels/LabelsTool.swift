@@ -17,6 +17,11 @@
  * date only (the date only when read clearly, always with a reminder); anything about doses gets
  * "I won't read medicine doses...". Medicine label text is never shown on screen.
  * Every action plays an earcon; every failure is spoken. See notes/labels-and-light-ios.md.
+ *
+ * Food check (roadmap V2, notes/food-check-ios.md): the user's allergens (MyAllergens, on the
+ * phone) against the pack's ingredients and allergy advice (FoodCheck); the date against today in
+ * plain words, with "remind me before it goes off" through Reminders.shared (FoodDates); and the
+ * cooking instructions one step at a time (CookingSteps). Medicine labels are unchanged.
  */
 
 import Foundation
@@ -55,6 +60,14 @@ final class LabelsTool: SpeakUpTool {
   private(set) var medicineName: String?
   /// The last line spoken, for the screen. Never a medicine dose: the tool never speaks one.
   private(set) var lastLine = ""
+  /// Cooking instructions as steps, after "how do I cook it".
+  private(set) var cookingSteps: [CookingStep] = []
+  /// The step being read, nil when not stepping through.
+  private(set) var stepIndex: Int?
+  /// The food date last said clearly, for "remind me before it goes off".
+  private(set) var foodDate: LabelDate?
+  /// The user's allergens (on the phone), for food check.
+  @ObservationIgnored let myAllergens: MyAllergens
 
   // Timing, as on Android (the frame rate is a little higher: Vision on a phone is quick).
   static let searchInterval: Duration = .milliseconds(333)
@@ -80,17 +93,31 @@ final class LabelsTool: SpeakUpTool {
   /// Where a label's text goes for "Ask about the text". Never a medicine label's.
   @ObservationIgnored var recentText: RecentText = .shared
 
+  @ObservationIgnored private let reminders: @MainActor () -> any ReminderScheduling
+  @ObservationIgnored private let now: () -> Date
+  @ObservationIgnored private var reminderTask: Task<Void, Never>?
+
   /// `productSource` is where "look it up" goes (Open Food Facts; tests pass a fake). `today` decides
-  /// whether a date has passed.
+  /// whether a date has passed. `myAllergens` defaults to the shared list, `reminders` to
+  /// `Reminders.shared` (read when used, since the Reminders feature replaces it at launch).
   init(
     productSource: any ProductSource = OpenFoodFactsSource(),
     today: @escaping () -> CivilDate = { CivilDate.today() },
-    tones: ToolTonePlayer = .shared
+    tones: ToolTonePlayer = .shared,
+    myAllergens: MyAllergens? = nil,
+    reminders: (@MainActor () -> any ReminderScheduling)? = nil,
+    now: @escaping () -> Date = { Date() }
   ) {
     self.productSource = productSource
     self.today = today
     self.tones = tones
+    self.myAllergens = myAllergens ?? .shared
+    self.reminders = reminders ?? { Reminders.shared }
+    self.now = now
   }
+
+  /// A reminders feature is there to ask (the default answers "unavailable").
+  var canRemind: Bool { !(reminders() is NoReminders) }
 
   // MARK: SpeakUpTool
 
@@ -116,6 +143,11 @@ final class LabelsTool: SpeakUpTool {
   }
 
   func handle(transcript: String) -> Bool {
+    // While stepping through cooking instructions, "next", "back" and "repeat" move the steps.
+    if stepIndex != nil, let step = LabelsGrammar.stepCommand(transcript) {
+      perform(step)
+      return true
+    }
     guard let command = LabelsGrammar.parse(transcript) else { return false }
     perform(command)
     return true
@@ -140,8 +172,10 @@ final class LabelsTool: SpeakUpTool {
       } else {
         readAll()
       }
-    case .expiry: withFreshView { $0.reply($0.expiryAnswer(), earcon: .done) }
-    case .cooking: sectionCommand(.cooking)
+    case .expiry: withFreshView { $0.expiryReply() }
+    case .cooking:
+      if isMedicine { return refuseMedicine() }
+      withFreshView { tool in tool.isMedicine ? tool.refuseMedicine() : tool.startSteps() }
     case .ingredients: sectionCommand(.ingredients)
     case .allergens(let query):
       if isMedicine { return refuseMedicine() }
@@ -152,7 +186,156 @@ final class LabelsTool: SpeakUpTool {
     case .dose:
       stopAll()
       reply(LabelsSpeech.medicineDose, earcon: .attention)
+    case .foodCheck:
+      if isMedicine { return refuseMedicine() }
+      if myAllergens.isEmpty { return reply(LabelsSpeech.noAllergensSet, earcon: .attention) }
+      withFreshView { tool in tool.isMedicine ? tool.refuseMedicine() : tool.foodCheckAnswer() }
+    case .setAllergens(let phrase): changeAllergens(phrase, .set)
+    case .addAllergens(let phrase): changeAllergens(phrase, .add)
+    case .removeAllergens(let phrase): changeAllergens(phrase, .remove)
+    case .clearAllergens:
+      myAllergens.set([])
+      reply(LabelsSpeech.allergensCleared, earcon: .done)
+    case .listAllergens:
+      if myAllergens.isEmpty { return reply(LabelsSpeech.noAllergensSet, earcon: .attention) }
+      reply(LabelsSpeech.myAllergens(FoodAllergens.spokenList(myAllergens.allergens)), earcon: .done)
+    case .remind: remindBeforeExpiry()
+    case .nextStep: moveStep(by: 1)
+    case .previousStep: moveStep(by: -1)
+    case .repeatStep: moveStep(by: 0)
     }
+  }
+
+  // MARK: Food check: my allergens
+
+  private enum ListChange { case set, add, remove }
+
+  private func changeAllergens(_ phrase: String, _ change: ListChange) {
+    let resolved = FoodAllergens.resolve(phrase)
+    var parts: [String] = []
+    if resolved.allergens.isEmpty {
+      let line = resolved.unknown.isEmpty ? LabelsSpeech.noAllergenHeard : LabelsSpeech.notRecognised(resolved.unknown)
+      return reply(line, earcon: .attention)
+    }
+    switch change {
+    case .set:
+      myAllergens.set(resolved.allergens)
+    case .add:
+      let new = myAllergens.add(resolved.allergens)
+      let old = resolved.allergens.filter { !new.contains($0) }
+      if !new.isEmpty { parts.append(LabelsSpeech.added(FoodAllergens.spokenList(new))) }
+      if !old.isEmpty { parts.append(LabelsSpeech.alreadyOn(FoodAllergens.spokenList(old))) }
+    case .remove:
+      let gone = myAllergens.remove(resolved.allergens)
+      let absent = resolved.allergens.filter { !gone.contains($0) }
+      if !gone.isEmpty { parts.append(LabelsSpeech.removed(FoodAllergens.spokenList(gone))) }
+      if !absent.isEmpty { parts.append(LabelsSpeech.notOn(FoodAllergens.spokenList(absent))) }
+    }
+    if change != .remove { parts.append(contentsOf: resolved.notes) }
+    if !resolved.unknown.isEmpty { parts.append(LabelsSpeech.notRecognised(resolved.unknown)) }
+    parts.append(
+      myAllergens.isEmpty ? LabelsSpeech.listEmpty : LabelsSpeech.myAllergens(FoodAllergens.spokenList(myAllergens.allergens)))
+    if change == .set { parts.append(LabelsSpeech.foodCheckAfterSet) }
+    reply(parts.joined(separator: " "), earcon: .done)
+  }
+
+  /// The panel's switches.
+  func setAllergen(_ allergen: FoodAllergen, on: Bool) {
+    if on {
+      myAllergens.add([allergen])
+      reply(LabelsSpeech.added(allergen.spoken), earcon: .done)
+    } else {
+      myAllergens.remove([allergen])
+      reply(LabelsSpeech.removed(allergen.spoken), earcon: .done)
+    }
+  }
+
+  /// "Is this OK for me?" from every side read so far.
+  private func foodCheckAnswer() {
+    let report = FoodCheck.check(sides: views.reversed().map(\.lines), allergens: myAllergens.allergens, product: product)
+    let earcon: Earcon
+    if !report.contains.isEmpty || !report.mayContain.isEmpty {
+      earcon = .attention
+    } else if report.state == .complete {
+      earcon = .done
+    } else {
+      earcon = .uncertain
+    }
+    if earcon == .uncertain { LightLabelKit.haptic(.failed) }
+    reply(report.spoken, earcon: earcon)
+  }
+
+  // MARK: Food check: dates and reminders
+
+  /// The date answer for food, or medicine's own rule. Records a clear food date for reminders.
+  private func foodDateAnswer() -> FoodDateAnswer {
+    let lines = views.reversed().flatMap(\.lines)
+    guard !isMedicine else { return FoodDateAnswer(spoken: expiryAnswer(), date: nil) }
+    let answer = FoodDates.answer(lines, today: today())
+    foodDate = answer.date
+    return answer
+  }
+
+  private func expiryReply() {
+    let answer = foodDateAnswer()
+    guard let date = answer.date else {
+      return reply(answer.spoken, earcon: isMedicine ? .done : .attention)
+    }
+    var text = answer.spoken
+    if canRemind, !date.isPast(today()) { text += " " + FoodDates.offer }
+    reply(text, earcon: .done)
+  }
+
+  private func remindBeforeExpiry() {
+    if isMedicine { return refuseMedicine() }
+    guard let date = foodDate else { return reply(LabelsSpeech.noDateForReminder, earcon: .attention) }
+    let name = product?.name ?? views.last.flatMap { LabelText.nameGuess($0.lines) }
+    let key = code?.productCode ?? (name ?? "food").lowercased().filter { $0.isLetter || $0.isNumber }
+    let day = today()
+    switch FoodDates.reminder(for: date, name: name, key: key, today: day, now: now()) {
+    case .passed: reply(LabelsSpeech.reminderPassed, earcon: .attention)
+    case .tooSoon: reply(LabelsSpeech.reminderTooSoon, earcon: .attention)
+    case .request(let request):
+      earcons.play(.working)
+      let scheduler = reminders()
+      reminderTask?.cancel()
+      reminderTask = Task { [weak self] in
+        let result = await scheduler.schedule(request)
+        guard let self, !Task.isCancelled else { return }
+        let line = FoodDates.scheduled(result, fireDate: request.fireDate, date: date, today: day)
+        if result == .scheduled {
+          self.reply(line, earcon: .done)
+        } else {
+          self.warn(line)
+        }
+      }
+    }
+  }
+
+  // MARK: Cooking steps
+
+  private func startSteps() {
+    let section = views.reversed().lazy.compactMap { LabelText.sectionLines($0.lines, .cooking, maxLines: 30)?.text }.first { !$0.isEmpty }
+    let steps = section.map(CookingSteps.split) ?? []
+    guard !steps.isEmpty else {
+      cookingSteps = []
+      stepIndex = nil
+      return reply(LabelsSpeech.noCooking, earcon: .attention)
+    }
+    cookingSteps = steps
+    stepIndex = 0
+    let first = CookingSteps.line(steps, 0)
+    reply([CookingSteps.intro(steps), first, steps.count > 1 ? LabelsSpeech.stepsHow : ""].filter { !$0.isEmpty }.joined(separator: " "), earcon: .done)
+    lastLine = first
+  }
+
+  private func moveStep(by delta: Int) {
+    guard let index = stepIndex, !cookingSteps.isEmpty else { return reply(LabelsSpeech.noSteps, earcon: .attention) }
+    let target = index + delta
+    if target >= cookingSteps.count { return reply(LabelsSpeech.lastStepAlready, earcon: .attention) }
+    if target < 0 { return reply(LabelsSpeech.firstStepAlready, earcon: .attention) }
+    stepIndex = target
+    reply(CookingSteps.line(cookingSteps, target, alwaysMethod: delta <= 0), earcon: delta == 0 ? .ready : .done)
   }
 
   private func sectionCommand(_ section: LabelSection) {
@@ -171,6 +354,9 @@ final class LabelsTool: SpeakUpTool {
     labelText = nil
     isMedicine = false
     medicineName = nil
+    cookingSteps = []
+    stepIndex = nil
+    foodDate = nil
     phase = .searching
     guard let source else { return warn("The camera isn't ready yet. Try again in a moment.") }
     earcons.play(.working)
@@ -388,7 +574,9 @@ final class LabelsTool: SpeakUpTool {
     let lines = blocks.flatMap { $0 }.compactMap { line -> LabelLine? in
       let text = LabelsString.trimmed(line.text)
       guard !text.isEmpty else { return nil }
-      return LabelLine(text: text, height: Double(line.box.height), confidence: line.words.map(\.confidence).min())
+      return LabelLine(
+        text: text, height: Double(line.box.height), confidence: line.words.map(\.confidence).min(),
+        touchesEdge: !FramingAdvisor.cutEdges([line], imageSize: page.imageSize).isEmpty)
     }
     guard !lines.isEmpty else { return false }
     let paragraphs = blocks.map { block in block.map { LabelsString.trimmed($0.text) }.joined(separator: " ") }.filter { !$0.isEmpty }
@@ -460,8 +648,9 @@ final class LabelsTool: SpeakUpTool {
   func expiryAnswer() -> String {
     let today = today()
     let lines = views.reversed().flatMap(\.lines)
+    // Food: the date against today, abstaining when it isn't clearly read (FoodDates).
+    guard isMedicine else { return FoodDates.answer(lines, today: today).spoken }
     let plain = LabelDates.answer(LabelDates.find(lines.map(\.text).joined(separator: "\n"), today: today), today: today)
-    guard isMedicine else { return plain ?? LabelsSpeech.noExpiry }
     // The lines the date is on: any line with a date or a date keyword, and the line after a
     // keyword (the date often sits below).
     let dateLines = lines.indices.filter { i in

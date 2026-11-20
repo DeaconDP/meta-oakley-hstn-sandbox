@@ -9,8 +9,36 @@
 enum LabelsSpeech {
   static let help =
     "Hold up a packet, tin or box in front of the camera. You can say: scan this, look it up, read the label, read it all, when does it expire, "
-    + "ingredients, cooking instructions, allergens, does it contain nuts, what is it, or stop scanning. Only the barcode number goes "
-    + "online, and only when you say look it up."
+    + "ingredients, how do I cook it, then next step, allergens, does it contain nuts, what is it, or stop scanning. "
+    + "For food check, tell me your allergens, for example my allergens are peanuts and milk, then say is this OK for me. "
+    + "Only the barcode number goes online, and only when you say look it up."
+
+  // Food check: my allergens
+  static let noAllergensSet =
+    "You haven't told me your allergens yet. Say, for example, my allergens are peanuts and milk. Then say is this OK for me."
+  static func myAllergens(_ list: String) -> String { "Your allergens are \(list)." }
+  static func notRecognised(_ words: [String]) -> String {
+    "I didn't recognise \(LabelText.listWords(words)). I check the 14 main allergens: \(FoodAllergens.catalogueSpoken)."
+  }
+  static let noAllergenHeard = "I didn't catch an allergen. Say, for example, add sesame."
+  static let allergensCleared = "I've cleared your allergens."
+  static let listEmpty = "Your list is now empty."
+  static func added(_ list: String) -> String { "Added \(list)." }
+  static func alreadyOn(_ list: String) -> String { "Already on your list: \(list)." }
+  static func removed(_ list: String) -> String { "Removed \(list)." }
+  static func notOn(_ list: String) -> String { "Not on your list: \(list)." }
+  static let foodCheckAfterSet = "Say is this OK for me with a pack in view."
+
+  // Cooking steps
+  static let stepsHow = "Say next step, previous step or repeat step."
+  static let noSteps = "I haven't read any cooking steps yet. Say how do I cook it."
+  static let lastStepAlready = "That was the last step. Say repeat step, or previous step."
+  static let firstStepAlready = "This is the first step. Say next step to go on."
+
+  // Reminders
+  static let noDateForReminder = "I need a clear use by or best before date first. Say when does it expire."
+  static let reminderPassed = "That date has already passed, so there's nothing to remind you about."
+  static let reminderTooSoon = "It goes off today, so it's too late for a reminder."
 
   // Searching
   static let searching = "Looking for a barcode. Hold it in front of the camera and turn it slowly."
