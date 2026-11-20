@@ -29,6 +29,12 @@ protocol PhoneCamera: ReadFrameSource {
   var hasTorch: Bool { get }
   var isTorchOn: Bool { get }
   func setTorch(_ on: Bool) -> TorchResult
+  /// EV at ISO 100 from the running camera's exposure (DarkWatch), nil when unknown.
+  var sceneEV: Double? { get }
+}
+
+extension PhoneCamera {
+  var sceneEV: Double? { nil }
 }
 
 @MainActor
@@ -57,6 +63,14 @@ final class PhoneFrameSource: NSObject, PhoneCamera {
   var hasTorch: Bool { device?.hasTorch ?? false }
 
   var cameraKind: CameraKind { .phone }
+
+  /// From the camera's auto exposure: ISO, shutter time and aperture (DarkWatch). The device's
+  /// exposure properties are key-value observable and safe to read from the main thread.
+  var sceneEV: Double? {
+    guard state == .running, let device else { return nil }
+    return SceneLight.ev100(
+      aperture: Double(device.lensAperture), exposureSeconds: CMTimeGetSeconds(device.exposureDuration), iso: Double(device.iso))
+  }
 
   // Injected so tests and the Simulator path don't depend on hardware.
   @ObservationIgnored private let findDevice: () -> AVCaptureDevice?

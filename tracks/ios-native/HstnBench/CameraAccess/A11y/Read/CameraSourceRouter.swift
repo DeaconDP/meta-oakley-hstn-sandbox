@@ -221,3 +221,13 @@ final class CameraSourceRouter: ReadFrameSource {
     current?.stopReadingStream()
   }
 }
+
+// MARK: - Light (DarkWatch)
+
+extension CameraSourceRouter: ReadLightSource {
+  var sceneEV: Double? { active == .phone ? phone.sceneEV : nil }
+
+  var canOfferTorch: Bool { active == .phone && phone.hasTorch && !phone.isTorchOn }
+
+  func turnTorchOn() { setTorch(true) }
+}

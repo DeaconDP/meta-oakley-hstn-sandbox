@@ -185,6 +185,24 @@ final class TextReader {
   @ObservationIgnored private var speechTask: Task<Void, Never>?
   /// Pages given to read(pages:source:) all had no text: end on the last notice, not "End of text".
   @ObservationIgnored private var pagesHadNoText = false
+  /// The raw cloud transcription of this read, for the steps.
+  @ObservationIgnored private var cloudText = ""
+
+  // Reading with the phone (notes/phone-reading-ios.md).
+  /// The steps of the last page read ("next step"). Attached to this reader in init.
+  @ObservationIgnored let steps = ReadSteps(reader: nil)
+  /// "It's dark" before OCR, with hysteresis (phone camera only).
+  @ObservationIgnored var darkWatch = DarkWatch()
+  /// After the dark warning: "Shall I turn the torch on?" waits for yes or no.
+  private(set) var torchOfferPending = false
+  /// The torch is offered once per run.
+  @ObservationIgnored private var torchOffered = false
+  /// Haptic cues for framing verdicts (phone camera only).
+  @ObservationIgnored var framingAssist: FramingAssist?
+
+  init() {
+    steps.attach(self)
+  }
 
   private struct PendingFirstWord {
     var generation: Int
@@ -250,6 +268,9 @@ final class TextReader {
     readID += 1
     resetCloud()
     pagesHadNoText = false
+    torchOfferPending = false
+    cloudText = ""
+    steps.leaveStepMode()
     earcons.play(.working)
     earcons.startWorkingTick(owner: Self.tickOwner)
     pendingFirstWord = PendingFirstWord(generation: generation, triggerAt: triggerAt, source: source)
@@ -292,6 +313,16 @@ final class TextReader {
 
   /// Stops speech and any recognition in flight. Keeps the sentences for previous/repeat.
   func stop() {
+    stop(earcon: true)
+  }
+
+  /// Something else of Read text's is about to speak (a step): stop reading without the earcon.
+  func quietForOtherSpeech() {
+    torchOfferPending = false
+    stop(earcon: false)
+  }
+
+  private func stop(earcon: Bool) {
     generation += 1
     readID += 1
     task?.cancel()
@@ -303,9 +334,34 @@ final class TextReader {
     pendingFirstWord = nil
     earcons.stopWorkingTick(owner: Self.tickOwner)
     announcer.stop()
-    earcons.play(.ready)
+    if earcon { earcons.play(.ready) }
     if phase != .idle { phase = .stopped }
   }
+
+  // MARK: Torch offer
+
+  /// "yes" to "Shall I turn the torch on?": the torch goes on, then the page is read again once the
+  /// exposure has settled.
+  func acceptTorchOffer() {
+    guard torchOfferPending else { return }
+    torchOfferPending = false
+    (source as? ReadLightSource)?.turnTorchOn()
+    let myGeneration = generation
+    Task { [weak self] in
+      try? await Task.sleep(for: Self.torchSettle)
+      guard let self, self.generation == myGeneration else { return }
+      self.read()
+    }
+  }
+
+  func declineTorchOffer() {
+    guard torchOfferPending else { return }
+    torchOfferPending = false
+    announcer.say(SpokenMessage.readTorchDeclined, kind: .reply)
+  }
+
+  /// How long the camera's exposure takes to follow the torch before reading again. [est]
+  static let torchSettle: Duration = .milliseconds(900)
 
   private func speakNothingToNavigate() {
     announcer.say(SpokenMessage.readNothingToNavigate, kind: .reply)
@@ -318,6 +374,14 @@ final class TextReader {
       return finish(guidance: SpokenMessage.readNoCamera, earcon: .error, myGeneration)
     }
     guard await ensureStream(source, myGeneration) else { return }
+
+    // The phone: too dark is said before OCR or the cloud, from the camera's exposure.
+    if source.cameraKind == .phone, let frame = await recentFrame(source, myGeneration),
+      await isTooDark(frame.image, source: source, myGeneration)
+    {
+      return warnDark(source: source, myGeneration)
+    }
+    guard isCurrent(myGeneration) else { return }
 
     if let client = CloudReading.shared.client() {
       return await runCloud(source, client: client, myGeneration, read: myRead)
@@ -341,6 +405,39 @@ final class TextReader {
       fromPhoto = true
     }
     await recognizeAndRespond(image, fromPhoto: fromPhoto, source: source, myGeneration)
+  }
+
+  // MARK: Dark warning
+
+  /// DarkWatch on this frame: the camera's EV when it has one, else the frame's mean brightness.
+  /// The brightness is measured on a 240 px copy, a few milliseconds, off the main actor.
+  private func isTooDark(_ image: UIImage, source: any ReadFrameSource, _ myGeneration: Int) async -> Bool {
+    let ev = (source as? ReadLightSource)?.sceneEV
+    var brightness: Double?
+    if ev == nil, let cgImage = image.cgImage {
+      brightness = await Task.detached(priority: .userInitiated) { TextRecognizer.measureQuality(cgImage).brightness }.value
+    }
+    guard isCurrent(myGeneration) else { return false }
+    let decision = darkWatch.check(ev: ev, brightness: brightness)
+    clock.note(
+      "read dark_check ev=\(ev.map { String(format: "%.1f", $0) } ?? "-") brightness=\(brightness.map { String(format: "%.2f", $0) } ?? "-") dark=\(darkWatch.isDark)")
+    return decision == .warn
+  }
+
+  /// "It's dark. Say torch on, or move somewhere brighter." instead of OCR, then, once per run, the
+  /// torch offer.
+  private func warnDark(source: any ReadFrameSource, _ myGeneration: Int) {
+    hapticAssist?.darkWarning()
+    finish(guidance: SpokenMessage.readDarkWarning, earcon: .attention, myGeneration)
+    guard !torchOffered, let light = source as? ReadLightSource, light.canOfferTorch else { return }
+    torchOffered = true
+    torchOfferPending = true
+    announcer.say(SpokenMessage.readTorchOffer, kind: .reply, interrupt: false)
+  }
+
+  /// The haptic cues for this reader: the app's for the shared one, a test's own otherwise.
+  private var hapticAssist: FramingAssist? {
+    framingAssist ?? (self === Self.shared ? FramingAssist.shared : nil)
   }
 
   /// On-phone OCR and the framing check for `image`, then the response. Also the cloud fallback.
@@ -368,6 +465,7 @@ final class TextReader {
     }
     if fromPhoto, pendingFirstWord?.source == "frame" { pendingFirstWord?.source = "photo" }
     clock.note("read verdict=\(verdict.logName) lines=\(recognized.page.lines.count) source=\(fromPhoto ? "photo" : "frame")")
+    if source.cameraKind == .phone { hapticAssist?.readVerdict(verdict) }
     respond(to: recognized.page, verdict: verdict, myGeneration)
   }
 
@@ -447,6 +545,8 @@ final class TextReader {
     sentences = rendered
     notice = guidance
     publishPage()
+    let pageText = StepPageText.make(blocks: blocks)
+    steps.pageRead(text: pageText.text, words: pageText.words)
     if let guidance {
       // Cut off: say where and which way to turn, then read what is visible.
       announcer.announce(
@@ -466,10 +566,13 @@ final class TextReader {
     isTranscribing = true
     var pageNumber = 0
     var hadText = false
+    var allBlocks: [[ReadLine]] = []
     for await page in pages {
       guard isCurrentRead(myRead) else { return }
       pageNumber += 1
-      let words = page.page.map { SentenceSplitter.sentences(blocks: ReadingOrder.blocks($0.lines)) } ?? []
+      let blocks = page.page.map { ReadingOrder.blocks($0.lines) } ?? []
+      allBlocks += blocks
+      let words = SentenceSplitter.sentences(blocks: blocks)
       let rendered = words
         .map { ReadSpeech.render($0, verbosity: preferences.verbosity, earconsEnabled: preferences.earconsEnabled) }
         .filter { !$0.chunks.isEmpty }
@@ -492,6 +595,10 @@ final class TextReader {
       return finish(guidance: source.nothingLine, earcon: .attention, generation)
     }
     pagesHadNoText = !hadText
+    if hadText {
+      let pageText = StepPageText.make(blocks: allBlocks)
+      steps.pageRead(text: pageText.text, words: pageText.words)
+    }
     guard waitingForMore else { return }
     // The voice was waiting at the last sentence: that was all of it.
     waitingForMore = false
@@ -648,6 +755,7 @@ final class TextReader {
             "cloud_first_text", ms: Self.milliseconds(since: photoReadyAt),
             detail: "size=\(Self.pixelSize(image)) source=\(fromPhoto ? "photo" : "frame")")
         }
+        cloudText += delta
         for sentence in splitter.append(delta) { addCloudSentence(sentence) }
       }
       guard isCurrentRead(myRead) else { return }
@@ -699,6 +807,9 @@ final class TextReader {
       return finish(guidance: guidance, earcon: .attention, generation)
     }
     clock.note("read cloud sentences=\(sentences.count)")
+    // The cloud gives no per-word confidence: every word counts as sure, as when it is read.
+    let words = cloudText.split(whereSeparator: \.isWhitespace).map { ReadWord(text: String($0), confidence: 1) }
+    steps.pageRead(text: cloudText, words: words)
     guard waitingForMore else { return }
     // The voice was waiting at the last sentence: that was all of it.
     waitingForMore = false

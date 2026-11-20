@@ -201,6 +201,64 @@ extension SpokenMessage {
     }
   }
 
+  // MARK: Read: dark warning (DarkWatch)
+
+  static let readDarkWarning = "It's dark. Say torch on, or move somewhere brighter."
+
+  /// Asked once per run, after the warning, when the phone has a torch that is off.
+  static let readTorchOffer = "Shall I turn the torch on? Say yes, or tap Torch on."
+
+  static let readTorchDeclined = "OK. Say torch on any time."
+
+  // MARK: Read: haptics setting
+
+  static let readHapticsOn = "Framing haptics on."
+
+  static let readHapticsOff = "Framing haptics off."
+
+  // MARK: Read: big text
+
+  static let bigTextOn = "Big text."
+
+  static let bigTextOff = "Big text off."
+
+  static let bigTextNothing = "Nothing read yet. Read something first, then say big text."
+
+  // MARK: Read: steps
+
+  static let stepsNothingRead = "Nothing read yet. Read a recipe or a manual first, then say next step."
+
+  static let stepsNone = "I didn't find numbered steps on this page. Say next to hear the next sentence."
+
+  static func stepsCount(_ count: Int) -> String {
+    count == 1 ? "1 step." : "\(count) steps."
+  }
+
+  static func stepsLeft(_ count: Int) -> String {
+    switch count {
+    case 0: "No steps left. That was the last one."
+    case 1: "1 step left."
+    default: "\(count) steps left."
+    }
+  }
+
+  static func stepPosition(_ index: Int, of count: Int) -> String {
+    "You're on step \(index + 1) of \(count)."
+  }
+
+  static func stepsNotStarted(_ count: Int) -> String {
+    "You haven't started the steps. There \(count == 1 ? "is 1" : "are \(count)"). Say next step for step 1."
+  }
+
+  static let stepLast = "That was the last step. Say repeat step to hear it again."
+
+  static let stepFirst = "This is the first step."
+
+  /// Said before a step printed without a number (a bullet or a paragraph).
+  static func stepLabel(_ index: Int) -> String {
+    "Step \(index + 1)."
+  }
+
   // MARK: Launch
 
   static let launchReading = "Reading."

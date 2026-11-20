@@ -111,7 +111,7 @@ The Simulator has no camera, so none of this has run with real frames: the sessi
 ## Open questions
 
 1. Should a voice switch persist? iOS saves it as the setting. Android keeps it until the next switch or the next run. Pick one.
-2. Is `.photo` the right preset? The reader's latest frame may be small with it; `.high` gives 1080p frames but may cap the still. Measure on a phone.
-3. Should the phone source tell the user, before reading, that it's too dark (from the frame's EXIF brightness), instead of after OCR? Android has DarkWatch for this.
-4. Haptics for framing and the big-text mirror (value-strategy V0, "Phone-specific UX") aren't done.
+2. Is `.photo` the right preset? The reader's latest frame may be small with it; `.high` gives 1080p frames but may cap the still. **Reasoned answer (2026-11-20, notes/phone-reading-ios.md):** keep `.photo` for the full-resolution still and the 4:3 page shape. If real frames come in under about 1000 px on the short side, pick a 4:3 `activeFormat` with at least 1440x1080 video rather than switching to `.high`. Still to measure on a phone.
+3. Should the phone source tell the user, before reading, that it's too dark (from the frame's EXIF brightness), instead of after OCR? Android has DarkWatch for this. **Answered (2026-11-20): yes.** `DarkWatch` checks the camera's exposure (EV from ISO, shutter and aperture) before OCR, with hysteresis (dark below EV 3, light above EV 4). It says "It's dark. Say torch on, or move somewhere brighter." and offers the torch once. The frame's brightness is the fallback. EV is used rather than frame brightness so that light text on black isn't flagged. See notes/phone-reading-ios.md.
+4. ~~Haptics for framing and the big-text mirror aren't done.~~ Done 2026-11-20, notes/phone-reading-ios.md.
 5. With a firmware update pending on linked glasses, the phone still reads. Is that right, or should the update block be shown?

@@ -85,7 +85,8 @@
 - [ ] V0: decide whether a spoken camera switch is saved (iOS saves it, Android keeps it for the run; the customisation rule says "keep that" saves) and whether AUTO switches back when glasses connect (iOS does, Android doesn't); make both match
 - [ ] V0: OCR quality at 30 cm and the darkness threshold on real phones; re-run `experiments/book-reader-resolution` on phone frames
 - [ ] V0: tools' own lines still say "glasses" in places; reword for the phone (Android ToolHub only rewrites connect/ready/lost/back)
-- [ ] V0: haptics for framing; big-text mirror of what's read; iOS dark warning before reading
+- [x] V0 iOS: haptics for framing; big-text mirror of what's read; iOS dark warning before reading; plus "read me the next step" (2026-11-20, notes/phone-reading-ios.md). Unit 562/0, ReadAloud 2/2, audits 15/15, BigText 1/1. Not tried on a real iPhone
+- [ ] V0 iOS: feel the framing haptics and tune the EV dark thresholds on a real iPhone, with BLV testers
 - [ ] V0: store builds without the DAT SDK: ~~iOS second target~~ (done 2026-11-20, `SpeakUp` scheme, notes/phone-camera-ios.md); Android product flavour
 - [ ] V0: TalkBack and VoiceOver walk-through of the new camera switch and setup buttons, ideally with blind and low-vision testers
 - [x] V0/V4 iOS (2026-11-20, notes/tools-home-ios.md, notes/reach-ios.md): tools home with Read text, Mail, Labels, Watch, Ask and Light; Siri and Shortcuts per tool; photos and PDFs from the share sheet, Files and the in-app button, read through TextReader with next/previous/repeat/stop. Unit 525/0, UI 41 passed, 1 skipped, 0 failed. Not tried on a real iPhone
