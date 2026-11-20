@@ -35,8 +35,23 @@ final class EarconPlayer {
 
   func play(_ earcon: Earcon) {
     guard preferences.earconsEnabled else { return }
+    // "Say it instead of beeping" (SoundsArea): the meaning in words, queued after any speech.
+    if let words = SoundsPolicy.spokenInsteadOfTone(earcon, situation: SoundsPolicy.current) {
+      Announcer.shared.say(words, interrupt: false)
+      return
+    }
     let audio = audio
-    audio.queue.async { audio.playEarcon(earcon) }
+    let requestedAt = DispatchTime.now().uptimeNanoseconds
+    audio.queue.async { audio.playEarcon(earcon, requestedAt: requestedAt) }
+  }
+
+  /// Plays the tone itself, whatever the Sounds settings say about words. For the Announcer, which
+  /// has already applied them (SoundsPolicy.plan).
+  func playTone(_ earcon: Earcon) {
+    guard preferences.earconsEnabled else { return }
+    let audio = audio
+    let requestedAt = DispatchTime.now().uptimeNanoseconds
+    audio.queue.async { audio.playEarcon(earcon, requestedAt: requestedAt) }
   }
 
   /// A soft tick about every second while any owner is waiting, so a wait is never silent.

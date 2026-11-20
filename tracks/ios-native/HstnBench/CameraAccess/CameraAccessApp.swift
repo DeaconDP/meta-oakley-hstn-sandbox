@@ -87,6 +87,8 @@ struct CameraAccessApp: App {
     ReminderAlerts.shared.install()
     // Make it your own: settings areas, undo and keep, profiles, and settings by voice.
     MakeItYourOwn.start()
+    // Your ears and Sounds (Make it your own): areas, voice grammars, and the audio shape.
+    AudioCustomisation.install()
 
     #if !SPEAKUP_NO_DAT
     self._wearablesViewModel = State(wrappedValue: WearablesViewModel(wearables: Wearables.shared))

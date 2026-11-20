@@ -613,6 +613,8 @@ struct CameraView: View {
       VoiceSettingsRows()
       MakeItYourOwnEntry()
       ReadingSettingsRows()
+      SoundsSettingsSection()
+      EarsSettingsSection()
       CustomButton(title: "Replay setup", style: .secondary, isDisabled: false) {
         setSettingsMenu(open: false)
         A11yPreferences.shared.resetOnboarding()

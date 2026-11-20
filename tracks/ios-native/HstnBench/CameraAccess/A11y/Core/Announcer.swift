@@ -244,10 +244,22 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   /// Plays one line and returns once it has ended. `false` if it was cut.
   private func play(_ line: Line) async -> Bool {
     let myGeneration = generation
-    if let earcon = line.earcon, preferences.earconsEnabled {
-      EarconPlayer.shared.play(earcon)
+    // Sounds settings and conversation mode (A11y/Customise/Sounds/SoundsPolicy.swift).
+    var text = line.text
+    switch SoundsPolicy.plan(text: line.text, kind: line.kind, earcon: line.earcon) {
+    case .drop:
+      return false
+    case .earconOnly(let earcon):
+      EarconPlayer.shared.playTone(earcon)
       try? await Task.sleep(for: .seconds(earcon.duration + 0.06))
-      guard generation == myGeneration else { return false }
+      return generation == myGeneration
+    case .speak(let earcon, let prefix):
+      if let prefix { text = "\(prefix). \(text)" }
+      if let earcon {
+        EarconPlayer.shared.playTone(earcon)
+        try? await Task.sleep(for: .seconds(earcon.duration + 0.06))
+        guard generation == myGeneration else { return false }
+      }
     }
     let output = Output.choose(
       kind: line.kind, voiceOverRunning: UIAccessibility.isVoiceOverRunning, useVoiceOverVoice: preferences.useVoiceOverVoice)
@@ -255,7 +267,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
     case .voiceOver:
       // The app's own voice is idle here (the queue is serial), so nothing talks over this.
       let announcement = NSAttributedString(
-        string: line.text,
+        string: text,
         attributes: [.accessibilitySpeechQueueAnnouncement: NSNumber(value: !line.interruptVoiceOver)])
       currentAnnouncement = line.text
       return await waitForEnd(timeout: Self.voiceOverTimeout(for: line.text)) {
@@ -268,24 +280,49 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
         await runOnAudioQueue { $0.beginSpeech() }
         guard generation == myGeneration else { return false }
       }
-      let utterance = TaggedUtterance(string: line.text)
       nextTag += 1
-      utterance.tag = nextTag
-      if prefersAssistive {
-        // VoiceOver's voice, rate and pitch override the utterance's own.
-        utterance.prefersAssistiveTechnologySettings = true
-      } else {
-        // Read per line, so a voice downloaded while the app runs takes over straight away.
-        utterance.voice = AppVoice.shared.voice
-        utterance.rate = preferences.speechRate
-        utterance.pitchMultiplier = preferences.speechPitch
-      }
-      // Make it your own: the pause after each line (sentences, when reading).
-      utterance.postUtteranceDelay = preferences.sentencePause
+      let tag = nextTag
+      let shape = AudioShapeStore.current
+      let utterance = makeUtterance(text, tag: tag, prefersAssistive: prefersAssistive, shape: shape)
       currentUtteranceTag = utterance.tag
       currentOnStart = line.onStart
+      // Through the shared engine when pan or Clear speech need it (A11y/Customise/Ears/AudioBus.swift).
+      if SpeechBusSpeaker.shared.shouldRoute(shape: shape) {
+        return await waitForEnd(timeout: nil) {
+          SpeechBusSpeaker.shared.speak(
+            utterance,
+            onStart: { [weak self] startedAt in self?.utteranceStarted(tag: tag, at: startedAt) },
+            onEnd: { [weak self] finished in self?.utteranceEnded(tag: tag, finished: finished) },
+            fallback: { [weak self] in
+              guard let self, currentUtteranceTag == tag else { return }
+              var direct = shape
+              direct.clearSpeech = nil
+              let fallbackUtterance = makeUtterance(text, tag: tag, prefersAssistive: prefersAssistive, shape: direct)
+              fallbackUtterance.volume = direct.speechVolume
+              synthesizer.speak(fallbackUtterance)
+            })
+        }
+      }
+      utterance.volume = shape.speechVolume
       return await waitForEnd(timeout: nil) { synthesizer.speak(utterance) }
     }
+  }
+
+  private func makeUtterance(_ text: String, tag: Int, prefersAssistive: Bool, shape: AudioShape) -> TaggedUtterance {
+    let utterance = TaggedUtterance(string: text)
+    utterance.tag = tag
+    if prefersAssistive {
+      // VoiceOver's voice, rate and pitch override the utterance's own.
+      utterance.prefersAssistiveTechnologySettings = true
+    } else {
+      // Read per line, so a voice downloaded while the app runs takes over straight away.
+      utterance.voice = AppVoice.shared.voice
+      utterance.rate = shape.speechRate(preferences.speechRate)
+      utterance.pitchMultiplier = preferences.speechPitch
+    }
+    // Make it your own: the pause after each line (sentences, when reading).
+    utterance.postUtteranceDelay = preferences.sentencePause
+    return utterance
   }
 
   /// Runs `start`, then suspends until finishCurrent(_:) or the timeout (which counts as finished:
@@ -328,6 +365,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
     if currentUtteranceTag != nil || synthesizer.isSpeaking {
       synthesizer.stopSpeaking(at: .immediate)
     }
+    SpeechBusSpeaker.shared.stop()
     finishCurrent(false)
     if let external {
       self.external = nil

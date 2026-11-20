@@ -394,6 +394,7 @@ final class WatchTool: SpeakUpTool {
         let line = WatchWording.seen(target.display, WatchWording.place(spot, camera: camera))
         lastSighting = line
         haptic()
+        WatchSideCue.mark(spot, camera: camera)
         say(line, earcon: .attention)
       case .gone:
         say(WatchWording.gone(target.display), interrupt: false)

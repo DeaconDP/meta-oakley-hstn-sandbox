@@ -19,6 +19,11 @@
  * - Route changes (glasses connecting) stop the engine: the sentence starts again on the new
  *   route from the audio already received. An interruption (a call) cancels it.
  *
+ * Pan, volume and Clear speech (the Ears and Sounds settings) apply through a SpeechShapingChain
+ * on this engine, the same chain the app's own voice uses on the shared engine (AudioBus). This
+ * player keeps its own engine: it is main-actor code with its own restart-on-route-change logic,
+ * and moving it onto the queue-confined earcon engine would risk starting a node on a stopped engine.
+ *
  * Start is reported with the uptime when the node starts (BenchClock's clock), for the
  * trigger_to_first_word metric; finish as finished, cancelled or failed.
  */
@@ -104,6 +109,7 @@ final class CloudVoicePlayer {
 
   private let engine = AVAudioEngine()
   private let node = AVAudioPlayerNode()
+  private let shaping = SpeechShapingChain()
   private let format = AVAudioFormat(standardFormatWithSampleRate: OpenAIClient.speechSampleRate, channels: 1)
   private let audio = A11yAudioSession.shared
   private var isConfigured = false
@@ -146,6 +152,12 @@ final class CloudVoicePlayer {
 
   func stop() {
     end(.cancelled)
+  }
+
+  /// The Ears and Sounds settings changed (AudioCustomisation.refreshShape).
+  func applyShape(_ shape: AudioShape) {
+    guard isConfigured else { return }
+    shaping.apply(shape, source: node)
   }
 
   // MARK: Playback
@@ -224,7 +236,8 @@ final class CloudVoicePlayer {
     guard !isConfigured, let format else { return }
     isConfigured = true
     engine.attach(node)
-    engine.connect(node, to: engine.mainMixerNode, format: format)
+    shaping.install(on: engine, source: node, sourceFormat: format, destination: engine.mainMixerNode)
+    shaping.apply(AudioShapeStore.current, source: node)
     let center = NotificationCenter.default
     observers.append(
       center.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { _ in
