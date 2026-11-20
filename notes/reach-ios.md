@@ -27,7 +27,7 @@ All in `A11y/Launch/LaunchIntents.swift`. Every intent parks a `LaunchAction` on
 - Action Button and Back Tap: pick any of these shortcuts in Settings.
 - The build's App Intents metadata lists 11 intents and 10 App Shortcuts (checked in `Metadata.appintents`).
 - Control Center (iOS 18 `ControlWidget`) needs a widget extension. Skipped. A small widget target could add one control per tool later.
-- The main screen still runs `.openMail` and the other tools as Read text until ToolHub lands. That isn't wired in this change.
+- The main screen opens each tool for its action (notes/tools-home-ios.md).
 
 ## Reading photos and PDFs
 
@@ -37,7 +37,7 @@ Every way in ends at one inbox, a folder of files named `<ms>-<random>.<ext>`. `
 
 Ways in:
 
-1. **In the app.** `ImportButton` offers "Choose a photo" (PhotosPicker, no library permission) or "Choose a file" (document picker, PDF or image). It reads straight away.
+1. **In the app.** "Read a photo or PDF" (`ImportButton`) sits under the six tools on the tools home. It offers "Choose a photo" (PhotosPicker, no library permission) or "Choose a file" (document picker, PDF or image). It reads straight away, in Read text's panel.
 2. **Open in / Copy to SpeakUp.** Both Info.plists declare `CFBundleDocumentTypes` for `com.adobe.pdf` and `public.image` (Viewer, Alternate). `LSSupportsOpeningDocumentsInPlace` is NO, so the app gets a copy. `.readsImports()` puts the file in the inbox and parks `.readImported`.
 3. **Share sheet.** See below.
 4. **`speakup://read-imported`** reads what is waiting. Shortcuts or tests can use it.
@@ -47,20 +47,27 @@ When the app comes to the front with something in the inbox, it parks `.readImpo
 How it reads:
 
 - Photo: "Reading the photo." Vision OCR runs meanwhile. Empty: "Nothing to read in this picture."
-- PDF: "PDF, 3 pages. Page 1.", then "Page 2." and so on. The next page is prepared while the current one is spoken.
+- PDF: "PDF, 3 pages. Page 1.", then "Page 2." and so on. Later pages are recognised while the first ones are spoken.
 - A PDF page with a text layer is read from the text layer, so the words are exact. A page without one is rendered (2600 px max) and OCR'd with `TextRecognizer`.
 - Imports use a lower minimum text height (1/128) than the camera, because pages and screenshots have small text. `TextRecognizer.recognize` got an optional `minimumTextHeight` parameter. The default is unchanged.
 - Transparent pictures are put on white first. Vision reads transparency as black, so black text on a clear PNG came back empty.
 - The order and sentences come from `ReadingOrder`, `SentenceSplitter` and `ReadSpeech.render`, like the camera. Uncertain words get the same earcon. Doses and amounts are withheld the same way.
-- Each page's text is added to `RecentText` under Read text, so Ask can answer questions about it.
+- Each page's text is added to `RecentText` under Read text, one passage per page, so Ask can answer questions about it. Page headings and notices are not added.
 - Locked PDF: "This PDF has a password..." Not a photo or PDF: "SpeakUp reads photos and PDFs..."
 - Everything stays on the phone. Imports never use the cloud reader.
 
-### Why ImportedReader is not TextReader
+### Imports are a Read text read (2026-11-20)
 
-`TextReader` has no public way to be given a page. Its only trigger is the camera. So `ImportedReader` speaks the sentences the same way, through `Announcer`. Next, previous and repeat go to TextReader and don't move through imported text. Starting a camera read, Stop or Magic Tap cuts the import.
+`TextReader.read(pages:source:)` takes text that is already recognised and skips the camera. `ImportedReading` recognises each page off the main thread and hands the pages over as they come (`ReadTextPage`: a heading, the page, a line for an empty page). From there it is a camera read:
 
-**Hook request:** a `TextReader.read(page: ReadPage)` entry would let imports share navigation. Not added, per the brief.
+- Next, previous and repeat move through the imported sentences. Page headings ("Page 2.") count as sentences.
+- Stop, Magic Tap and "stop" stop it and keep the text for repeat. A new camera read replaces it.
+- The reading card shows the sentence and "Reading sentence 3 of 9".
+- It ends with "End of text". When nothing had text, it ends on the notice ("Nothing to read in this picture.") instead.
+
+`ImportedReader` is gone. `RenderedSentence` gained `isNotice` and `earcon` for headings and notices.
+
+If a read is going when the app comes to the front, waiting items are not read until the next time.
 
 ## Share extension "SpeakUp Share"
 
@@ -73,7 +80,9 @@ How it reads:
 
 ## Tests
 
-`CameraAccessTests/ImportTests.swift`: 33 tests in 5 classes.
+`CameraAccessTests/ImportTests.swift`: 41 tests in 6 classes.
+
+- ImportReadingTests (8, new): a PDF read as sentences with page headings and published for Ask; next, previous, repeat and stop on imported text; a photo's intro; a blank picture ends on its notice; a file that isn't a PDF; no pages at all; a camera read cuts an import; readPending empties the inbox.
 
 - ImportPDFTests: page count, text layer read exactly, reading order, scanned page goes to OCR, blank page, not a PDF, render size, fallback lines.
 - ImportPhotoTests: OCR of a photo, text on a transparent background, blank picture, not an image, scaling down, the spoken lines.
@@ -82,6 +91,8 @@ How it reads:
 - OpenToolIntentTests: tool to LaunchAction, one intent per tool, the parameter, openAppWhenRun, display names, at most 10 shortcuts.
 
 Full CameraAccessTests run, skipping DATGlassesDisplayMockTests.testTheCardRendersOnTheMockDisplay, with `-parallel-testing-enabled NO`: **492 tests, 0 failures**. Both schemes build. `plutil -lint` passes on the project and all plists and entitlements.
+
+After imports moved to TextReader (2026-11-20): **525 tests, 0 failures**. UI test `ToolsHomeUITests.testImportButtonIsOnTheHomeAndOffersBothPickers` passes.
 
 ## Checked end to end on the Simulator
 

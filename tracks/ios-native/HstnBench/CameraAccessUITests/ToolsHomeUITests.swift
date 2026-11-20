@@ -75,6 +75,25 @@ final class ToolsHomeUITests: XCTestCase {
     }
   }
 
+  /// "Read a photo or PDF" sits under the tools, as one named button that offers the two pickers.
+  func testImportButtonIsOnTheHomeAndOffersBothPickers() {
+    launch()
+    let importButton = app.buttons["importButton"]
+    XCTAssertTrue(importButton.waitForExistence(timeout: 10), "The import button should be on the tools home")
+    XCTAssertEqual(importButton.label, "Read a photo or PDF")
+    XCTAssertGreaterThan(importButton.frame.minY, row("light").frame.maxY, "it comes after the six tools")
+    reveal(importButton)
+    importButton.tap()
+    XCTAssertTrue(app.buttons["Choose a photo"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["Choose a file"].exists)
+    // iOS 27 shows the choices without a Cancel row; a tap outside dismisses them.
+    let cancel = app.buttons["Cancel"]
+    if cancel.exists { cancel.tap() } else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap() }
+    let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.buttons["Choose a photo"])
+    wait(for: [gone], timeout: 5)
+    XCTAssertTrue(app.staticTexts["tools_home_title"].exists)
+  }
+
   func testToolsOpenAndCloseByVoice() {
     launch(["--voice-inject"])
     let field = app.textFields["voice_test_transcript"]

@@ -68,7 +68,8 @@ final class VoiceControlUITests: XCTestCase {
   func testHandsFreeOffByVoiceShowsTheMicButton() {
     launch(["--hands-free"])
     XCTAssertTrue(app.switches["hands_free_toggle"].waitForExistence(timeout: 10))
-    say("touch mode")
+    // Hands-free speaks its opening line at launch, and while the app speaks only "reader, ..." counts.
+    say("reader, touch mode")
     waitForLastCommand("handsFreeOff")
     XCTAssertTrue(app.buttons["push_to_talk_button"].waitForExistence(timeout: 5))
     XCTAssertEqual(app.staticTexts["voice_test_status"].label, "off")

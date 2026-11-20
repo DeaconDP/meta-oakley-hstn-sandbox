@@ -231,7 +231,10 @@ struct SayLine: View {
         .font(.rounded(.footnote, weight: .semibold))
         .foregroundStyle(Theme.inkSoft)
         .fixedSize(horizontal: false, vertical: true)
-        .accessibilityHidden(true)
+        // Not hidden: text on screen that VoiceOver can't reach fails the accessibility audit
+        // ("Potentially inaccessible text"), and it is how a VoiceOver user learns the commands.
+        .accessibilityLabel("You can say " + phrases.joined(separator: ", "))
+        .accessibilityIdentifier("say_line")
     }
   }
 }

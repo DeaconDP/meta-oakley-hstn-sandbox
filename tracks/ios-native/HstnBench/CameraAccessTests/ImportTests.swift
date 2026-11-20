@@ -3,7 +3,8 @@
  *
  * PDFs are made here with UIGraphicsPDFRenderer: text drawn as text has a text layer (read
  * exactly, no OCR); text drawn into a bitmap first and then placed as an image has none (OCR).
- * The inbox runs in a temporary folder. Nothing here speaks or opens a picker.
+ * The inbox runs in a temporary folder. Nothing here opens a picker. ImportReadingTests reads
+ * through a fresh TextReader, so it speaks; each test stops it.
  */
 
 import PDFKit
@@ -334,6 +335,126 @@ final class ImportURLTests: XCTestCase {
     try ImportedReading.inbox.add(data: Fixture.blankPNG(), fileExtension: "png")
     ImportedReading.appBecameActive(router: router)
     XCTAssertEqual(router.consume(), .readImported)
+  }
+}
+
+// MARK: - Reading through TextReader
+
+/// Imports are read by TextReader.read(pages:source:), so they behave like a camera read.
+@MainActor
+final class ImportReadingTests: XCTestCase {
+  private var reader: TextReader!
+  private var store: RecentText!
+
+  override func setUp() async throws {
+    reader = TextReader()
+    store = RecentText(defaults: nil)
+    reader.recentText = store
+  }
+
+  override func tearDown() async throws {
+    reader.stop()
+    Announcer.shared.stop()
+    reader = nil
+  }
+
+  private func waitFor(_ seconds: Double = 15, _ condition: () -> Bool) async throws {
+    let deadline = Date().addingTimeInterval(seconds)
+    while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(20)) }
+  }
+
+  private var displayed: [String] { reader.sentences.map(\.display) }
+
+  func testAPDFIsReadAsSentencesWithPageHeadingsAndPublishedForAsk() async throws {
+    let pdf = Fixture.textPDF(["The bus leaves at nine.", "Bring a coat. It may rain."])
+    ImportedReading.read([.init(kind: .pdf, data: pdf)], reader: reader)
+    XCTAssertTrue(reader.isActive)
+    try await waitFor { displayed.count >= 5 }
+    XCTAssertEqual(displayed.first, "PDF, 2 pages. Page 1.")
+    XCTAssertTrue(displayed.contains("Page 2."), "\(displayed)")
+    XCTAssertTrue(displayed.joined(separator: " ").lowercased().contains("bus leaves at nine"), "\(displayed)")
+    XCTAssertTrue(displayed.joined(separator: " ").lowercased().contains("may rain"), "\(displayed)")
+    let ask = try XCTUnwrap(store.snapshot(source: .read))
+    XCTAssertEqual(ask.title, "A PDF")
+    XCTAssertEqual(ask.passages.count, 2, "one passage per page")
+    XCTAssertFalse(ask.fullText.contains("Page 2."), "headings aren't page text")
+  }
+
+  func testNextPreviousRepeatAndStopMoveThroughImportedText() async throws {
+    ImportedReading.read([.init(kind: .pdf, data: Fixture.textPDF(["One cat sat. Two dogs ran. Three birds flew."]))], reader: reader)
+    try await waitFor { displayed.count >= 4 }
+    XCTAssertEqual(reader.index, 0)
+    reader.next()
+    XCTAssertEqual(reader.index, 1)
+    XCTAssertEqual(reader.phase, .reading)
+    reader.next()
+    XCTAssertEqual(reader.index, 2)
+    reader.previous()
+    XCTAssertEqual(reader.index, 1)
+    reader.repeatSentence()
+    XCTAssertEqual(reader.index, 1)
+    XCTAssertEqual(store.snapshot(source: .read)?.current, TextReader.spokenText(reader.sentences[1]))
+    reader.stop()
+    XCTAssertEqual(reader.phase, .stopped)
+    XCTAssertTrue(reader.hasSentences, "stop keeps the text for repeat")
+    XCTAssertEqual(reader.statusText, "Stopped at sentence 2 of \(reader.sentences.count)")
+    reader.repeatSentence()
+    XCTAssertEqual(reader.phase, .reading)
+    XCTAssertEqual(reader.index, 1)
+  }
+
+  func testAPhotoSaysItsIntroThenItsText() async throws {
+    let photo = try XCTUnwrap(Fixture.picture("Fresh bread daily").pngData())
+    ImportedReading.read([.init(kind: .image, data: photo)], reader: reader)
+    try await waitFor { reader.hasSentences }
+    XCTAssertTrue(displayed.joined(separator: " ").lowercased().contains("fresh bread"), "\(displayed)")
+    XCTAssertFalse(displayed.contains(SpokenMessage.importReadingPhoto), "the intro is said, not kept as a sentence")
+    XCTAssertEqual(store.snapshot(source: .read)?.title, "A photo")
+  }
+
+  func testABlankPictureEndsOnItsNotice() async throws {
+    ImportedReading.read([.init(kind: .image, data: Fixture.blankPNG())], reader: reader)
+    try await waitFor { reader.hasSentences }
+    XCTAssertEqual(displayed, [SpokenMessage.importNothingInPicture])
+    XCTAssertNil(store.snapshot(source: .read), "nothing to ask about")
+    try await waitFor(20) { reader.phase == .guided }
+    XCTAssertEqual(reader.phase, .guided, "no \"End of text\" after a notice")
+    XCTAssertEqual(reader.notice, SpokenMessage.importNothingInPicture)
+  }
+
+  func testAFileThatIsntAPDFSaysSo() async throws {
+    ImportedReading.read([.init(kind: .pdf, data: Data("not a pdf".utf8))], reader: reader)
+    try await waitFor { reader.hasSentences }
+    XCTAssertEqual(displayed, [SpokenMessage.importCouldNotOpen])
+  }
+
+  func testNoPagesAtAllEndsWithTheNothingLine() async throws {
+    reader.read(pages: [], source: ReadTextSource(title: "A PDF", nothingLine: SpokenMessage.importNothingInPDF))
+    try await waitFor { reader.phase == .guided }
+    XCTAssertEqual(reader.notice, SpokenMessage.importNothingInPDF)
+  }
+
+  func testACameraReadCutsAnImport() async throws {
+    ImportedReading.read([.init(kind: .pdf, data: Fixture.textPDF(["A long page of text to read."]))], reader: reader)
+    try await waitFor { reader.hasSentences }
+    reader.read()  // No camera here: it says so.
+    XCTAssertFalse(reader.hasSentences)
+    try await waitFor { reader.phase == .guided }
+    XCTAssertEqual(reader.notice, SpokenMessage.readNoCamera)
+  }
+
+  func testReadPendingEmptiesTheInbox() async throws {
+    let saved = ImportedReading.inbox
+    ImportedReading.inbox = temporaryInbox()
+    defer {
+      ImportedReading.inbox.removeAll()
+      ImportedReading.inbox = saved
+    }
+    try ImportedReading.inbox.add(data: Fixture.textPDF(["Hello there."]), fileExtension: "pdf")
+    ImportedReading.readPending(reader: reader)
+    XCTAssertFalse(ImportedReading.hasPending)
+    try await waitFor { reader.hasSentences }
+    XCTAssertEqual(displayed.first, "PDF, 1 page.")
   }
 }
 

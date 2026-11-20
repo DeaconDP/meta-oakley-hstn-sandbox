@@ -101,6 +101,7 @@ Plan: notes/value-strategy.md > 6.
 - **V2 Daily triggers:** U1 reminders and medication log, food check (expiry against today, your allergens, cooking steps), "read me the next step" for recipes and manuals.
 - **V3 Carer mode:** with the user's consent, share letter summaries and the medication log with a helper, asynchronously; "ask a helper" hand-off.
 - **V4 Reach:** one-tap and one-word entry (Quick Settings tile, widget, share sheet for photos, screenshots and PDFs; iOS Action Button, App Intents, Back Tap), more languages, store copy that leads with jobs.
+- **Built on iOS 2026-11-20 (V0, V4):** a tools home with six tools on the phone camera, a store build without DAT, Siri and Shortcuts for every tool, and photos and PDFs from the share sheet, Files or the in-app button, read like a camera page. All unit and UI tests pass on the Simulator; not yet on a real iPhone (notes/tools-home-ios.md, notes/reach-ios.md).
 - **V5 Glasses as premium:** the same tools hands-free once Meta opens publishing; meanwhile a Beta with blind glasses owners from Meta's programmes (BVA, VA Blind Rehab, Vision Ireland, ACB).
 - **Business track:** apply for grants, pilot one UK letter sponsor (bank or energy firm), talk to Meta's accessibility team about the curated catalogue.
 

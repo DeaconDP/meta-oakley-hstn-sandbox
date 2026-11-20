@@ -33,6 +33,10 @@
  * The camera is the phone's or the glasses' (CameraSourceRouter, V0 "Glasses optional"); the
  * pipeline is the same, only the guidance wording follows `ReadFrameSource.cameraKind`.
  *
+ * Text recognised elsewhere (an imported photo or PDF, notes/reach-ios.md) comes in through
+ * `read(pages:source:)`: no camera, no cloud, but the same sentences, navigation, stop, end line
+ * and RecentText as a camera read. Pages may arrive while earlier ones are spoken.
+ *
  * Metrics (BenchClock, picked up by bench.sh): `trigger_to_first_word` from the trigger to the
  * first line of the response being heard, whatever that line is (detail `first=` says whether it
  * was text, guidance or a fallback notice; `source=` is frame, photo, cloud or cloud_fallback);
@@ -98,6 +102,26 @@ struct ReadTiming: Equatable {
   }
 }
 
+/// One page of text recognised somewhere other than the camera, for `TextReader.read(pages:source:)`.
+struct ReadTextPage: Sendable {
+  /// Said first, as a sentence of its own ("PDF, 3 pages. Page 1.").
+  var heading: String?
+  /// The page's text. nil when it couldn't be read.
+  var page: ReadPage?
+  /// Said, with the attention earcon, when the page has no readable text ("No text on this page.").
+  var emptyLine: String?
+}
+
+/// Where the text given to `TextReader.read(pages:source:)` came from.
+struct ReadTextSource: Sendable {
+  /// For Ask ("A photo", "A PDF").
+  var title: String
+  /// Said at once while the first page is still being recognised ("Reading the photo.").
+  var intro: String?
+  /// Said when no page gives anything to say.
+  var nothingLine = SpokenMessage.readFailed
+}
+
 @MainActor
 @Observable
 final class TextReader {
@@ -159,6 +183,8 @@ final class TextReader {
   @ObservationIgnored private var waitingForMore = false
   /// Waits for the Announcer to go quiet, then starts the cloud voice.
   @ObservationIgnored private var speechTask: Task<Void, Never>?
+  /// Pages given to read(pages:source:) all had no text: end on the last notice, not "End of text".
+  @ObservationIgnored private var pagesHadNoText = false
 
   private struct PendingFirstWord {
     var generation: Int
@@ -191,22 +217,46 @@ final class TextReader {
 
   /// Read what the glasses see. Interrupts any reading in progress.
   func read() {
+    let (myGeneration, myRead) = beginRead(source: "frame")
+    phase = .preparing
+    task = Task { await run(myGeneration, read: myRead) }
+  }
+
+  /// Reads text that was already recognised (an imported photo or PDF), skipping the camera and
+  /// the cloud. From there on it is a camera read: next, previous, repeat, stop, the end line and
+  /// RecentText. Pages may still be arriving while the first ones are spoken. Interrupts any
+  /// reading in progress.
+  func read(pages: AsyncStream<ReadTextPage>, source: ReadTextSource) {
+    let (myGeneration, myRead) = beginRead(source: "import")
+    phase = .recognizing
+    if let intro = source.intro { speakInterim(intro, first: "intro", myGeneration) }
+    task = Task { await runPages(pages, source: source, myGeneration, read: myRead) }
+  }
+
+  func read(pages: [ReadTextPage], source: ReadTextSource) {
+    read(
+      pages: AsyncStream { continuation in
+        for page in pages { continuation.yield(page) }
+        continuation.finish()
+      }, source: source)
+  }
+
+  /// Cuts what is going on and starts a new read: working earcon and tick, nothing read yet.
+  private func beginRead(source: String) -> (generation: Int, read: Int) {
     let triggerAt = BenchClock.uptimeNanoseconds()
     generation += 1
-    let myGeneration = generation
     task?.cancel()
     announcer.stop()
     readID += 1
-    let myRead = readID
     resetCloud()
+    pagesHadNoText = false
     earcons.play(.working)
     earcons.startWorkingTick(owner: Self.tickOwner)
-    pendingFirstWord = PendingFirstWord(generation: myGeneration, triggerAt: triggerAt)
+    pendingFirstWord = PendingFirstWord(generation: generation, triggerAt: triggerAt, source: source)
     sentences = []
     index = 0
     notice = nil
-    phase = .preparing
-    task = Task { await run(myGeneration, read: myRead) }
+    return (generation, readID)
   }
 
   // MARK: Navigation
@@ -406,6 +456,55 @@ final class TextReader {
     speak(at: 0, interrupt: false, myGeneration)
   }
 
+  // MARK: Text from elsewhere
+
+  private func runPages(
+    _ pages: AsyncStream<ReadTextPage>, source: ReadTextSource, _ myGeneration: Int, read myRead: Int
+  ) async {
+    let preferences = A11yPreferences.shared
+    // Like a cloud transcription: sentences arrive while earlier ones are spoken.
+    isTranscribing = true
+    var pageNumber = 0
+    var hadText = false
+    for await page in pages {
+      guard isCurrentRead(myRead) else { return }
+      pageNumber += 1
+      let words = page.page.map { SentenceSplitter.sentences(blocks: ReadingOrder.blocks($0.lines)) } ?? []
+      let rendered = words
+        .map { ReadSpeech.render($0, verbosity: preferences.verbosity, earconsEnabled: preferences.earconsEnabled) }
+        .filter { !$0.chunks.isEmpty }
+      if let heading = page.heading { addSentence(Self.noticeSentence(heading)) }
+      guard !rendered.isEmpty else {
+        if let line = page.emptyLine { addSentence(Self.noticeSentence(line, earcon: .attention)) }
+        continue
+      }
+      hadText = true
+      // One passage per page, as spoken: withheld numbers stay withheld.
+      recentText.append(
+        rendered.map(Self.spokenText).joined(separator: " "), source: .read, key: "read-\(myRead)-\(pageNumber)")
+      recentText.setTitle(source.title, source: .read)
+      for sentence in rendered { addSentence(sentence) }
+    }
+    guard isCurrentRead(myRead) else { return }
+    isTranscribing = false
+    clock.note("read pages=\(pageNumber) sentences=\(sentences.count) text=\(hadText)")
+    guard !sentences.isEmpty else {
+      return finish(guidance: source.nothingLine, earcon: .attention, generation)
+    }
+    pagesHadNoText = !hadText
+    guard waitingForMore else { return }
+    // The voice was waiting at the last sentence: that was all of it.
+    waitingForMore = false
+    readFinished()
+  }
+
+  /// A line that isn't page text (a page heading, "No text on this page."), as a sentence.
+  private static func noticeSentence(_ line: String, earcon: Earcon? = nil) -> RenderedSentence {
+    RenderedSentence(
+      display: line, chunks: [SpokenChunk(text: line, flagged: false)], uncertainWords: 0, withheld: nil, isNotice: true,
+      earcon: earcon)
+  }
+
   // MARK: Speaking
 
   private func startSpeaking(at newIndex: Int) {
@@ -424,7 +523,8 @@ final class TextReader {
     guard sentences.indices.contains(sentenceIndex) else { return }
     index = sentenceIndex
     phase = .reading
-    recentText.setCurrent(Self.spokenText(sentences[sentenceIndex]), source: .read)
+    let sentence = sentences[sentenceIndex]
+    recentText.setCurrent(sentence.isNotice ? nil : Self.spokenText(sentence), source: .read)
     if let cloudClient {
       return speakCloud(at: sentenceIndex, interrupt: interrupt, client: cloudClient, myGeneration)
     }
@@ -439,7 +539,9 @@ final class TextReader {
       }
       let onStart = chunkIndex == 0 ? firstWordHandler(myGeneration, first: "text") : nil
       let cut = interrupt && chunkIndex == 0
-      if chunk.flagged {
+      if chunkIndex == 0, let earcon = sentences[sentenceIndex].earcon {
+        announcer.announce(chunk.text, earcon: earcon, kind: .reply, interrupt: cut, onFinish: onFinish, onStart: onStart)
+      } else if chunk.flagged {
         announcer.announce(chunk.text, earcon: .uncertain, kind: .reply, interrupt: cut, onFinish: onFinish, onStart: onStart)
       } else {
         announcer.say(chunk.text, kind: .reply, interrupt: cut, onFinish: onFinish, onStart: onStart)
@@ -460,11 +562,22 @@ final class TextReader {
       // The voice caught up with the transcription; addCloudSentence carries on.
       waitingForMore = true
     } else {
-      phase = .finished
-      recentText.setCurrent(nil, source: .read)
-      announcer.announce(
-        SpokenMessage.readEnd(verbosity: A11yPreferences.shared.verbosity), earcon: .done, kind: .reply, interrupt: false)
+      readFinished()
     }
+  }
+
+  /// The last sentence was spoken: "End of text", or, when no imported page had text, end on its
+  /// notice as guidance.
+  private func readFinished() {
+    recentText.setCurrent(nil, source: .read)
+    if pagesHadNoText {
+      notice = sentences.last?.display
+      phase = .guided
+      return
+    }
+    phase = .finished
+    announcer.announce(
+      SpokenMessage.readEnd(verbosity: A11yPreferences.shared.verbosity), earcon: .done, kind: .reply, interrupt: false)
   }
 
   /// A progress line while work continues ("Taking a photo to read."). The tick keeps going.
@@ -554,12 +667,19 @@ final class TextReader {
     let preferences = A11yPreferences.shared
     let rendered = CloudSentence.rendered(text, verbosity: preferences.verbosity, earconsEnabled: preferences.earconsEnabled)
     guard !rendered.chunks.isEmpty else { return }
-    sentences.append(rendered)
+    if sentences.isEmpty { clock.note("read verdict=cloud") }
+    addSentence(rendered)
     publishPage()
+  }
+
+  /// A sentence that arrived while reading (cloud stream, imported pages): the first one starts
+  /// the voice at once; later ones continue a voice that caught up, or have their cloud audio
+  /// fetched ahead while the one before plays.
+  private func addSentence(_ rendered: RenderedSentence) {
+    sentences.append(rendered)
     let newIndex = sentences.count - 1
     if newIndex == 0 {
       earcons.stopWorkingTick(owner: Self.tickOwner)
-      clock.note("read verdict=cloud")
       speak(at: 0, interrupt: false, generation)
     } else if waitingForMore {
       waitingForMore = false
@@ -582,9 +702,7 @@ final class TextReader {
     guard waitingForMore else { return }
     // The voice was waiting at the last sentence: that was all of it.
     waitingForMore = false
-    phase = .finished
-    recentText.setCurrent(nil, source: .read)
-    announcer.announce(SpokenMessage.readEnd(verbosity: preferences.verbosity), earcon: .done, kind: .reply, interrupt: false)
+    readFinished()
   }
 
   /// Any transcription error: one short line, then the on-phone path for the same picture. If the
@@ -687,7 +805,7 @@ final class TextReader {
 
   /// The page read so far, as one passage per read (a cloud page grows as it streams in).
   private func publishPage() {
-    let text = sentences.map(Self.spokenText).joined(separator: " ")
+    let text = sentences.filter { !$0.isNotice }.map(Self.spokenText).joined(separator: " ")
     recentText.append(text, source: .read, key: "read-\(readID)")
   }
 

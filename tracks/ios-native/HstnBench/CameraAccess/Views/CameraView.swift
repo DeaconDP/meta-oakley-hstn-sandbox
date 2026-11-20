@@ -97,6 +97,8 @@ struct CameraView: View {
                 CameraSourceCard(router: router, connectGlasses: connectGlasses)
               } else {
                 ToolsHome(openTool: openFromHome, status: speakStatus)
+                ImportButton(subtitle: "Hear a photo, screenshot or PDF from your phone.")
+                  .buttonStyle(.a11ySecondary)
                 if !showSettingsMenu { HandsFreeControls() }
                 CameraSourceCard(router: router, connectGlasses: connectGlasses)
                 if link.supportsGlasses {
