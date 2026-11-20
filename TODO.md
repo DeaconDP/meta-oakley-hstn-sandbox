@@ -53,16 +53,23 @@
 
 ## Make it your own (notes/customisation-roadmap.md)
 - [ ] C0: one settings schema shared by both platforms (rate on one 0.5–3× scale, per-tool overrides); migrate the existing Android prefs and the iOS `A11yPreferences` keys; merge the book rate into "main rate + book override"
+  - [x] iOS (2026-11-20, notes/customisation-ios-core.md): SettingsStore over the SettingsArea contract, rate on the 0.5–3× scale with `a11y.speechRate` migrated losslessly, per-tool verbosity overrides, versioned setup JSON. Android and the book rate still to do
 - [ ] C0: one audio bus per platform (Android single AudioTrack mixer; iOS `AVSpeechSynthesizer.write` into the shared engine); check earcons still play within 100 ms
 - [ ] C0: settings grammar: slower/faster, shorter/more detail, "keep that", "undo", "what's my setup", "reset speech", "lock settings"
-- [ ] Fix the gap in notes/a11y-onboarding.md:69: iOS detail level and rate aren't in Settings; earcons can't be reached
+  - [x] iOS (2026-11-20): all of these, plus reset <area>, reset everything (yes/no, undoable), profiles and share codes by voice; one hook in `VoiceControl.inject`
+- [x] Fix the gap in notes/a11y-onboarding.md:69: iOS detail level and rate aren't in Settings; earcons can't be reached (2026-11-20: Settings > Make it your own)
 - [ ] C1: speech presets (Brisk/Normal/Gentle), voice choice by voice with samples, per-tool verbosity, earcon on/off/volume/earcons-only, Android settings screen
+  - [x] iOS (2026-11-20): presets Brisk/Normal/Gentle/Clear speech rate, pitch, pauses, voice choice by ear, per-tool verbosity, earcons on/off on screen. Earcon volume and earcons-only are the sounds area's; the OpenAI voice isn't choosable yet
 - [ ] C2: balance, which ear for which sound, mono-aware cues (iOS `isMonoAudioEnabled`), Clear speech preset (DynamicsProcessing / AVAudioUnitEQ), conversation mode
 - [ ] C3: aliases + macros by voice with conflict check, home-menu show/hide/reorder, wake word choice, tip pacing Fewer/Normal/Off
+  - [x] iOS tip pacing Fewer/Normal/Off (2026-11-20)
 - [ ] C4 (Experimental): glasses controls map for `Capture`/`Select`/`Nav`, "what do my buttons do?", `LaunchApp` into a tool; find out whether Meta's press-and-hold shortcut can launch a DAT app
 - [ ] C5: profiles (Home / Out and about / Reading), switch by voice, optional announced triggers, learned suggestions
+  - [x] iOS (2026-11-20): starters, save/switch/list/delete by voice and on screen, learned suggestions after three tweaks. No automatic triggers yet
 - [ ] C6: detail dial + description preferences passed to the model
+  - [ ] iOS: the area is stored and settable (2026-11-20) but unused: iOS has no Look closer yet
 - [ ] C7: export/import setup code, helper view, backup with the bookmarks
+  - [x] iOS export/import as JSON and a `SPEAKUP1.` code, share sheet, paste, by voice; undoable (2026-11-20). Helper view and backup still to do
 - [ ] Real HSTN: per-temple stereo, OS mono/balance over A2DP, capture-button events, `KEY_PARAM_PAN` support
 
 - [ ] iOS hands-free: `DATGlassesDisplayMockTests.testTheCardRendersOnTheMockDisplay` fails every run ("The display didn't start", 50–73 s) on a fresh iOS 27 simulator (2026-11-18; the other 228 unit tests pass)
@@ -73,7 +80,7 @@
 - [ ] J2 iOS: "switch to <tool>" phrases; "read a photo" / "read a file" open Import
 - [ ] J3 iOS: check notes/a11y-onboarding.md:72 against the code; spoken welcome and "Use my voice" button without VoiceOver; spoken pre-prompt before mic, speech and camera alerts; camera asked at setup when "phone" is chosen
 - [ ] J4 iOS: Import by voice; spoken "tap the mic to answer" in toolbox mode; error alerts always spoken; spoken Meta AI handoff and return; find out about "read my latest photo" with PhotoKit
-- [ ] J5 iOS: natural voice, VoiceOver voice, sounds and tips by voice; "undo" / "put it back"; "what's my setup" (with C0/C1)
+- [ ] J5 iOS: natural voice, VoiceOver voice, sounds and tips by voice; "undo" / "put it back"; "what's my setup" (with C0/C1). Done 2026-11-20 except "sounds on/off" by voice, undo for hands-free and glasses display, and the `settingsOpened` line (notes/customisation-ios-core.md)
 - [ ] J6 iOS: widget extension with a `ControlWidget` (Action button, Control Center, Lock Screen); spoken help on Back Tap and the Action button; "Hey Meta, start SpeakUp" in the Beta build
 - [ ] J7 iOS: one `--voice-inject` UI test from launch to end session; real-iPhone runs with VoiceOver, with Voice Control (check "Tap Allow" on permission alerts) and with neither; blind testers
 

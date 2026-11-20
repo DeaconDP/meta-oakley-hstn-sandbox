@@ -85,6 +85,8 @@ struct CameraAccessApp: App {
     // Reminders (A11y/Reminders): the on-phone store, and reminders spoken while the app is in front.
     Reminders.shared = ReminderStore.live()
     ReminderAlerts.shared.install()
+    // Make it your own: settings areas, undo and keep, profiles, and settings by voice.
+    MakeItYourOwn.start()
 
     #if !SPEAKUP_NO_DAT
     self._wearablesViewModel = State(wrappedValue: WearablesViewModel(wearables: Wearables.shared))

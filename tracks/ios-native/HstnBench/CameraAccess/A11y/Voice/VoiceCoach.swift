@@ -72,6 +72,8 @@ enum CoachSituation: Equatable, Sendable {
 struct VoiceCoachSchedule: Equatable, Sendable {
   static let newUserGaps: [TimeInterval] = [8, 30, 60, 120]
   static let familiarGaps: [TimeInterval] = [30, 60, 120]
+  /// Tips pacing "fewer" (Make it your own > Tips): a long first gap, and only two tips.
+  static let fewerGaps: [TimeInterval] = [60, 180]
   /// A situation's first tip heard to the end this many times counts as learned.
   static let learnedAfter = 3
 
@@ -84,8 +86,9 @@ struct VoiceCoachSchedule: Equatable, Sendable {
     quietSince = start
   }
 
-  init(timesHeard: Int, start: Date) {
-    self.init(gaps: timesHeard >= Self.learnedAfter ? Self.familiarGaps : Self.newUserGaps, start: start)
+  init(timesHeard: Int, start: Date, fewer: Bool = false) {
+    let learned = timesHeard >= Self.learnedAfter ? Self.familiarGaps : Self.newUserGaps
+    self.init(gaps: fewer ? Self.fewerGaps : learned, start: start)
   }
 
   /// The user said or did something: tips start over from the first gap.
@@ -248,6 +251,8 @@ final class VoiceCoach {
     var timesHeard: @MainActor (_ key: String) -> Int
     var noteHeard: @MainActor (_ key: String) -> Void
     var say: @MainActor (_ text: String, _ onFinish: @escaping Announcer.Completion) -> Void
+    /// Tips pacing "fewer" (A11yPreferences.tipsFewer).
+    var fewerTips: @MainActor () -> Bool = { false }
   }
 
   private let environment: Environment
@@ -308,7 +313,8 @@ final class VoiceCoach {
     let current = currentSituation()
     if current != situation {
       situation = current
-      schedule = VoiceCoachSchedule(timesHeard: current.map { environment.timesHeard($0.key) } ?? 0, start: now)
+      schedule = VoiceCoachSchedule(
+        timesHeard: current.map { environment.timesHeard($0.key) } ?? 0, start: now, fewer: environment.fewerTips())
     }
     guard let current, environment.tipsEnabled(), environment.isListening(), !isSpeakingTip, !environment.isBusy() else {
       schedule.busy(at: now)
@@ -347,6 +353,7 @@ extension VoiceCoach.Environment {
     verbosity: { A11yPreferences.shared.verbosity },
     timesHeard: { A11yPreferences.shared.voiceTipsHeard[$0] ?? 0 },
     noteHeard: { A11yPreferences.shared.voiceTipsHeard[$0, default: 0] += 1 },
-    say: { text, onFinish in Announcer.shared.say(text, interrupt: false, onFinish: onFinish) }
+    say: { text, onFinish in Announcer.shared.say(text, interrupt: false, onFinish: onFinish) },
+    fewerTips: { A11yPreferences.shared.tipsFewer }
   )
 }

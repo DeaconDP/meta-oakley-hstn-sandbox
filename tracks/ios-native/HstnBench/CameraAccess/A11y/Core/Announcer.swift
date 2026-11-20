@@ -278,7 +278,10 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
         // Read per line, so a voice downloaded while the app runs takes over straight away.
         utterance.voice = AppVoice.shared.voice
         utterance.rate = preferences.speechRate
+        utterance.pitchMultiplier = preferences.speechPitch
       }
+      // Make it your own: the pause after each line (sentences, when reading).
+      utterance.postUtteranceDelay = preferences.sentencePause
       currentUtteranceTag = utterance.tag
       currentOnStart = line.onStart
       return await waitForEnd(timeout: nil) { synthesizer.speak(utterance) }

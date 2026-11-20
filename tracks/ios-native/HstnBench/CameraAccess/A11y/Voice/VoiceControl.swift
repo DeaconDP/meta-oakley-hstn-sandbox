@@ -71,6 +71,8 @@ final class VoiceControl {
     var now: @MainActor () -> Date
     /// A command was understood (for the glasses display card's "last heard").
     var noteCommand: @MainActor (VoiceCommand) -> Void = { _ in }
+    /// Make it your own: the settings grammars' reply, or nil when the words aren't for them.
+    var routeSettings: @MainActor (_ text: String) -> String? = { SettingsVoiceGate.route($0) }
   }
 
   // MARK: State for the UI
@@ -412,6 +414,16 @@ final class VoiceControl {
     let parsed = VoiceCommandParser.parse(transcript, context: context)
     var command: VoiceCommand?
     if case .command(let parsedCommand) = parsed { command = parsedCommand }
+    // Settings by voice (A11y/Customise) before the tools and the parse; not while a question waits.
+    if question == nil, let text = VoiceCommandParser.addressedText(transcript, context: context),
+      let reply = environment.routeSettings(text)
+    {
+      if pushToTalk { endPushToTalk(nothingHeard: false) }
+      environment.playEarcon(.heard)
+      lastCommandAt = environment.now()
+      say(reply)
+      return
+    }
     if screen == .camera, !(command.map(answersQuestion) ?? false), let tools,
       let text = VoiceCommandParser.addressedText(transcript, context: context), tools.route(text, command: command)
     {
@@ -536,8 +548,7 @@ final class VoiceControl {
   }
 
   private func setVerbosity(_ verbosity: Verbosity) {
-    preferences.verbosity = verbosity
-    say(SpokenMessage.verbositySet(verbosity))
+    say(SpeechChanges.setVerbosity(preferences, verbosity))  // recorded for undo (A11y/Customise)
   }
 
   private func changeRate(by delta: Float) {
@@ -545,13 +556,7 @@ final class VoiceControl {
       environment.say(SpokenMessage.voiceRateFollowsVoiceOver, nil, true, nil)
       return
     }
-    let before = preferences.speechRate
-    preferences.speechRate = before + delta
-    if preferences.speechRate == before {
-      environment.say(delta > 0 ? SpokenMessage.voiceFastest : SpokenMessage.voiceSlowest, nil, true, nil)
-    } else {
-      environment.say(delta > 0 ? SpokenMessage.voiceFaster : SpokenMessage.voiceSlower, nil, true, nil)
-    }
+    say(SpeechChanges.stepRate(preferences, faster: delta > 0))  // 0.5-3x scale, recorded for undo
   }
 
   // MARK: Glasses
