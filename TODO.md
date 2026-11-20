@@ -58,6 +58,11 @@
 - [ ] Fix the gap in notes/a11y-onboarding.md:69: iOS detail level and rate aren't in Settings; earcons can't be reached
 - [ ] C1: speech presets (Brisk/Normal/Gentle), voice choice by voice with samples, per-tool verbosity, earcon on/off/volume/earcons-only, Android settings screen
 - [ ] C2: balance, which ear for which sound, mono-aware cues (iOS `isMonoAudioEnabled`), Clear speech preset (DynamicsProcessing / AVAudioUnitEQ), conversation mode
+  - [x] C0 iOS audio bus (2026-11-20, notes/customisation-ios-ears.md): `AVSpeechSynthesizer.write` into the earcon engine through `AudioBus`, used when pan or Clear speech need it (`ears.speechBus` kill switch, falls back to `speak()` on failure); natural voice shaped by the same chain on its own engine. Sim: earcon trigger to sound ~10 ms warm / ~28 ms cold; bus first word ~4 ms warm, ~600 ms cold, so it is pre-warmed
+  - [x] C1 iOS Sounds (2026-11-20): `SoundsArea` with earcons on/off (still `a11y.earconsEnabled`), earcon and voice volume, earcons only, say it instead of beeping; voice phrases; on-screen section
+  - [x] C2 iOS Your ears (2026-11-20): `EarsArea` with balance, ear per kind of sound, iOS mono + "I use mono", Watch for text pan/pitch side cue, Clear speech (dynamics + EQ + slower) with the A/B listening check, conversation mode; voice phrases; on-screen section
+  - [ ] C2 iOS on real hardware: per-temple stereo on HSTN, OS mono/balance over A2DP, Clear speech EQ on the glasses' speakers, bus latency on an iPhone
+  - [ ] Settings core: route `SettingsVoice` before `VoiceCommandParser` while conversation mode or the clarity check is active, so "carry on", "again" and "stop" reach them
 - [ ] C3: aliases + macros by voice with conflict check, home-menu show/hide/reorder, wake word choice, tip pacing Fewer/Normal/Off
 - [ ] C4 (Experimental): glasses controls map for `Capture`/`Select`/`Nav`, "what do my buttons do?", `LaunchApp` into a tool; find out whether Meta's press-and-hold shortcut can launch a DAT app
 - [ ] C5: profiles (Home / Out and about / Reading), switch by voice, optional announced triggers, learned suggestions

@@ -82,6 +82,8 @@ struct CameraAccessApp: App {
     EarconPlayer.shared.prepare()
     // And look up the voice, so the first word doesn't wait on that.
     AppVoice.shared.prepare()
+    // Your ears and Sounds (Make it your own): areas, voice grammars, and the audio shape.
+    AudioCustomisation.install()
 
     #if !SPEAKUP_NO_DAT
     self._wearablesViewModel = State(wrappedValue: WearablesViewModel(wearables: Wearables.shared))
