@@ -82,6 +82,9 @@ struct CameraAccessApp: App {
     EarconPlayer.shared.prepare()
     // And look up the voice, so the first word doesn't wait on that.
     AppVoice.shared.prepare()
+    // Reminders (A11y/Reminders): the on-phone store, and reminders spoken while the app is in front.
+    Reminders.shared = ReminderStore.live()
+    ReminderAlerts.shared.install()
 
     #if !SPEAKUP_NO_DAT
     self._wearablesViewModel = State(wrappedValue: WearablesViewModel(wearables: Wearables.shared))

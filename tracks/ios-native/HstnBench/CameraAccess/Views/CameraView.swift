@@ -10,7 +10,7 @@
 // CameraView.swift
 //
 // The main screen, and the only one after setup: the tools home (notes/tools-home-ios.md). The
-// status, then the six tools (ToolHub), the camera card, and Settings. Opening a tool shows its
+// status, then the seven tools (ToolHub), the camera card, and Settings. Opening a tool shows its
 // panel with a Close button in place of the list. Read text is the first tool: its tile reads at
 // once, as the one big Read button did. There are no camera steps to take by hand. Reading starts
 // the session and the stream itself, and going to the background ends them. Glasses are a small
@@ -319,7 +319,7 @@ struct CameraView: View {
       // Shown in Read text's panel, as any page is.
       if hub.openTool != .read { hub.openReadTextQuietly() }
       ImportedReading.readPending()
-    case .openMail, .openLabels, .openWatch, .openAsk, .openLight:
+    case .openMail, .openLabels, .openWatch, .openAsk, .openLight, .openReminders:
       setSettingsMenu(open: false)
       if let tool = action?.tool { hub.open(tool) }
     case nil: break
@@ -379,7 +379,7 @@ struct CameraView: View {
     case .openReader:
       setSettingsMenu(open: false)
       hub.open(.read)
-    case .openMail, .openLabels, .openWatch, .openAsk, .openLight:
+    case .openMail, .openLabels, .openWatch, .openAsk, .openLight, .openReminders:
       // Usually ToolHub opened it already with the words said; this is a glasses display button.
       setSettingsMenu(open: false)
       if let tool = command.tool { hub.open(tool) }

@@ -24,6 +24,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
   case watch
   case ask
   case light
+  case reminders
 
   var id: String { rawValue }
 
@@ -36,6 +37,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
     case .watch: "Watch for text"
     case .ask: "Ask about the text"
     case .light: "Light and colour"
+    case .reminders: "Reminders"
     }
   }
 
@@ -48,6 +50,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
     case .watch: "Keeps looking and tells you when a word or number appears."
     case .ask: "Answers questions about what was just read."
     case .light: "Tells you if a light is on, and what colour something is."
+    case .reminders: "Reminders, your medicine log and what's due this week."
     }
   }
 
@@ -59,6 +62,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
     case .watch: "eye"
     case .ask: "questionmark.bubble"
     case .light: "lightbulb"
+    case .reminders: "bell"
     }
   }
 
@@ -71,6 +75,7 @@ enum ToolID: String, CaseIterable, Identifiable, Sendable {
     case .watch: ["open watch for text", "watch for text"]
     case .ask: ["open ask", "ask about the text"]
     case .light: ["open light and colour", "light and colour", "is the light on", "what colour is this"]
+    case .reminders: ["open reminders", "reminders", "my reminders", "medicine log"]
     }
   }
 }

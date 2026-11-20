@@ -71,7 +71,7 @@ extension SpokenMessage {
   /// The tools, one short line each, from ToolID, then how to open one.
   static let toolsList: String = {
     let tools = ToolID.allCases.map { "\($0.title): \($0.summary.lowercasedFirst)" }.joined(separator: " ")
-    return "SpeakUp has six tools. \(tools) To use one, say open and its name, like open mail reader. "
+    return "SpeakUp has seven tools. \(tools) To use one, say open and its name, like open mail reader. "
       + "Say status to check the camera, or settings."
   }()
 

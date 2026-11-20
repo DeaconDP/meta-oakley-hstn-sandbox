@@ -507,7 +507,7 @@ final class VoiceControl {
       say(SpokenMessage.whereAmI(screen: screen.spokenName, state: describeScreen?()))
     case .listTools:
       say(screen == .camera ? SpokenMessage.toolsList : SpokenMessage.toolsListNotConnected)
-    case .openMail, .openLabels, .openWatch, .openAsk, .openLight:
+    case .openMail, .openLabels, .openWatch, .openAsk, .openLight, .openReminders:
       say(screen == .camera ? SpokenMessage.readerOpen : SpokenMessage.readerNeedsGlasses)
     case .mainMenu, .back, .close:
       say(screen.mainMenuLine)

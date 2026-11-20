@@ -1,7 +1,7 @@
 /*
  * ImportButton - "Read a photo or PDF": pick a photo from Photos or a file from Files, and hear it
  *
- * On the tools home, under the six tools, styled like their rows (CameraView):
+ * On the tools home, under the seven tools, styled like their rows (CameraView):
  *
  *   ImportButton(subtitle: "...")
  *     .buttonStyle(.a11ySecondary)

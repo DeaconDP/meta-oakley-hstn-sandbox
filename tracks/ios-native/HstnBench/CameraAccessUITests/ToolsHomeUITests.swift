@@ -15,7 +15,7 @@ final class ToolsHomeUITests: XCTestCase {
 
   private static let titles: [(id: String, title: String)] = [
     ("read", "Read text"), ("mail", "Mail reader"), ("labels", "Labels and barcodes"), ("watch", "Watch for text"),
-    ("ask", "Ask about the text"), ("light", "Light and colour"),
+    ("ask", "Ask about the text"), ("light", "Light and colour"), ("reminders", "Reminders"),
   ]
 
   override func setUp() async throws {
@@ -81,7 +81,7 @@ final class ToolsHomeUITests: XCTestCase {
     let importButton = app.buttons["importButton"]
     XCTAssertTrue(importButton.waitForExistence(timeout: 10), "The import button should be on the tools home")
     XCTAssertEqual(importButton.label, "Read a photo or PDF")
-    XCTAssertGreaterThan(importButton.frame.minY, row("light").frame.maxY, "it comes after the six tools")
+    XCTAssertGreaterThan(importButton.frame.minY, row("reminders").frame.maxY, "it comes after the seven tools")
     reveal(importButton)
     importButton.tap()
     XCTAssertTrue(app.buttons["Choose a photo"].waitForExistence(timeout: 5))
@@ -118,5 +118,30 @@ final class ToolsHomeUITests: XCTestCase {
     wait(for: [expectation(for: watching, evaluatedWith: app.staticTexts["tool_title"])], timeout: 10)
     say("reader, main menu")
     XCTAssertTrue(app.staticTexts["tools_home_title"].waitForExistence(timeout: 10))
+  }
+
+  /// "Remind me ..." from the tools home opens Reminders, confirms, and lists it; "undo" takes it off.
+  /// UI tests use notifications that never ask (ReminderStore.live), so no permission prompt.
+  func testReminderByVoiceFromTheHome() {
+    launch(["--voice-inject"])
+    let field = app.textFields["voice_test_transcript"]
+    XCTAssertTrue(field.waitForExistence(timeout: 10))
+    func say(_ text: String) {
+      field.tap()
+      field.typeText(text + "\n")
+    }
+    say("reader, remind me in 20 minutes to take the bins out")
+    let opened = NSPredicate(format: "label == %@", "Reminders")
+    wait(for: [expectation(for: opened, evaluatedWith: app.staticTexts["tool_title"])], timeout: 10)
+    let confirm = app.staticTexts["reminders_last_line"]
+    XCTAssertTrue(confirm.waitForExistence(timeout: 10))
+    let confirmed = NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", "Reminder at ", "take the bins out. Say undo to cancel.")
+    wait(for: [expectation(for: confirmed, evaluatedWith: confirm)], timeout: 10)
+    XCTAssertTrue(
+      app.buttons["Cancel reminder: take the bins out"].waitForExistence(timeout: 5), "it's listed under Coming up, with Cancel")
+    say("reader, undo")
+    let undone = NSPredicate(format: "label BEGINSWITH %@", "Undone.")
+    wait(for: [expectation(for: undone, evaluatedWith: confirm)], timeout: 10)
+    XCTAssertTrue(app.staticTexts["reminders_none"].waitForExistence(timeout: 5))
   }
 }

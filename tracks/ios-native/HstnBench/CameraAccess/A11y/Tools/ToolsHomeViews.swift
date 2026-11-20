@@ -1,5 +1,5 @@
 /*
- * ToolsHomeViews - the tools home on the main screen: the six tools as big rows, the open tool's
+ * ToolsHomeViews - the tools home on the main screen: the seven tools as big rows, the open tool's
  * header with Close, and the small optional glasses row (notes/tools-home-ios.md)
  *
  * Phone first: every tool works with the iPhone's camera. Each row is one VoiceOver button named
@@ -20,6 +20,7 @@ extension ToolID {
     case .watch: .purple
     case .ask: .orange
     case .light: .yellow
+    case .reminders: .red
     }
   }
 
@@ -30,7 +31,7 @@ extension ToolID {
   var homeIdentifier: String { self == .read ? "read_button" : "tool_open_\(rawValue)" }
 }
 
-/// The six tools. Read text comes first and reads at once, as the one Read button did.
+/// The seven tools. Read text comes first and reads at once, as the one Read button did.
 struct ToolsHome: View {
   var openTool: (ToolID) -> Void
   /// "Status" in the VoiceOver actions on the Read text row.

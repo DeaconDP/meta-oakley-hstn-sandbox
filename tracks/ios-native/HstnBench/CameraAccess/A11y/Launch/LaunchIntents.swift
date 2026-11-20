@@ -24,6 +24,11 @@
  *
  * App Shortcuts limits: at most 10 AppShortcuts, each phrase has `.applicationName` once, and no
  * phrase fits two intents. LaunchShortcuts uses all 10; ReadImportedIntent is in Shortcuts only.
+ *
+ * Reminders (notes/reminders-ios.md) took Ask's App Shortcut slot. Ask only helps right after
+ * something was read, so it is usually reached from inside the app; reminders are a daily job
+ * people start cold ("What's due with SpeakUp"). Ask keeps its intent (Shortcuts, the Action
+ * Button, Back Tap) and "Open Ask about the text in SpeakUp" through OpenToolIntent.
  */
 
 import AppIntents
@@ -105,6 +110,7 @@ extension ToolID: AppEnum {
       .watch: DisplayRepresentation(title: "Watch for text", image: .init(systemName: "eye")),
       .ask: DisplayRepresentation(title: "Ask about the text", image: .init(systemName: "questionmark.bubble")),
       .light: DisplayRepresentation(title: "Light and colour", image: .init(systemName: "lightbulb")),
+      .reminders: DisplayRepresentation(title: "Reminders", image: .init(systemName: "bell")),
     ]
   }
 }
@@ -201,6 +207,17 @@ struct OpenAskIntent: OpenOneToolIntent {
   static var title: LocalizedStringResource { "Ask about the text" }
   static var description: IntentDescription {
     IntentDescription("Opens ask: questions about what was just read.")
+  }
+}
+
+/// Reminders needs no camera, but it opens the app: the panel lists what's coming up and the
+/// voice commands work there ("remind me at 6 to ...").
+struct OpenRemindersIntent: OpenOneToolIntent {
+  static var tool: ToolID { .reminders }
+  static var openAppWhenRun: Bool { true }
+  static var title: LocalizedStringResource { "My reminders" }
+  static var description: IntentDescription {
+    IntentDescription("Opens reminders: what's due this week, and your medicine log.")
   }
 }
 
@@ -304,13 +321,14 @@ struct LaunchShortcuts: AppShortcutsProvider {
       systemImageName: "eye"
     )
     AppShortcut(
-      intent: OpenAskIntent(),
+      intent: OpenRemindersIntent(),
       phrases: [
-        "Ask about the text with \(.applicationName)",
-        "\(.applicationName) ask",
+        "My reminders in \(.applicationName)",
+        "What's due with \(.applicationName)",
+        "\(.applicationName) reminders",
       ],
-      shortTitle: "Ask",
-      systemImageName: "questionmark.bubble"
+      shortTitle: "Reminders",
+      systemImageName: "bell"
     )
     AppShortcut(
       intent: OpenToolIntent(),
