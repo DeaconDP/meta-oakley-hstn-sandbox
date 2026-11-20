@@ -236,28 +236,28 @@ final class CustomiseWordsTests: CustomiseTestCase {
   // MARK: Tools menu
 
   func testTheMenuOrderIsChangedByVoiceAndPersists() {
-    XCTAssertEqual(engine.reply(to: "put labels first"), SpokenMessage.homeMoved(.labels, position: 0, count: 6))
+    XCTAssertEqual(engine.reply(to: "put labels first"), SpokenMessage.homeMoved(.labels, position: 0, count: 7))
     XCTAssertEqual(area.orderedTools.first, .labels)
-    XCTAssertEqual(engine.reply(to: "move mail up"), SpokenMessage.homeMoved(.mail, position: 1, count: 6))
-    XCTAssertEqual(engine.reply(to: "put read text last"), SpokenMessage.homeMoved(.read, position: 5, count: 6))
+    XCTAssertEqual(engine.reply(to: "move mail up"), SpokenMessage.homeMoved(.mail, position: 1, count: 7))
+    XCTAssertEqual(engine.reply(to: "put read text last"), SpokenMessage.homeMoved(.read, position: 6, count: 7))
     XCTAssertEqual(engine.reply(to: "hide light and colour"), SpokenMessage.homeHidden([.light]))
-    XCTAssertEqual(area.visibleTools, [.labels, .mail, .watch, .ask, .read])
+    XCTAssertEqual(area.visibleTools, [.labels, .mail, .watch, .ask, .reminders, .read])
 
     let reloaded = WordsArea(defaults: defaults, mirrorsAddressWord: false)
-    XCTAssertEqual(reloaded.orderedTools, [.labels, .mail, .watch, .ask, .light, .read])
-    XCTAssertEqual(reloaded.visibleTools, [.labels, .mail, .watch, .ask, .read])
+    XCTAssertEqual(reloaded.orderedTools, [.labels, .mail, .watch, .ask, .light, .reminders, .read])
+    XCTAssertEqual(reloaded.visibleTools, [.labels, .mail, .watch, .ask, .reminders, .read])
 
     XCTAssertEqual(engine.reply(to: "show all tools"), SpokenMessage.homeAllShown)
-    XCTAssertEqual(area.visibleTools.count, 6)
+    XCTAssertEqual(area.visibleTools.count, 7)
     XCTAssertEqual(engine.reply(to: "show all tools"), SpokenMessage.homeNothingHidden)
   }
 
   func testHidingSeveralShowingOneAndNeverHidingAll() {
     XCTAssertEqual(engine.reply(to: "hide ask, watch and light"), SpokenMessage.homeHidden([.ask, .watch, .light]))
     XCTAssertEqual(engine.reply(to: "show watch"), SpokenMessage.homeShown([.watch]))
-    XCTAssertEqual(area.visibleTools, [.read, .mail, .labels, .watch])
-    XCTAssertEqual(engine.reply(to: "hide read text and mail and labels and watch"), SpokenMessage.homeCantHideAll)
-    XCTAssertEqual(area.visibleTools.count, 4)
+    XCTAssertEqual(area.visibleTools, [.read, .mail, .labels, .watch, .reminders])
+    XCTAssertEqual(engine.reply(to: "hide read text and mail and labels and watch and reminders"), SpokenMessage.homeCantHideAll)
+    XCTAssertEqual(area.visibleTools.count, 5)
     XCTAssertEqual(engine.reply(to: "hide the kettle"), SpokenMessage.homeUnknownTool("the kettle"))
   }
 
@@ -271,13 +271,13 @@ final class CustomiseWordsTests: CustomiseTestCase {
 
   func testTheToolsListFollowsTheMenu() {
     let wasHidden = WordsArea.shared.orderedTools.filter(WordsArea.shared.isHidden)
-    XCTAssertTrue(SpokenMessage.toolsList.hasPrefix(wasHidden.isEmpty ? "SpeakUp has six tools." : "Your menu has"))
+    XCTAssertTrue(SpokenMessage.toolsList.hasPrefix(wasHidden.isEmpty ? "SpeakUp has seven tools." : "Your menu has"))
     let shared = WordsArea.shared
     let before = shared.snapshot()
     defer { try? shared.restore(before) }
     _ = shared.hide([.light, .ask])
     let list = SpokenMessage.toolsList
-    XCTAssertTrue(list.hasPrefix("Your menu has four tools."), list)
+    XCTAssertTrue(list.hasPrefix("Your menu has five tools."), list)
     XCTAssertFalse(list.contains(ToolID.light.title))
     XCTAssertTrue(list.contains("show all tools"))
   }
@@ -333,7 +333,7 @@ final class CustomiseWordsTests: CustomiseTestCase {
       area.differencesFromDefaults(),
       [
         "post means open mail reader", "morning post will open mail, then read it all",
-        "tools menu order: labels and barcodes, read text, mail reader, watch for text, ask about the text, and light and colour",
+        "tools menu order: labels and barcodes, read text, mail reader, watch for text, ask about the text, light and colour, and reminders",
         "hidden tools: light and colour", "you call me robin",
       ])
     let changed = area.snapshot()
@@ -350,8 +350,8 @@ final class CustomiseWordsTests: CustomiseTestCase {
     let old = #"{"aliases":[{"name":"post","phrase":"repeat"}],"homeOrder":["light","kettle"],"hiddenTools":["kettle"],"extra":1}"#
     try area.restore(Data(old.utf8))
     XCTAssertEqual(area.aliases.count, 1)
-    XCTAssertEqual(area.orderedTools, [.light, .read, .mail, .labels, .watch, .ask])
-    XCTAssertEqual(area.visibleTools.count, 6)
+    XCTAssertEqual(area.orderedTools, [.light, .read, .mail, .labels, .watch, .ask, .reminders])
+    XCTAssertEqual(area.visibleTools.count, 7)
     XCTAssertEqual(area.addressWord, "reader")
     XCTAssertTrue(area.macros.isEmpty)
   }
