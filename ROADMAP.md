@@ -105,6 +105,18 @@ Plan: notes/value-strategy.md > 6.
 - **V5 Glasses as premium:** the same tools hands-free once Meta opens publishing; meanwhile a Beta with blind glasses owners from Meta's programmes (BVA, VA Blind Rehab, Vision Ireland, ACB).
 - **Business track:** apply for grants, pilot one UK letter sponsor (bank or energy firm), talk to Meta's accessibility team about the curated catalogue.
 
+## Voice from start to finish (iOS, added 2026-11-20)
+
+A blind user can run SpeakUp on iPhone by voice alone, from launch to the end of the session. Where iOS forces a tap (system permission alerts, pickers), the app says so and names the voice way round it. Full plan: notes/voice-journey-ios.md.
+
+- **J1 End the session by voice:** "goodbye", "end session", "close the app" say goodbye, then stop the mic, the glasses session and audio, and leave the app idle; "close" always goes up one level, as on Android. A short "listening" line on return. iOS has no way for an app to quit itself, so the user leaves with the lock button or Siri.
+- **J2 Grammar gaps:** "switch to \<tool>", and "read a photo" / "read a file" to open Import.
+- **J3 First run for everyone:** spoken welcome and a big "Use my voice" button without VoiceOver; a spoken pre-prompt before every system alert, naming Voice Control's "Tap Allow".
+- **J4 No touch-only dead ends:** Import by voice, error alerts always spoken, spoken handoff to and from Meta AI.
+- **J5 Every setting by voice, with undo:** voice choice, sounds, tips, "undo", "what's my setup". The iOS slice of C0 and C1.
+- **J6 Ways in without the icon:** a Control Center / Action button control, Back Tap help, "Hey Meta, start SpeakUp" (Beta).
+- **J7 Prove it:** one UI test for the whole walkthrough, and real-iPhone runs with VoiceOver, with Voice Control, and with neither.
+
 ## Beyond reading: new use-cases (added 2026-11-18)
 
 Glasses are good for two things: **hands-free** (camera, mic and speakers at head height while the hands are busy) and **heads-up** (a glance at a lens, display glasses only). HSTN covers the first; Meta Ray-Ban Display adds the second. SpeakUp stays audio-first on both, and a display mirrors the audio. Full catalogue, prior art and what Meta already covers: notes/use-cases.md.

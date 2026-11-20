@@ -67,6 +67,15 @@
 
 - [ ] iOS hands-free: `DATGlassesDisplayMockTests.testTheCardRendersOnTheMockDisplay` fails every run ("The display didn't start", 50–73 s) on a fresh iOS 27 simulator (2026-11-18; the other 228 unit tests pass)
 
+## Voice from start to finish (notes/voice-journey-ios.md)
+- [ ] J1 iOS: end the session by voice ("goodbye", "end session", "close the app"): goodbye, stop the listener, `endSession()`, ticks off, non-saved "ended" flag, "listening" line on return; "close" goes up one level as on Android; update `testListToolsAndCloseTheApp`
+- [ ] J2 iOS: "switch to <tool>" phrases; "read a photo" / "read a file" open Import
+- [ ] J3 iOS: check notes/a11y-onboarding.md:72 against the code; spoken welcome and "Use my voice" button without VoiceOver; spoken pre-prompt before mic, speech and camera alerts; camera asked at setup when "phone" is chosen
+- [ ] J4 iOS: Import by voice; spoken "tap the mic to answer" in toolbox mode; error alerts always spoken; spoken Meta AI handoff and return; find out about "read my latest photo" with PhotoKit
+- [ ] J5 iOS: natural voice, VoiceOver voice, sounds and tips by voice; "undo" / "put it back"; "what's my setup" (with C0/C1)
+- [ ] J6 iOS: widget extension with a `ControlWidget` (Action button, Control Center, Lock Screen); spoken help on Back Tap and the Action button; "Hey Meta, start SpeakUp" in the Beta build
+- [ ] J7 iOS: one `--voice-inject` UI test from launch to end session; real-iPhone runs with VoiceOver, with Voice Control (check "Tap Allow" on permission alerts) and with neither; blind testers
+
 ## Everyday value (notes/value-strategy.md)
 - [x] V0 Android: phone camera mode (2026-11-19, notes/phone-camera.md): `PhoneCamera` (CameraX 1.5.3) behind a DAT-free `PageCamera`, glasses-only parts moved to `GlassesLink`, `CameraSourceSelector` switches at runtime, `cameraSource` AUTO/PHONE/GLASSES with a spoken fallback after the 20 s link wait, frame-difference `motion` for page turns, first-run "Use my phone's camera", Bluetooth only asked for glasses, phone pitfalls (permission, camera in use, too dark), torch and camera switch by voice. JVM 350/0. **Instrumentation not run** (emulator overloaded, adb killed by Unity's adb)
 - [x] V0 iOS: phone camera mode (2026-11-19, notes/phone-camera-ios.md): `PhoneFrameSource` + `CameraSourceRouter`, setup leads with "Use my iPhone's camera", camera card with preview and torch, voice phrases, phone pitfalls. Unit tests 258 passed, 1 failed (the known display mock test). Not tried on a real iPhone
