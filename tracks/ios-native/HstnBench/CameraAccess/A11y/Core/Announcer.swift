@@ -67,6 +67,16 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   /// The last text passed to say() or announce(), for a "repeat" command.
   private(set) var lastSpoken: String?
 
+  /// The word the app's own voice is saying: its line and the word's range in it
+  /// (AVSpeechSynthesizer's willSpeakRange). nil between lines, for VoiceOver announcements and
+  /// for external speech (the cloud voice). The big-text mirror highlights it.
+  struct SpokenWord: Equatable {
+    let line: String
+    let range: NSRange
+  }
+
+  private(set) var spokenWord: SpokenWord?
+
   @ObservationIgnored private let synthesizer = AVSpeechSynthesizer()
   @ObservationIgnored private let audio = A11yAudioSession.shared
   @ObservationIgnored private let preferences = A11yPreferences.shared
@@ -293,6 +303,7 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
   }
 
   private func finishCurrent(_ finished: Bool) {
+    if spokenWord != nil { spokenWord = nil }
     currentUtteranceTag = nil
     currentAnnouncement = nil
     currentOnStart = nil
@@ -372,6 +383,17 @@ final class Announcer: NSObject, AVSpeechSynthesizerDelegate {
     let startedAt = DispatchTime.now().uptimeNanoseconds
     guard let tag = (utterance as? TaggedUtterance)?.tag else { return }
     Task { @MainActor in self.utteranceStarted(tag: tag, at: startedAt) }
+  }
+
+  nonisolated func speechSynthesizer(
+    _ synthesizer: AVSpeechSynthesizer, willSpeakRangeOfSpeechString characterRange: NSRange, utterance: AVSpeechUtterance
+  ) {
+    guard let tag = (utterance as? TaggedUtterance)?.tag else { return }
+    let line = utterance.speechString
+    Task { @MainActor in
+      guard tag == self.currentUtteranceTag else { return }
+      self.spokenWord = SpokenWord(line: line, range: characterRange)
+    }
   }
 
   nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {

@@ -157,8 +157,9 @@ final class ToolHub: VoiceToolRouting {
 
 // MARK: - Read text as a tool
 
-/// The original reader (TextReader) behind the same seam as the other tools. Its voice commands
-/// (read, next, back, repeat, stop) are the app's own, so it takes no transcript itself.
+/// The original reader (TextReader) behind the same seam as the other tools. Its sentence commands
+/// (read, next, back, repeat, stop) are the app's own; its own phrases (steps, big text, yes to the
+/// torch offer) are in ReadTextVoice (A11y/Read/ReadSteps.swift).
 @MainActor
 final class ReadTextTool: SpeakUpTool {
   let toolID: ToolID = .read
@@ -171,11 +172,12 @@ final class ReadTextTool: SpeakUpTool {
   }
 
   var helpLine: String {
-    "Read text. Say read to read what's in view, then next, back, repeat or stop."
+    "Read text. Say read to read what's in view, then next, back, repeat or stop. Say big text for large print, and next step for recipes and manuals."
   }
 
   func start(source: ReadFrameSource) {
     reader.source = source
+    if reader === TextReader.shared { FramingAssist.shared.start(source: source) }
     if quietStart {
       quietStart = false
       return
@@ -188,10 +190,11 @@ final class ReadTextTool: SpeakUpTool {
   }
 
   func stop() {
+    if reader === TextReader.shared { FramingAssist.shared.stop() }
     if reader.isActive { reader.stop() }
   }
 
-  func handle(transcript: String) -> Bool { false }
+  func handle(transcript: String) -> Bool { ReadTextVoice.handle(transcript, reader: reader) }
 
   func pauseForStop() {
     if reader.isActive { reader.stop() }
@@ -221,6 +224,7 @@ struct ReadTextPanel: View {
         ReadPanel(isLargeText: dynamicTypeSize.isAccessibilitySize, onStatus: speakStatus)
       }
     }
+    .bigTextMirrorCover()
   }
 
   private func speakStatus() {

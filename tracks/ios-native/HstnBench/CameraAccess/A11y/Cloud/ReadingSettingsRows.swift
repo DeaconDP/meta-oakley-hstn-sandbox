@@ -48,6 +48,7 @@ struct ReadingSettingsRows: View {
     .onChange(of: preferences.useNaturalVoice) { _, isOn in
       Announcer.shared.say(isOn ? SpokenMessage.readNaturalVoiceOn : SpokenMessage.readNaturalVoiceOff)
     }
+    ReadingHapticsRow()
     SecureField("Paste an OpenAI API key", text: $draftKey)
       .font(.rounded(.body, weight: .medium))
       .foregroundStyle(Theme.ink)
