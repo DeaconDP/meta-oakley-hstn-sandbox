@@ -65,7 +65,7 @@
   - [x] C1 iOS Sounds (2026-11-20): `SoundsArea` with earcons on/off (still `a11y.earconsEnabled`), earcon and voice volume, earcons only, say it instead of beeping; voice phrases; on-screen section
   - [x] C2 iOS Your ears (2026-11-20): `EarsArea` with balance, ear per kind of sound, iOS mono + "I use mono", Watch for text pan/pitch side cue, Clear speech (dynamics + EQ + slower) with the A/B listening check, conversation mode; voice phrases; on-screen section
   - [ ] C2 iOS on real hardware: per-temple stereo on HSTN, OS mono/balance over A2DP, Clear speech EQ on the glasses' speakers, bus latency on an iPhone
-  - [ ] Settings core: route `SettingsVoice` before `VoiceCommandParser` while conversation mode or the clarity check is active, so "carry on", "again" and "stop" reach them
+  - [x] Settings core: `SettingsVoice` runs before the tools and the command parse in `VoiceControl.inject`, so "carry on", "again" and "stop" reach conversation mode and the clarity check (2026-11-20, checked at merge)
 - [ ] C3: aliases + macros by voice with conflict check, home-menu show/hide/reorder, wake word choice, tip pacing Fewer/Normal/Off
   - [x] iOS tip pacing Fewer/Normal/Off (2026-11-20)
   - [x] C3 iOS (2026-11-20, notes/customisation-ios-words.md): aliases, macros built by voice with read-back and run in order, conflict check, tools menu show/hide/reorder by voice and on screen, address word choice. Tip pacing not done. Not tried on a real iPhone

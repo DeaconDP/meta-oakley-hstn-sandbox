@@ -77,6 +77,7 @@ extension ToolID {
     case .watch: ["watch for text", "watch", "watching", "text watcher"]
     case .ask: ["ask about the text", "ask", "questions", "ask a question"]
     case .light: ["light and colour", "light and color", "light", "colour", "color", "colours", "colors", "the light"]
+    case .reminders: ["reminders", "reminder", "my reminders", "the reminders"]
     }
   }
 

@@ -17,7 +17,7 @@ struct WordsSettingsSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      CustomiseHeader(title: "Your words", id: "words_header")
+      WordsHeader(title: "Your words", id: "words_header")
 
       CustomiseSubheader(title: "Tools menu")
       ForEach(Array(area.orderedTools.enumerated()), id: \.element) { index, tool in
@@ -129,7 +129,7 @@ enum WordsTargets {
 
 // MARK: - Shared pieces for the customise sections
 
-struct CustomiseHeader: View {
+struct WordsHeader: View {
   let title: String
   let id: String
 

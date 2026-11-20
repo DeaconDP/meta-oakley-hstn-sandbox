@@ -13,7 +13,7 @@ struct ControlsSettingsSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      CustomiseHeader(title: GlassesSupport.isBuiltIn ? "Your buttons (Experimental)" : "Your favourite tool", id: "controls_header")
+      WordsHeader(title: GlassesSupport.isBuiltIn ? "Your buttons (Experimental)" : "Your favourite tool", id: "controls_header")
 
       Picker("Favourite tool", selection: favouriteBinding) {
         Text("None").tag(ToolID?.none)
