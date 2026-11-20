@@ -361,10 +361,21 @@ final class VoiceControl {
   /// which take the transcript for the open tool's own phrases ("read", "repeat", "how much") and
   /// for "watch for 42" from anywhere, but leave the app's always-on commands (stop, close, main
   /// menu, help, another tool) alone; then the screen's commands; then the common ones.
-  func inject(transcript: String) {
+  func inject(transcript heard: String) {
     guard let screen else { return }
     let pushToTalk = isPushToTalkActive
     let context = context(on: screen)
+    // "Your words" (Customise/Words/WordsEngine): the user's own words and macros, before parsing.
+    var transcript = heard
+    switch UtteranceHook.rewrite?(heard, context) ?? .unchanged {
+    case .unchanged: break
+    case .rewritten(let words): transcript = words
+    case .handled:
+      if pushToTalk { endPushToTalk(nothingHeard: false) }
+      environment.playEarcon(.heard)
+      lastCommandAt = environment.now()
+      return
+    }
     let parsed = VoiceCommandParser.parse(transcript, context: context)
     var command: VoiceCommand?
     if case .command(let parsedCommand) = parsed { command = parsedCommand }

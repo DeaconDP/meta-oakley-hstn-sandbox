@@ -133,9 +133,9 @@ enum VoiceCoachLines {
   struct Words {
     let wakeWord: Bool
 
-    func say(_ command: String) -> String { wakeWord ? "say reader, \(command)" : "say \(command)" }
+    func say(_ command: String) -> String { wakeWord ? "say \(AddressWord.current), \(command)" : "say \(command)" }
     /// At the start of a sentence.
-    func sayFirst(_ command: String) -> String { wakeWord ? "Say reader, \(command)" : "Say \(command)" }
+    func sayFirst(_ command: String) -> String { wakeWord ? "Say \(AddressWord.current), \(command)" : "Say \(command)" }
   }
 
   /// `glassesSupported` false is the App Store build: it never offers connect or the glasses.

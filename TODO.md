@@ -59,7 +59,10 @@
 - [ ] C1: speech presets (Brisk/Normal/Gentle), voice choice by voice with samples, per-tool verbosity, earcon on/off/volume/earcons-only, Android settings screen
 - [ ] C2: balance, which ear for which sound, mono-aware cues (iOS `isMonoAudioEnabled`), Clear speech preset (DynamicsProcessing / AVAudioUnitEQ), conversation mode
 - [ ] C3: aliases + macros by voice with conflict check, home-menu show/hide/reorder, wake word choice, tip pacing Fewer/Normal/Off
+  - [x] C3 iOS (2026-11-20, notes/customisation-ios-words.md): aliases, macros built by voice with read-back and run in order, conflict check, tools menu show/hide/reorder by voice and on screen, address word choice. Tip pacing not done. Not tried on a real iPhone
 - [ ] C4 (Experimental): glasses controls map for `Capture`/`Select`/`Nav`, "what do my buttons do?", `LaunchApp` into a tool; find out whether Meta's press-and-hold shortcut can launch a DAT app
+  - [x] C4 iOS (2026-11-20, notes/customisation-ios-words.md): glasses controls map wired to MWDATInputs 1.0.1 (Beta build only), "what do my buttons do?" with the Meta warning, favourite tool, Shortcuts intents to run a macro or open the favourite. Not done: `LaunchApp`, the press-and-hold question
+  - [ ] C4 iOS on real glasses: which Inputs events HSTN sends, swipe directions, the double-press timing, inputs after re-wear
 - [ ] C5: profiles (Home / Out and about / Reading), switch by voice, optional announced triggers, learned suggestions
 - [ ] C6: detail dial + description preferences passed to the model
 - [ ] C7: export/import setup code, helper view, backup with the bookmarks

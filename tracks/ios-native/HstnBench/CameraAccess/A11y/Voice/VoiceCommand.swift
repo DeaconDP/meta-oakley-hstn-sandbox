@@ -189,9 +189,9 @@ enum VoiceParseResult: Equatable, Sendable {
 }
 
 enum VoiceCommandParser {
-  static let wakeWord = "reader"
+  /// "reader" unless the user chose another address word (Customise/Words/AddressWord).
+  static var wakeWord: String { AddressWord.current }
 
-  private static let wakeWords: Set<String> = ["reader", "readers"]
   private static let wakeLeadIns: Set<String> = ["hey", "hi", "ok", "okay"]
 
   private static let phrases: [VoiceCommand: [String]] = [
@@ -306,8 +306,8 @@ enum VoiceCommandParser {
   private static func stripWakeWord(_ tokens: [String]) -> (Bool, [String]) {
     var rest = tokens[...]
     while let first = rest.first, wakeLeadIns.contains(first) { rest = rest.dropFirst() }
-    guard let first = rest.first, wakeWords.contains(first) else { return (false, tokens) }
-    return (true, Array(rest.dropFirst()))
+    guard let used = AddressWord.length(atStartOf: rest) else { return (false, tokens) }
+    return (true, Array(rest.dropFirst(used)))
   }
 
   /// The command for the words, peeling filler off one piece at a time and checking for a phrase
@@ -436,7 +436,7 @@ enum VoiceCommandParser {
     if screenCommands(context: context).contains(.openMail) {
       groups.insert("Tools: say open, then \(toolNames).", at: 1)
     }
-    let lead = context.requiresWakeWord || context.isSpeaking ? "Say reader first, then one of these." : "You can say these."
+    let lead = context.requiresWakeWord || context.isSpeaking ? "Say \(wakeWord) first, then one of these." : "You can say these."
     return ([lead] + groups).joined(separator: " ")
   }
 }

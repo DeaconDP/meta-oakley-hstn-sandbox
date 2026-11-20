@@ -60,12 +60,16 @@ extension SpokenMessage {
 
   // MARK: Tools
 
-  /// The tools, one short line each, from ToolID, then how to open one.
-  static let toolsList: String = {
-    let tools = ToolID.allCases.map { "\($0.title): \($0.summary.lowercasedFirst)" }.joined(separator: " ")
-    return "SpeakUp has six tools. \(tools) To use one, say open and its name, like open mail reader. "
-      + "Say status to check the camera, or settings."
-  }()
+  /// The tools on the user's menu, in their order (Customise/Words/WordsArea), one short line each,
+  /// then how to open one.
+  static var toolsList: String {
+    let shown = WordsArea.visibleToolsMirror
+    let all = shown.count == ToolID.allCases.count
+    let tools = shown.map { "\($0.title): \($0.summary.lowercasedFirst)" }.joined(separator: " ")
+    let count = all ? "SpeakUp has six tools." : "Your menu has \(WordsText.count(shown.count)) tools."
+    return "\(count) \(tools) To use one, say open and its name, like open mail reader. "
+      + (all ? "" : "Say show all tools to bring back the rest. ") + "Say status to check the camera, or settings."
+  }
 
   static let toolsListNotConnected =
     "SpeakUp has three tools. Reader reads printed text aloud, once your glasses are connected. Say connect first. Status checks your glasses. Settings changes voice and answers."
