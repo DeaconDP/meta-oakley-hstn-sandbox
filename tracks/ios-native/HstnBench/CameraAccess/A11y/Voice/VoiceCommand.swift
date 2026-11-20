@@ -64,6 +64,12 @@ enum VoiceCommand: String, CaseIterable, Sendable {
   case whichCamera
   case torchOn
   case torchOff
+  // The everyday tools (ToolHub). Read text is .read ("read now") and .openReader.
+  case openMail
+  case openLabels
+  case openWatch
+  case openAsk
+  case openLight
 
   /// The word or phrase help offers for it, and the name the UI shows as the last command.
   var phrase: String {
@@ -101,8 +107,41 @@ enum VoiceCommand: String, CaseIterable, Sendable {
     case .whichCamera: "which camera"
     case .torchOn: "torch on"
     case .torchOff: "torch off"
+    case .openMail: "open mail reader"
+    case .openLabels: "open labels"
+    case .openWatch: "watch for text"
+    case .openAsk: "open ask"
+    case .openLight: "light and colour"
     }
   }
+
+  /// The tool this command opens, if it opens one. "read" opens Read text and reads at once.
+  var tool: ToolID? {
+    switch self {
+    case .openReader, .read: .read
+    case .openMail: .mail
+    case .openLabels: .labels
+    case .openWatch: .watch
+    case .openAsk: .ask
+    case .openLight: .light
+    default: nil
+    }
+  }
+
+  /// The command that opens `tool` without doing anything else.
+  static func open(_ tool: ToolID) -> VoiceCommand {
+    switch tool {
+    case .read: .openReader
+    case .mail: .openMail
+    case .labels: .openLabels
+    case .watch: .openWatch
+    case .ask: .openAsk
+    case .light: .openLight
+    }
+  }
+
+  /// The commands that open a tool by name.
+  static let openTools: [VoiceCommand] = ToolID.allCases.map(open)
 }
 
 /// Which screen commands apply to.
@@ -129,6 +168,9 @@ struct VoiceContext: Equatable, Sendable {
   var addressed = false
   /// A yes-or-no question is waiting (VoiceControl.ask), so yes, no and continue work here too.
   var awaitingAnswer = false
+  /// This build can use Meta glasses. The App Store build (SPEAKUP_NO_DAT) can't, so help and tips
+  /// don't offer connect or use the glasses there.
+  var glassesSupported = GlassesSupport.isBuiltIn
 }
 
 enum VoiceParseResult: Equatable, Sendable {
@@ -171,7 +213,17 @@ enum VoiceCommandParser {
       "list tools", "what tools are there", "what tools do you have", "tools", "list features", "what features are there",
       "features", "what can this app do",
     ],
-    .openReader: ["open reader", "open the reader", "open read text", "open reading"],
+    .openReader: ["open reader", "open the reader", "open read text", "open reading"] + ToolID.read.openPhrases.filter { $0 != "read text" },
+    .openMail: ToolID.mail.openPhrases + ["open mail", "open the mail reader", "open my mail", "read the letter", "read a letter"],
+    .openLabels: ToolID.labels.openPhrases + [
+      "open labels and barcodes", "labels and barcodes", "open the labels", "scan barcode", "scan a label", "barcode", "barcodes",
+    ],
+    .openWatch: ToolID.watch.openPhrases + ["open watch", "watch for a word", "watch for words"],
+    .openAsk: ToolID.ask.openPhrases + ["open ask about the text", "ask about it", "ask a question"],
+    .openLight: ToolID.light.openPhrases + [
+      "open light", "open light and color", "light and color", "what color is this", "open colour", "open color",
+      "is the light on or off", "is there a light on",
+    ],
     .openSettings: ["settings", "open settings", "open the settings", "show settings"],
     .close: ["close", "close this", "close settings", "close the settings", "done"],
     .whereAmI: ["where am i", "what screen is this", "what screen am i on", "where are we"],
@@ -328,7 +380,29 @@ enum VoiceCommandParser {
       let reading: [VoiceCommand] = context.hasReadSentences ? [.continueOn] : []
       let camera: [VoiceCommand] = [.whichCamera, .usePhone, .useGlasses, .torchOn, .torchOff]
       return [.read, .status, .tryAgain, .openReader, .openSettings, .back, .close, .connect, .disconnect] + camera + reading + answers
+        + VoiceCommand.openTools
     }
+  }
+
+  /// "read text, mail reader, labels, watch for text, ask, or light and colour".
+  static let toolNames: String = {
+    let names = ["read text", "mail reader", "labels", "watch for text", "ask", "light and colour"]
+    return names.dropLast().joined(separator: ", ") + ", or " + names.last!
+  }()
+
+  /// The words a tool should get: the transcript with any "reader, ..." taken off, or nil when it
+  /// isn't for the app (the wake word was needed, or the mic heard the app's own speech). The same
+  /// gates as parse(_:context:), for tools that have their own phrases (ToolHub).
+  static func addressedText(_ transcript: String, context: VoiceContext) -> String? {
+    let tokens = normalize(transcript)
+    guard !tokens.isEmpty else { return nil }
+    let (saidWake, afterWake) = stripWakeWord(tokens)
+    let hadWake = saidWake || context.addressed
+    if !hadWake, context.isSpeaking || context.requiresWakeWord { return nil }
+    if overlaps(tokens, spoken: normalize(context.spokenText), hadWake: hadWake) { return nil }
+    guard saidWake else { return transcript }
+    guard !afterWake.isEmpty else { return nil }
+    return afterWake.joined(separator: " ")
   }
 
   static func availableCommands(context: VoiceContext) -> [VoiceCommand] {
@@ -343,17 +417,25 @@ enum VoiceCommandParser {
     let quiet: Set<VoiceCommand> = [
       .back, .close, .yes, .no, .continueOn, .tryAgain, .disconnect, .openReader, .useGlasses, .torchOff,
     ]
-    var here = screenCommands(context: context).filter { !quiet.contains($0) }.map(\.phrase)
+    let glassesOnly: Set<VoiceCommand> = [.connect, .useGlasses, .disconnect, .glassesDisplayOn, .glassesDisplayOff]
+    var here = screenCommands(context: context)
+      .filter { !quiet.contains($0) && !VoiceCommand.openTools.contains($0) }
+      .filter { context.glassesSupported || !glassesOnly.contains($0) }
+      .map(\.phrase)
     if context.screen == .welcome { here.append(VoiceCommand.no.phrase) }
     if context.hasReadSentences { here += ["next", "back"] }
     if context.awaitingAnswer { here += ["yes", "no"] }
     let mode: VoiceCommand = context.handsFree ? .handsFreeOff : .handsFreeOn
-    let groups = [
+    let settings: [VoiceCommand] = context.glassesSupported ? [.shortAnswers, .glassesDisplayOff, mode] : [.shortAnswers, .detailedAnswers, mode]
+    var groups = [
       "Here: \(here.joined(separator: ", ")).",
       "Anywhere: \([VoiceCommand.mainMenu, .listTools, .whereAmI].map(\.phrase).joined(separator: ", ")).",
       "Speech: \([VoiceCommand.stop, .repeatLast, .faster, .slower].map(\.phrase).joined(separator: ", ")).",
-      "Settings: \([VoiceCommand.shortAnswers, .glassesDisplayOff, mode].map(\.phrase).joined(separator: ", ")).",
+      "Settings: \(settings.map(\.phrase).joined(separator: ", ")).",
     ]
+    if screenCommands(context: context).contains(.openMail) {
+      groups.insert("Tools: say open, then \(toolNames).", at: 1)
+    }
     let lead = context.requiresWakeWord || context.isSpeaking ? "Say reader first, then one of these." : "You can say these."
     return ([lead] + groups).joined(separator: " ")
   }

@@ -169,6 +169,7 @@ final class AppVoice {
 
   @ObservationIgnored private var cachedVoice: AVSpeechSynthesisVoice?
   @ObservationIgnored private var isLoaded = false
+  @ObservationIgnored private var isLoading = false
   @ObservationIgnored private var observer: NSObjectProtocol?
   @ObservationIgnored private let preferences = A11yPreferences.shared
 
@@ -184,8 +185,11 @@ final class AppVoice {
 
   /// The voice to put on an utterance. The first lookup is slow enough to delay the first word, so
   /// prepare() runs it ahead of time; if that hasn't finished, it happens here.
+  /// While prepare()'s lookup is still running, the British default stands in: a second lookup on
+  /// the main thread at the same time deadlocked inside TextToSpeech on the iOS 27 Simulator
+  /// (both waited in axUnsafeForcedSync; notes/tools-home-ios.md).
   var voice: AVSpeechSynthesisVoice? {
-    if !isLoaded { apply(Self.installedVoices()) }
+    if !isLoaded, !isLoading { apply(Self.installedVoices()) }
     return cachedVoice ?? AVSpeechSynthesisVoice(language: "en-GB")
   }
 
@@ -203,10 +207,16 @@ final class AppVoice {
   }
 
   private func refreshInBackground() {
+    isLoading = true
     Task.detached(priority: .utility) { [weak self] in
       let voices = Self.installedVoices()
-      await self?.apply(voices)
+      await self?.finishLoading(voices)
     }
+  }
+
+  private func finishLoading(_ voices: [VoiceDescriptor]) {
+    isLoading = false
+    apply(voices)
   }
 
   nonisolated private static func installedVoices() -> [VoiceDescriptor] {

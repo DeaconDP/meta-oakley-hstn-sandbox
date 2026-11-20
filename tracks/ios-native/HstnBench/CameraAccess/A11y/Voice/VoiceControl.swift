@@ -146,6 +146,8 @@ final class VoiceControl {
   @ObservationIgnored private var describeScreen: (@MainActor () -> String?)?
   @ObservationIgnored private var question: (yes: @MainActor () -> Void, no: @MainActor () -> Void)?
   @ObservationIgnored private var pushToTalkTimeout: Task<Void, Never>?
+  /// The tools (ToolHub): gets a transcript before the screen's commands, see inject(transcript:).
+  @ObservationIgnored weak var tools: (any VoiceToolRouting)?
 
   private static let logger = Logger(subsystem: "com.deaco.hstnbench", category: "VoiceControl")
   private static let glassesCoolOff: TimeInterval = 60
@@ -354,10 +356,28 @@ final class VoiceControl {
   }
 
   /// A finished utterance from a listener, or from a test. The seam for injecting transcripts.
+  ///
+  /// Routing order: a yes-or-no question first; then the tools (ToolHub) on the camera screen,
+  /// which take the transcript for the open tool's own phrases ("read", "repeat", "how much") and
+  /// for "watch for 42" from anywhere, but leave the app's always-on commands (stop, close, main
+  /// menu, help, another tool) alone; then the screen's commands; then the common ones.
   func inject(transcript: String) {
     guard let screen else { return }
     let pushToTalk = isPushToTalkActive
-    switch VoiceCommandParser.parse(transcript, context: context(on: screen)) {
+    let context = context(on: screen)
+    let parsed = VoiceCommandParser.parse(transcript, context: context)
+    var command: VoiceCommand?
+    if case .command(let parsedCommand) = parsed { command = parsedCommand }
+    if screen == .camera, !(command.map(answersQuestion) ?? false), let tools,
+      let text = VoiceCommandParser.addressedText(transcript, context: context), tools.route(text, command: command)
+    {
+      if pushToTalk { endPushToTalk(nothingHeard: false) }
+      environment.playEarcon(.heard)
+      lastCommandAt = environment.now()
+      Self.logger.info("tool took a transcript")
+      return
+    }
+    switch parsed {
     case .command(let command):
       // Push to talk ends before the command runs, so "hands-free on" keeps the mic open.
       if pushToTalk { endPushToTalk(nothingHeard: false) }
@@ -401,6 +421,11 @@ final class VoiceControl {
     performCommon(command, on: screen)
   }
 
+  /// A waiting question would take this command.
+  private func answersQuestion(_ command: VoiceCommand) -> Bool {
+    question != nil && [.yes, .no, .continueOn].contains(command)
+  }
+
   /// A waiting question takes yes and no first.
   private func answer(_ command: VoiceCommand) -> Bool {
     guard let question else { return false }
@@ -438,6 +463,8 @@ final class VoiceControl {
       say(SpokenMessage.whereAmI(screen: screen.spokenName, state: describeScreen?()))
     case .listTools:
       say(screen == .camera ? SpokenMessage.toolsList : SpokenMessage.toolsListNotConnected)
+    case .openMail, .openLabels, .openWatch, .openAsk, .openLight:
+      say(screen == .camera ? SpokenMessage.readerOpen : SpokenMessage.readerNeedsGlasses)
     case .mainMenu, .back, .close:
       say(screen.mainMenuLine)
     case .openReader:
@@ -728,6 +755,16 @@ final class VoiceControl {
       self?.reconcile()
     }
   }
+}
+
+// MARK: - Tools
+
+/// What VoiceControl needs from the tools (ToolHub), so it can hand a transcript to the open tool.
+@MainActor
+protocol VoiceToolRouting: AnyObject {
+  /// `text` is the transcript for the app (wake word taken off); `command` is what the app's grammar
+  /// made of it, if anything. True if a tool used it.
+  func route(_ text: String, command: VoiceCommand?) -> Bool
 }
 
 // MARK: - Live environment

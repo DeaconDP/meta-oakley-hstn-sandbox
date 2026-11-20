@@ -32,7 +32,7 @@ extension SpokenMessage {
     ["You're on \(screen).", state].compactMap { $0 }.joined(separator: " ")
   }
 
-  static let mainMenuCamera = "Main menu. Say read, status, or list tools."
+  static let mainMenuCamera = "Main menu. Say read, list tools, or open and a tool's name."
 
   static let mainMenuHome = "Main menu. Your glasses aren't connected. Say connect, or use the phone."
 
@@ -48,13 +48,24 @@ extension SpokenMessage {
 
   static let readerOpen = "Reader. Hold up a page and say read."
 
+  static func toolOpened(_ tool: ToolID) -> String { "\(tool.title)." }
+
+  static func toolClosed(_ tool: ToolID) -> String { "\(tool.title) closed. Main menu." }
+
+  static func toolHelp(_ tool: ToolID, _ toolLine: String) -> String {
+    "\(toolLine) Say close to go back to the tools, stop to quiet it, or open and another tool's name."
+  }
+
   static let readerNeedsGlasses = "The reader needs your glasses. Say connect first."
 
   // MARK: Tools
 
-  /// The features, one short line each. Kept in step with HandsFreeTool.
-  static let toolsList =
-    "SpeakUp has three tools. Reader: reads printed text aloud, say read. Status: checks your glasses, say status. Settings: voice and answers, say settings."
+  /// The tools, one short line each, from ToolID, then how to open one.
+  static let toolsList: String = {
+    let tools = ToolID.allCases.map { "\($0.title): \($0.summary.lowercasedFirst)" }.joined(separator: " ")
+    return "SpeakUp has six tools. \(tools) To use one, say open and its name, like open mail reader. "
+      + "Say status to check the camera, or settings."
+  }()
 
   static let toolsListNotConnected =
     "SpeakUp has three tools. Reader reads printed text aloud, once your glasses are connected. Say connect first. Status checks your glasses. Settings changes voice and answers."
@@ -92,4 +103,12 @@ extension SpokenMessage {
 
   static let metaAIRegistrationQuestion =
     "Meta AI wants to connect your glasses to this app. Say yes to finish in Meta AI, or no."
+}
+
+extension String {
+  /// "Reads printed text" as "reads printed text", for a sentence that runs on from a name.
+  fileprivate var lowercasedFirst: String {
+    guard let first else { return self }
+    return first.lowercased() + dropFirst()
+  }
 }

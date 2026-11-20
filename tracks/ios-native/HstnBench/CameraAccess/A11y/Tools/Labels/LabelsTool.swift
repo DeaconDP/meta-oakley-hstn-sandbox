@@ -77,6 +77,8 @@ final class LabelsTool: SpeakUpTool {
   @ObservationIgnored private var views: [LabelView] = []
   /// Bumped by every command and stop, so late work from before does nothing.
   @ObservationIgnored private var generation = 0
+  /// Where a label's text goes for "Ask about the text". Never a medicine label's.
+  @ObservationIgnored var recentText: RecentText = .shared
 
   /// `productSource` is where "look it up" goes (Open Food Facts; tests pass a fake). `today` decides
   /// whether a date has passed.
@@ -96,7 +98,15 @@ final class LabelsTool: SpeakUpTool {
 
   func start(source: any ReadFrameSource) {
     self.source = source
+    announcer.announce("Labels and barcodes.", earcon: .ready, kind: .reply, interrupt: true)
     startScan(announce: true)
+  }
+
+  /// The app's global "stop": the barcode search and its ticks end; "scan" starts again.
+  func pauseForStop() {
+    guard phase == .searching || phase == .lookingUp || phase == .reading else { return }
+    stopAll()
+    phase = code != nil ? .found : .idle
   }
 
   func stop() {
@@ -389,6 +399,7 @@ final class LabelsTool: SpeakUpTool {
     }
     // Nothing from a medicine label is shown or kept on screen beyond its name.
     labelText = isMedicine ? nil : view.text
+    publishText()
     return true
   }
 
@@ -396,6 +407,14 @@ final class LabelsTool: SpeakUpTool {
     isMedicine = true
     medicineName = MedicineCheck.nameOnly(name ?? "")
     labelText = nil
+  }
+
+  /// Every side read so far, for "Ask about the text". A medicine label publishes nothing, and
+  /// takes back what its other sides published.
+  private func publishText() {
+    guard !isMedicine else { return recentText.clear(source: .labels) }
+    let text = views.map { $0.paragraphs.joined(separator: "\n") }.joined(separator: "\n\n")
+    recentText.append(text, source: .labels, key: "label")
   }
 
   /// Word for word, newest side. Medicine: the name and the refusal, nothing else.
@@ -522,5 +541,6 @@ final class LabelsTool: SpeakUpTool {
       markMedicine(product?.name ?? LabelText.nameGuess(lines))
     }
     labelText = isMedicine ? nil : text
+    publishText()
   }
 }

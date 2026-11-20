@@ -798,6 +798,23 @@ final class MailToolTests: XCTestCase {
     withExtendedLifetime(camera) {}
   }
 
+  /// Ask about the text works after a letter: its masked text and the sentence being read.
+  func testALettersSafeTextIsPublishedAndTheSentenceTracked() async {
+    let store = RecentText(defaults: nil)
+    let mail = tool(photo: Fixtures.utilityBill())
+    mail.recentText = store
+    let camera = FakeLetterCamera()
+    mail.start(source: camera)
+    mail.perform(.summarise)
+    await waitUntilLooked(mail)
+    let text = store.snapshot(source: .mail)?.fullText ?? ""
+    XCTAssertTrue(text.contains("Northgate Energy"), text)
+    mail.perform(.readAll)
+    XCTAssertEqual(store.snapshot(source: .mail)?.current, mail.currentSentence)
+    mail.stop()
+    withExtendedLifetime(camera) {}
+  }
+
   func testNextPageOnTheSamePageAddsNothing() async {
     let mail = tool(photo: Fixtures.utilityBill())
     let camera = FakeLetterCamera()  // The tool holds its source weakly, as TextReader does.

@@ -143,6 +143,8 @@ final class TextReader {
   /// older OCR run do nothing.
   @ObservationIgnored private var generation = 0
   @ObservationIgnored private var pendingFirstWord: PendingFirstWord?
+  /// Where each page goes for "Ask about the text": the words as spoken, never the image.
+  @ObservationIgnored var recentText: RecentText = .shared
 
   // Cloud reading. `generation` changes with every navigation, but the transcription keeps
   // streaming across next/previous, so it checks `readID` (bumped by read() and stop()) instead.
@@ -394,6 +396,7 @@ final class TextReader {
     earcons.stopWorkingTick(owner: Self.tickOwner)
     sentences = rendered
     notice = guidance
+    publishPage()
     if let guidance {
       // Cut off: say where and which way to turn, then read what is visible.
       announcer.announce(
@@ -421,6 +424,7 @@ final class TextReader {
     guard sentences.indices.contains(sentenceIndex) else { return }
     index = sentenceIndex
     phase = .reading
+    recentText.setCurrent(Self.spokenText(sentences[sentenceIndex]), source: .read)
     if let cloudClient {
       return speakCloud(at: sentenceIndex, interrupt: interrupt, client: cloudClient, myGeneration)
     }
@@ -457,6 +461,7 @@ final class TextReader {
       waitingForMore = true
     } else {
       phase = .finished
+      recentText.setCurrent(nil, source: .read)
       announcer.announce(
         SpokenMessage.readEnd(verbosity: A11yPreferences.shared.verbosity), earcon: .done, kind: .reply, interrupt: false)
     }
@@ -550,6 +555,7 @@ final class TextReader {
     let rendered = CloudSentence.rendered(text, verbosity: preferences.verbosity, earconsEnabled: preferences.earconsEnabled)
     guard !rendered.chunks.isEmpty else { return }
     sentences.append(rendered)
+    publishPage()
     let newIndex = sentences.count - 1
     if newIndex == 0 {
       earcons.stopWorkingTick(owner: Self.tickOwner)
@@ -577,6 +583,7 @@ final class TextReader {
     // The voice was waiting at the last sentence: that was all of it.
     waitingForMore = false
     phase = .finished
+    recentText.setCurrent(nil, source: .read)
     announcer.announce(SpokenMessage.readEnd(verbosity: preferences.verbosity), earcon: .done, kind: .reply, interrupt: false)
   }
 
@@ -674,6 +681,19 @@ final class TextReader {
       "trigger_to_first_word", ms: ms,
       detail: "first=\(first) source=\(pending.source) route=\(Announcer.shared.currentOutputDescription().replacingOccurrences(of: " ", with: "_"))")
     lastTiming = ReadTiming(firstWordMs: ms, ocrMs: pending.ocrMs, frameAgeMs: pending.frameAgeMs, source: pending.source)
+  }
+
+  // MARK: Ask about the text
+
+  /// The page read so far, as one passage per read (a cloud page grows as it streams in).
+  private func publishPage() {
+    let text = sentences.map(Self.spokenText).joined(separator: " ")
+    recentText.append(text, source: .read, key: "read-\(readID)")
+  }
+
+  /// A sentence as it is spoken: withheld numbers stay withheld.
+  static func spokenText(_ sentence: RenderedSentence) -> String {
+    sentence.chunks.map(\.text).joined(separator: " ")
   }
 
   // MARK: Helpers

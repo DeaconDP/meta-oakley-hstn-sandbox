@@ -26,37 +26,57 @@ enum HandsFreeMode {
   }
 }
 
-/// The features the toolbox lists and "list tools" names. The reader is the one real tool; status
-/// and settings are listed so a new user can find them.
+/// What the toolbox lists and "list tools" names: the six tools (ToolID), then status and
+/// settings, so a new user can find them.
 enum HandsFreeTool: String, CaseIterable, Identifiable, Sendable {
   case reader
+  case mail
+  case labels
+  case watch
+  case ask
+  case light
   case status
   case settings
 
   var id: String { rawValue }
 
-  var title: String {
+  /// The tool this row opens, if it is one.
+  var tool: ToolID? {
     switch self {
-    case .reader: "Read text"
-    case .status: "Glasses status"
-    case .settings: "Settings"
+    case .reader: .read
+    case .mail: .mail
+    case .labels: .labels
+    case .watch: .watch
+    case .ask: .ask
+    case .light: .light
+    case .status, .settings: nil
     }
+  }
+
+  init(_ tool: ToolID) {
+    switch tool {
+    case .read: self = .reader
+    case .mail: self = .mail
+    case .labels: self = .labels
+    case .watch: self = .watch
+    case .ask: self = .ask
+    case .light: self = .light
+    }
+  }
+
+  var title: String {
+    if let tool { return tool.title }
+    return self == .status ? "Camera status" : "Settings"
   }
 
   var summary: String {
-    switch self {
-    case .reader: "Reads printed text aloud, word for word."
-    case .status: "Says whether your glasses are ready, and their battery."
-    case .settings: "Voice, speed, answer length and the glasses display."
-    }
+    if let tool { return tool.summary }
+    return self == .status ? "Says whether the camera is ready to read." : "Voice, speed, answer length and the glasses display."
   }
 
   var icon: String {
-    switch self {
-    case .reader: "text.viewfinder"
-    case .status: "checkmark.circle"
-    case .settings: "gearshape.fill"
-    }
+    if let tool { return tool.systemImage }
+    return self == .status ? "checkmark.circle" : "gearshape.fill"
   }
 
   /// The spoken command that does the same as tapping it.
@@ -65,6 +85,7 @@ enum HandsFreeTool: String, CaseIterable, Identifiable, Sendable {
     case .reader: .read
     case .status: .status
     case .settings: .openSettings
+    default: tool.map(VoiceCommand.open) ?? .help
     }
   }
 }
